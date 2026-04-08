@@ -1,9 +1,11 @@
 package com.apihub.common.web;
 
 import com.apihub.common.config.SecurityConfig;
+import com.apihub.auth.service.JwtTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,6 +19,9 @@ class HealthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockBean
+    private JwtTokenService jwtTokenService;
 
     @Test
     void shouldReturnOkWhenCheckingHealth() throws Exception {

@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { PanelCard, SectionHeader } from "@api-hub/ui";
 
+import { LoginForm } from "../../features/auth/components/login-form";
+
 export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl items-center justify-center p-8">
@@ -10,23 +12,25 @@ export default function LoginPage() {
         <section className="hidden rounded-[2rem] border border-white/50 bg-white/50 p-10 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur lg:flex lg:flex-col lg:justify-between">
           <div className="space-y-4">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-slate-500">ApiHub Console</p>
-            <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-slate-950">统一接入、管理与审计你的 API 项目。</h1>
+            <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-slate-950">
+              Shape, review, and publish your API workspace from a single console.
+            </h1>
             <p className="max-w-lg text-base leading-7 text-slate-600">
-              当前页面只提供控制台入口骨架，用于验证前端路由、基础样式和工作台入口链路。
+              Raycast-inspired cards, grouped navigation, and a focused editing surface for your evolving API catalogue.
             </p>
           </div>
           <div className="grid gap-4 text-sm text-slate-600 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4">
               <div className="text-2xl font-semibold text-slate-950">01</div>
-              <p className="mt-2">统一登录入口</p>
+              <p className="mt-2">Credential-based entry</p>
             </div>
             <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4">
               <div className="text-2xl font-semibold text-slate-950">02</div>
-              <p className="mt-2">项目控制台路由</p>
+              <p className="mt-2">Project dashboard</p>
             </div>
             <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4">
               <div className="text-2xl font-semibold text-slate-950">03</div>
-              <p className="mt-2">工作台占位页面</p>
+              <p className="mt-2">Endpoint workbench</p>
             </div>
           </div>
         </section>
@@ -39,22 +43,9 @@ export default function LoginPage() {
           >
             <PanelCard>
               <div className="w-full min-w-[min(26rem,calc(100vw-4rem))] max-w-md space-y-6">
-                <SectionHeader title="登录 ApiHub" description="使用本地账号进入控制台" />
-                <div className="space-y-3">
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                    placeholder="用户名"
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                    placeholder="密码"
-                    type="password"
-                  />
-                  <button className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white transition hover:bg-slate-800">
-                    登录
-                  </button>
-                </div>
-                <p className="text-sm text-slate-500">登录后将进入 `/console/projects` 项目控制台。</p>
+                <SectionHeader title="Sign in to ApiHub" description="Use the local account provisioned by the backend seed data." />
+                <LoginForm />
+                <p className="text-sm text-slate-500">After login you will be redirected to `/console/projects`.</p>
               </div>
             </PanelCard>
           </motion.div>

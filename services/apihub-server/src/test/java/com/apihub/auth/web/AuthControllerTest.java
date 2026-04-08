@@ -2,6 +2,7 @@ package com.apihub.auth.web;
 
 import com.apihub.auth.model.LoginResponse;
 import com.apihub.auth.service.AuthService;
+import com.apihub.auth.service.JwtTokenService;
 import com.apihub.common.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private JwtTokenService jwtTokenService;
 
     @Test
     void shouldLoginSuccessfully() throws Exception {
