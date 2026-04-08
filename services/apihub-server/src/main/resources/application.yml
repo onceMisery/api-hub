@@ -1,0 +1,8 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${APIHUB_DB_URL:jdbc:mysql://localhost:3306/apihub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
+    username: ${APIHUB_DB_USERNAME:root}
+    password: ${APIHUB_DB_PASSWORD:root}
