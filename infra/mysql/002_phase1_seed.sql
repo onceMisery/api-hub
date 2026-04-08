@@ -29,3 +29,101 @@ INSERT INTO space (
   1,
   'active'
 );
+
+INSERT INTO project (
+  id,
+  space_id,
+  name,
+  project_key,
+  description,
+  owner_id,
+  status
+) VALUES (
+  1,
+  1,
+  'Default Project',
+  'default',
+  'Seed project for phase 1 workbench',
+  1,
+  'active'
+);
+
+INSERT INTO module (
+  id,
+  project_id,
+  name,
+  module_key,
+  sort_order,
+  created_by
+) VALUES (
+  1,
+  1,
+  'Core',
+  'core-1',
+  0,
+  1
+);
+
+INSERT INTO api_group (
+  id,
+  module_id,
+  name,
+  group_key,
+  sort_order,
+  created_by
+) VALUES (
+  1,
+  1,
+  'User APIs',
+  'user-apis-1',
+  0,
+  1
+);
+
+INSERT INTO api_endpoint (
+  id,
+  project_id,
+  module_id,
+  group_id,
+  name,
+  description,
+  route_key,
+  http_method,
+  path,
+  status,
+  sort_order,
+  created_by,
+  updated_by
+) VALUES (
+  1,
+  1,
+  1,
+  1,
+  'Get User',
+  'Seed endpoint for project workbench',
+  'GET:/users/{id}',
+  'GET',
+  '/users/{id}',
+  'draft',
+  0,
+  1,
+  1
+);
+
+INSERT INTO api_version (
+  id,
+  endpoint_id,
+  revision_no,
+  version_label,
+  snapshot_json,
+  change_summary,
+  created_by
+) VALUES (
+  1,
+  1,
+  1,
+  'v1',
+  JSON_OBJECT('path', '/users/{id}', 'method', 'GET'),
+  'Initial seed version',
+  1
+);

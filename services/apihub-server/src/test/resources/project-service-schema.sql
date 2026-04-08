@@ -1,0 +1,70 @@
+CREATE TABLE sys_user (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(64) NOT NULL,
+  display_name VARCHAR(128) NOT NULL,
+  email VARCHAR(128) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE space (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  space_key VARCHAR(64) NOT NULL,
+  owner_id BIGINT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE project (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  space_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  project_key VARCHAR(64) NOT NULL,
+  description TEXT,
+  owner_id BIGINT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE module (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  module_key VARCHAR(64) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL
+);
+
+CREATE TABLE api_group (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  module_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  group_key VARCHAR(128) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL
+);
+
+CREATE TABLE api_endpoint (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  module_id BIGINT NOT NULL,
+  group_id BIGINT NULL,
+  name VARCHAR(256) NOT NULL,
+  description TEXT,
+  route_key VARCHAR(640) NOT NULL,
+  http_method VARCHAR(16) NOT NULL,
+  path VARCHAR(512) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL
+);
+
+CREATE TABLE api_version (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  revision_no INT NOT NULL,
+  version_label VARCHAR(64),
+  snapshot_json CLOB NOT NULL,
+  change_summary TEXT,
+  created_by BIGINT NOT NULL
+);
