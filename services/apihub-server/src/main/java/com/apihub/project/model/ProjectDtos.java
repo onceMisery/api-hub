@@ -48,13 +48,36 @@ public final class ProjectDtos {
     public record GroupDetail(Long id, Long moduleId, String name) {
     }
 
-    public record CreateEnvironmentRequest(String name, String baseUrl, Boolean isDefault) {
+    public record EnvironmentEntry(String name, String value) {
     }
 
-    public record UpdateEnvironmentRequest(String name, String baseUrl, Boolean isDefault) {
+    public record CreateEnvironmentRequest(
+            String name,
+            String baseUrl,
+            Boolean isDefault,
+            List<EnvironmentEntry> variables,
+            List<EnvironmentEntry> defaultHeaders
+    ) {
     }
 
-    public record EnvironmentDetail(Long id, Long projectId, String name, String baseUrl, boolean isDefault) {
+    public record UpdateEnvironmentRequest(
+            String name,
+            String baseUrl,
+            Boolean isDefault,
+            List<EnvironmentEntry> variables,
+            List<EnvironmentEntry> defaultHeaders
+    ) {
+    }
+
+    public record EnvironmentDetail(
+            Long id,
+            Long projectId,
+            String name,
+            String baseUrl,
+            boolean isDefault,
+            List<EnvironmentEntry> variables,
+            List<EnvironmentEntry> defaultHeaders
+    ) {
     }
 
     public record EndpointListResponse(List<EndpointDetail> endpoints) {

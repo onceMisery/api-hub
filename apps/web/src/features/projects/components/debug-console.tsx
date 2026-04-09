@@ -1,15 +1,17 @@
 "use client";
 
-import type { DebugExecutionResult, EndpointDetail, EnvironmentDetail, ExecuteDebugPayload } from "@api-hub/api-sdk";
+import type { DebugExecutionResult, DebugHistoryItem, EndpointDetail, EnvironmentDetail, ExecuteDebugPayload } from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
 
 type DebugConsoleProps = {
   endpoint: EndpointDetail | null;
   environment: EnvironmentDetail | null;
+  history: DebugHistoryItem[];
+  isLoadingHistory: boolean;
   onExecute: (payload: ExecuteDebugPayload) => Promise<DebugExecutionResult>;
 };
 
-export function DebugConsole({ endpoint, environment, onExecute }: DebugConsoleProps) {
+export function DebugConsole({ endpoint, environment, history, isLoadingHistory, onExecute }: DebugConsoleProps) {
   const [queryString, setQueryString] = useState("");
   const [headersText, setHeadersText] = useState("");
   const [body, setBody] = useState("");
@@ -20,6 +22,7 @@ export function DebugConsole({ endpoint, environment, onExecute }: DebugConsoleP
   useEffect(() => {
     setError(null);
     setResult(null);
+    setHeadersText(formatHeaderEntries(environment?.defaultHeaders ?? []));
   }, [endpoint?.id, environment?.id]);
 
   const previewUrl = useMemo(() => buildPreviewUrl(environment?.baseUrl, endpoint?.path, queryString), [environment?.baseUrl, endpoint?.path, queryString]);
@@ -154,6 +157,28 @@ export function DebugConsole({ endpoint, environment, onExecute }: DebugConsoleP
           </Field>
         </div>
       ) : null}
+
+      <div className="mt-5 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recent history</p>
+        <div className="mt-3 space-y-3">
+          {isLoadingHistory ? (
+            <p className="text-sm text-slate-500">Loading history...</p>
+          ) : history.length === 0 ? (
+            <p className="text-sm text-slate-500">No debug history yet.</p>
+          ) : (
+            history.map((item) => (
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3" key={item.id}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{item.statusCode}</span>
+                  <span className="text-xs text-slate-500">{item.durationMs} ms</span>
+                  <span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</span>
+                </div>
+                <p className="mt-2 font-mono text-xs text-slate-600">{item.finalUrl}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </section>
   );
 }
@@ -190,6 +215,10 @@ function buildPreviewUrl(baseUrl?: string, path?: string, queryString?: string) 
   const normalizedQuery = queryString?.trim().replace(/^\?/, "") ?? "";
 
   return normalizedQuery ? `${normalizedBaseUrl}${normalizedPath}?${normalizedQuery}` : `${normalizedBaseUrl}${normalizedPath}`;
+}
+
+function formatHeaderEntries(entries: { name: string; value: string }[]) {
+  return entries.map((entry) => `${entry.name}: ${entry.value}`.trimEnd()).join("\n");
 }
 
 function Field({ children, label }: { children: React.ReactNode; label: string }) {

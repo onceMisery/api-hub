@@ -8,6 +8,7 @@ const {
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
+  fetchDebugHistory,
   fetchEnvironments,
   executeDebug,
   createModule,
@@ -32,6 +33,7 @@ const {
   fetchEndpointParameters: vi.fn(),
   fetchEndpointResponses: vi.fn(),
   fetchEndpointVersions: vi.fn(),
+  fetchDebugHistory: vi.fn(),
   fetchEnvironments: vi.fn(),
   executeDebug: vi.fn(),
   createModule: vi.fn(),
@@ -63,6 +65,7 @@ vi.mock("@api-hub/api-sdk", () => ({
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
+  fetchDebugHistory,
   fetchEnvironments,
   executeDebug,
   createModule,
@@ -142,8 +145,9 @@ describe("ProjectShell", () => {
     fetchEndpointParameters.mockResolvedValue({ data: [] });
     fetchEndpointResponses.mockResolvedValue({ data: [] });
     fetchEndpointVersions.mockResolvedValue({ data: [] });
+    fetchDebugHistory.mockResolvedValue({ data: [] });
     fetchEnvironments.mockResolvedValue({
-      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true }]
+      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] }]
     });
     executeDebug.mockResolvedValue({
       data: {
@@ -156,9 +160,9 @@ describe("ProjectShell", () => {
       }
     });
     createModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
-    createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false } });
+    createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [] } });
     updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
-    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true } });
+    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] } });
     deleteModule.mockResolvedValue({ data: null });
     createGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
     updateGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
@@ -383,8 +387,10 @@ describe("ProjectShell", () => {
     await waitFor(() =>
       expect(createEnvironment).toHaveBeenCalledWith(1, {
         baseUrl: "https://staging.dev",
+        defaultHeaders: [],
         isDefault: false,
-        name: "Staging"
+        name: "Staging",
+        variables: []
       })
     );
 
@@ -397,8 +403,10 @@ describe("ProjectShell", () => {
     await waitFor(() =>
       expect(updateEnvironment).toHaveBeenCalledWith(41, {
         baseUrl: "https://local.dev",
+        defaultHeaders: [],
         isDefault: true,
-        name: "Production"
+        name: "Production",
+        variables: []
       })
     );
 

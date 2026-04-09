@@ -1,9 +1,13 @@
 package com.apihub.project.repository;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
@@ -26,6 +30,7 @@ public class ProjectRepository {
 
     private static final long DEFAULT_SPACE_ID = 1L;
     private static final long DEFAULT_USER_ID = 1L;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final RowMapper<ProjectDetail> PROJECT_ROW_MAPPER = (rs, rowNum) -> new ProjectDetail(
             rs.getLong("id"),
@@ -48,10 +53,11 @@ public class ProjectRepository {
             rs.getLong("project_id"),
             rs.getString("name"),
             rs.getString("base_url"),
-            rs.getBoolean("is_default"));
+            rs.getBoolean("is_default"),
+            deserializeEntries(rs.getString("variables_json")),
+            deserializeEntries(rs.getString("default_headers_json")));
 
     private final JdbcTemplate jdbcTemplate;
-
     public ProjectRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -220,7 +226,7 @@ public class ProjectRepository {
 
     public List<EnvironmentDetail> listEnvironments(Long projectId) {
         return jdbcTemplate.query("""
-                select id, project_id, name, base_url, is_default
+                select id, project_id, name, base_url, is_default, variables_json, default_headers_json
                 from environment
                 where project_id = ?
                 order by is_default desc, id
@@ -229,7 +235,7 @@ public class ProjectRepository {
 
     public Optional<EnvironmentDetail> findEnvironment(Long environmentId) {
         return jdbcTemplate.query("""
-                select id, project_id, name, base_url, is_default
+                select id, project_id, name, base_url, is_default, variables_json, default_headers_json
                 from environment
                 where id = ?
                 """, ENVIRONMENT_ROW_MAPPER, environmentId).stream().findFirst();
@@ -243,14 +249,16 @@ public class ProjectRepository {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
-                    insert into environment (project_id, name, base_url, is_default, created_by)
-                    values (?, ?, ?, ?, ?)
+                    insert into environment (project_id, name, base_url, is_default, variables_json, default_headers_json, created_by)
+                    values (?, ?, ?, ?, ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, projectId);
             statement.setString(2, request.name());
             statement.setString(3, request.baseUrl());
             statement.setBoolean(4, Boolean.TRUE.equals(request.isDefault()));
-            statement.setLong(5, DEFAULT_USER_ID);
+            statement.setString(5, serializeEntries(request.variables()));
+            statement.setString(6, serializeEntries(request.defaultHeaders()));
+            statement.setLong(7, DEFAULT_USER_ID);
             return statement;
         }, keyHolder);
         return findEnvironment(requireGeneratedId(keyHolder)).orElseThrow();
@@ -264,12 +272,14 @@ public class ProjectRepository {
 
         jdbcTemplate.update("""
                 update environment
-                set name = ?, base_url = ?, is_default = ?
+                set name = ?, base_url = ?, is_default = ?, variables_json = ?, default_headers_json = ?
                 where id = ?
                 """,
                 request.name(),
                 request.baseUrl(),
                 Boolean.TRUE.equals(request.isDefault()),
+                serializeEntries(request.variables()),
+                serializeEntries(request.defaultHeaders()),
                 environmentId);
         return findEnvironment(environmentId).orElseThrow();
     }
@@ -314,6 +324,27 @@ public class ProjectRepository {
         String slug = value == null ? "" : value.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-");
         slug = slug.replaceAll("(^-+|-+$)", "");
         return slug.isBlank() ? "item" : slug;
+    }
+
+    private static List<EnvironmentEntry> deserializeEntries(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return OBJECT_MAPPER.readValue(json, new TypeReference<List<EnvironmentEntry>>() {
+            });
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to parse environment JSON", exception);
+        }
+    }
+
+    private String serializeEntries(List<EnvironmentEntry> entries) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(entries == null ? List.of() : entries);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize environment JSON", exception);
+        }
     }
 
     public record ModuleReference(Long id, Long projectId) {

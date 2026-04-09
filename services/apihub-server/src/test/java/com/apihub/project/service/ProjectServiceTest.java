@@ -6,6 +6,7 @@ import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
@@ -43,8 +44,18 @@ class ProjectServiceTest {
 
         var project = projectService.createProject(new CreateProjectRequest("Demo", "demo", "first project"));
         var updatedProject = projectService.updateProject(project.id(), new UpdateProjectRequest("Demo Updated", "desc"));
-        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest("Local", "https://local.dev", true));
-        var updatedEnvironment = projectService.updateEnvironment(environment.id(), new UpdateEnvironmentRequest("Staging", "https://staging.dev", true));
+        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
+                "Local",
+                "https://local.dev",
+                true,
+                java.util.List.of(new EnvironmentEntry("token", "dev-token")),
+                java.util.List.of(new EnvironmentEntry("Authorization", "Bearer {{token}}"))));
+        var updatedEnvironment = projectService.updateEnvironment(environment.id(), new UpdateEnvironmentRequest(
+                "Staging",
+                "https://staging.dev",
+                true,
+                java.util.List.of(new EnvironmentEntry("token", "staging-token")),
+                java.util.List.of(new EnvironmentEntry("X-App", "apihub"))));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -84,6 +95,8 @@ class ProjectServiceTest {
         assertThat(updatedProject.name()).isEqualTo("Demo Updated");
         assertThat(environment.name()).isEqualTo("Local");
         assertThat(updatedEnvironment.baseUrl()).isEqualTo("https://staging.dev");
+        assertThat(updatedEnvironment.variables()).containsExactly(new EnvironmentEntry("token", "staging-token"));
+        assertThat(updatedEnvironment.defaultHeaders()).containsExactly(new EnvironmentEntry("X-App", "apihub"));
         assertThat(projectService.listEnvironments(project.id())).extracting("name").containsExactly("Staging");
         assertThat(renamedModule.name()).isEqualTo("Core Services");
         assertThat(renamedGroup.name()).isEqualTo("User Management");
@@ -103,7 +116,12 @@ class ProjectServiceTest {
     @Test
     void shouldDeleteEndpointGroupAndModule() {
         var project = projectService.createProject(new CreateProjectRequest("Cleanup", "cleanup", "cleanup project"));
-        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest("Local", "https://cleanup.dev", false));
+        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
+                "Local",
+                "https://cleanup.dev",
+                false,
+                java.util.List.of(),
+                java.util.List.of()));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Legacy"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("Deprecated"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(

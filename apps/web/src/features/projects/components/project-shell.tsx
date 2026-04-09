@@ -13,6 +13,7 @@ import {
   deleteModule,
   fetchEndpoint,
   fetchEnvironments,
+  fetchDebugHistory,
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
@@ -27,6 +28,7 @@ import {
   type EnvironmentDetail,
   type CreateEnvironmentPayload,
   type DebugExecutionResult,
+  type DebugHistoryItem,
   type EndpointDetail,
   type ModuleTreeItem,
   type ParameterDetail,
@@ -57,11 +59,13 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<number | null>(null);
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
   const [endpoint, setEndpoint] = useState<EndpointDetail | null>(null);
+  const [debugHistory, setDebugHistory] = useState<DebugHistoryItem[]>([]);
   const [parameters, setParameters] = useState<ParameterDetail[]>([]);
   const [responses, setResponses] = useState<ResponseDetail[]>([]);
   const [versions, setVersions] = useState<VersionDetail[]>([]);
   const [isLoadingTree, setIsLoadingTree] = useState(true);
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,6 +79,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   useEffect(() => {
     if (!selectedEndpointId) {
       setEndpoint(null);
+      setDebugHistory([]);
       setParameters([]);
       setResponses([]);
       setVersions([]);
@@ -127,6 +132,43 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       isMounted = false;
     };
   }, [selectedEndpointId]);
+
+  useEffect(() => {
+    if (!selectedEndpointId) {
+      setDebugHistory([]);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingHistory(true);
+
+    void fetchDebugHistory(projectId, selectedEndpointId, 10)
+      .then((response) => {
+        if (isMounted) {
+          setDebugHistory(response.data);
+        }
+      })
+      .catch((loadError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (handleUnauthorized(loadError)) {
+          return;
+        }
+
+        setError(loadError instanceof Error ? loadError.message : "Failed to load debug history");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingHistory(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId, selectedEndpointId]);
 
   const treeStats = useMemo(() => {
     const groupCount = modules.reduce((count, module) => count + module.groups.length, 0);
@@ -235,7 +277,13 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onUpdateEnvironment={handleUpdateEnvironment}
             selectedEnvironmentId={selectedEnvironmentId}
           />
-          <DebugConsole endpoint={endpoint} environment={selectedEnvironment} onExecute={handleExecuteDebug} />
+          <DebugConsole
+            endpoint={endpoint}
+            environment={selectedEnvironment}
+            history={debugHistory}
+            isLoadingHistory={isLoadingHistory}
+            onExecute={handleExecuteDebug}
+          />
           <EndpointEditor
             endpoint={endpoint}
             isLoading={isLoadingEndpoint}
@@ -613,6 +661,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
     try {
       const response = await executeDebug(payload);
+      if (selectedEndpointId) {
+        const historyResponse = await fetchDebugHistory(projectId, selectedEndpointId, 10);
+        setDebugHistory(historyResponse.data);
+      }
       return response.data;
     } catch (executionError) {
       if (handleUnauthorized(executionError)) {

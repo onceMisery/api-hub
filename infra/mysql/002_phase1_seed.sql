@@ -54,6 +54,8 @@ INSERT INTO environment (
   name,
   base_url,
   is_default,
+  variables_json,
+  default_headers_json,
   created_by
 ) VALUES (
   1,
@@ -61,6 +63,8 @@ INSERT INTO environment (
   'Local',
   'https://local.dev',
   1,
+  JSON_ARRAY(),
+  JSON_ARRAY(),
   1
 );
 

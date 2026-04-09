@@ -1,6 +1,6 @@
 "use client";
 
-import type { CreateEnvironmentPayload, EnvironmentDetail, UpdateEnvironmentPayload } from "@api-hub/api-sdk";
+import type { CreateEnvironmentPayload, EnvironmentDetail, EnvironmentEntry, UpdateEnvironmentPayload } from "@api-hub/api-sdk";
 import { useState } from "react";
 
 type EnvironmentPanelProps = {
@@ -22,9 +22,13 @@ export function EnvironmentPanel({
 }: EnvironmentPanelProps) {
   const [createForm, setCreateForm] = useState<CreateEnvironmentPayload>({
     baseUrl: "",
+    defaultHeaders: [],
     isDefault: false,
-    name: ""
+    name: "",
+    variables: []
   });
+  const [createVariablesText, setCreateVariablesText] = useState("");
+  const [createHeadersText, setCreateHeadersText] = useState("");
 
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -45,14 +49,20 @@ export function EnvironmentPanel({
           void onCreateEnvironment({
             ...createForm,
             baseUrl: createForm.baseUrl.trim(),
-            name: createForm.name.trim()
-          }).then(() =>
+            defaultHeaders: parseEntries(createHeadersText, ":"),
+            name: createForm.name.trim(),
+            variables: parseEntries(createVariablesText, "=")
+          }).then(() => {
             setCreateForm({
               baseUrl: "",
+              defaultHeaders: [],
               isDefault: false,
-              name: ""
-            })
-          );
+              name: "",
+              variables: []
+            });
+            setCreateVariablesText("");
+            setCreateHeadersText("");
+          });
         }}
       >
         <Field label="New environment name">
@@ -71,6 +81,24 @@ export function EnvironmentPanel({
             onChange={(event) => setCreateForm((current) => ({ ...current, baseUrl: event.target.value }))}
             placeholder="https://staging.example.com"
             value={createForm.baseUrl}
+          />
+        </Field>
+        <Field label="New environment variables">
+          <textarea
+            aria-label="New environment variables"
+            className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setCreateVariablesText(event.target.value)}
+            placeholder={"token=dev-token\nuserId=31"}
+            value={createVariablesText}
+          />
+        </Field>
+        <Field label="New environment headers">
+          <textarea
+            aria-label="New environment headers"
+            className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setCreateHeadersText(event.target.value)}
+            placeholder={"Authorization: Bearer {{token}}\nX-App: ApiHub"}
+            value={createHeadersText}
           />
         </Field>
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
@@ -123,9 +151,13 @@ function EnvironmentCard({
 }) {
   const [draft, setDraft] = useState<UpdateEnvironmentPayload>({
     baseUrl: environment.baseUrl,
+    defaultHeaders: environment.defaultHeaders,
     isDefault: environment.isDefault,
-    name: environment.name
+    name: environment.name,
+    variables: environment.variables
   });
+  const [variablesText, setVariablesText] = useState(formatEntries(environment.variables, "="));
+  const [headersText, setHeadersText] = useState(formatEntries(environment.defaultHeaders, ":"));
 
   return (
     <div className={`rounded-[1.6rem] border p-4 transition ${isSelected ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-white"}`}>
@@ -166,6 +198,28 @@ function EnvironmentCard({
             value={draft.baseUrl}
           />
         </Field>
+        <Field label={`Environment ${environment.id} variables`} dark={isSelected}>
+          <textarea
+            aria-label={`Environment ${environment.id} variables`}
+            className={`min-h-24 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) => {
+              setVariablesText(event.target.value);
+              setDraft((current) => ({ ...current, variables: parseEntries(event.target.value, "=") }));
+            }}
+            value={variablesText}
+          />
+        </Field>
+        <Field label={`Environment ${environment.id} headers`} dark={isSelected}>
+          <textarea
+            aria-label={`Environment ${environment.id} headers`}
+            className={`min-h-24 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) => {
+              setHeadersText(event.target.value);
+              setDraft((current) => ({ ...current, defaultHeaders: parseEntries(event.target.value, ":") }));
+            }}
+            value={headersText}
+          />
+        </Field>
         <label className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isSelected ? "border-white/15 bg-white/10 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
           <input
             aria-label={`Environment ${environment.id} default`}
@@ -184,8 +238,10 @@ function EnvironmentCard({
           onClick={() =>
             void onUpdateEnvironment(environment.id, {
               baseUrl: draft.baseUrl.trim(),
+              defaultHeaders: draft.defaultHeaders,
               isDefault: draft.isDefault,
-              name: draft.name.trim()
+              name: draft.name.trim(),
+              variables: draft.variables
             })
           }
           type="button"
@@ -212,4 +268,27 @@ function Field({ children, dark = false, label }: { children: React.ReactNode; d
       {children}
     </label>
   );
+}
+
+function parseEntries(value: string, separator: ":" | "="): EnvironmentEntry[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf(separator);
+      if (separatorIndex === -1) {
+        return { name: line.trim(), value: "" };
+      }
+
+      return {
+        name: line.slice(0, separatorIndex).trim(),
+        value: line.slice(separatorIndex + 1).trim()
+      };
+    })
+    .filter((entry) => entry.name);
+}
+
+function formatEntries(entries: EnvironmentEntry[], separator: ":" | "=") {
+  return entries.map((entry) => `${entry.name}${separator} ${entry.value}`.trimEnd()).join("\n");
 }

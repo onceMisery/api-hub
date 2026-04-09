@@ -59,12 +59,19 @@ export type GroupDetail = {
   name: string;
 };
 
+export type EnvironmentEntry = {
+  name: string;
+  value: string;
+};
+
 export type EnvironmentDetail = {
   id: number;
   projectId: number;
   name: string;
   baseUrl: string;
   isDefault: boolean;
+  variables: EnvironmentEntry[];
+  defaultHeaders: EnvironmentEntry[];
 };
 
 export type CreateModulePayload = {
@@ -101,12 +108,16 @@ export type CreateEnvironmentPayload = {
   name: string;
   baseUrl: string;
   isDefault: boolean;
+  variables: EnvironmentEntry[];
+  defaultHeaders: EnvironmentEntry[];
 };
 
 export type UpdateEnvironmentPayload = {
   name: string;
   baseUrl: string;
   isDefault: boolean;
+  variables: EnvironmentEntry[];
+  defaultHeaders: EnvironmentEntry[];
 };
 
 export type ParameterDetail = {
@@ -177,6 +188,22 @@ export type DebugExecutionResult = {
   responseHeaders: DebugHeader[];
   responseBody: string;
   durationMs: number;
+};
+
+export type DebugHistoryItem = {
+  id: number;
+  projectId: number;
+  environmentId: number;
+  endpointId: number;
+  method: string;
+  finalUrl: string;
+  requestHeaders: DebugHeader[];
+  requestBody: string;
+  statusCode: number;
+  responseHeaders: DebugHeader[];
+  responseBody: string;
+  durationMs: number;
+  createdAt: string;
 };
 
 export function fetchProjects() {
@@ -313,4 +340,13 @@ export function executeDebug(payload: ExecuteDebugPayload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+}
+
+export function fetchDebugHistory(projectId: number, endpointId?: number, limit = 10) {
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (endpointId) {
+    searchParams.set("endpointId", String(endpointId));
+  }
+
+  return apiFetch<DebugHistoryItem[]>(`/api/v1/projects/${projectId}/debug-history?${searchParams.toString()}`);
 }

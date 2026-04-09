@@ -18,7 +18,9 @@ describe("EnvironmentPanel", () => {
             projectId: 1,
             name: "Local",
             baseUrl: "https://local.dev",
-            isDefault: true
+            isDefault: true,
+            variables: [{ name: "token", value: "dev-token" }],
+            defaultHeaders: [{ name: "Authorization", value: "Bearer {{token}}" }]
           }
         ]}
         onCreateEnvironment={onCreateEnvironment}
@@ -31,26 +33,33 @@ describe("EnvironmentPanel", () => {
 
     fireEvent.change(screen.getByLabelText("New environment name"), { target: { value: "Staging" } });
     fireEvent.change(screen.getByLabelText("New environment base URL"), { target: { value: "https://staging.dev" } });
+    fireEvent.change(screen.getByLabelText("New environment variables"), { target: { value: "token=staging-token" } });
+    fireEvent.change(screen.getByLabelText("New environment headers"), { target: { value: "Authorization: Bearer {{token}}" } });
     fireEvent.click(screen.getByRole("button", { name: "Add environment" }));
 
     await waitFor(() =>
       expect(onCreateEnvironment).toHaveBeenCalledWith({
         baseUrl: "https://staging.dev",
+        defaultHeaders: [{ name: "Authorization", value: "Bearer {{token}}" }],
         isDefault: false,
-        name: "Staging"
+        name: "Staging",
+        variables: [{ name: "token", value: "staging-token" }]
       })
     );
 
     fireEvent.change(screen.getByLabelText("Environment 41 name"), { target: { value: "Production" } });
     fireEvent.change(screen.getByLabelText("Environment 41 base URL"), { target: { value: "https://prod.dev" } });
-    fireEvent.click(screen.getByLabelText("Environment 41 default"));
+    fireEvent.change(screen.getByLabelText("Environment 41 variables"), { target: { value: "token=prod-token" } });
+    fireEvent.change(screen.getByLabelText("Environment 41 headers"), { target: { value: "X-App: api-hub" } });
     fireEvent.click(screen.getByRole("button", { name: "Save environment 41" }));
 
     await waitFor(() =>
       expect(onUpdateEnvironment).toHaveBeenCalledWith(41, {
         baseUrl: "https://prod.dev",
-        isDefault: false,
-        name: "Production"
+        defaultHeaders: [{ name: "X-App", value: "api-hub" }],
+        isDefault: true,
+        name: "Production",
+        variables: [{ name: "token", value: "prod-token" }]
       })
     );
 

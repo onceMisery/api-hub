@@ -1,5 +1,6 @@
 package com.apihub.debug.model;
 
+import java.time.Instant;
 import java.util.List;
 
 public final class DebugDtos {
@@ -26,6 +27,23 @@ public final class DebugDtos {
             List<DebugHeader> responseHeaders,
             String responseBody,
             long durationMs
+    ) {
+    }
+
+    public record DebugHistoryItem(
+            Long id,
+            Long projectId,
+            Long environmentId,
+            Long endpointId,
+            String method,
+            String finalUrl,
+            List<DebugHeader> requestHeaders,
+            String requestBody,
+            int statusCode,
+            List<DebugHeader> responseHeaders,
+            String responseBody,
+            long durationMs,
+            Instant createdAt
     ) {
     }
 }

@@ -33,6 +33,8 @@ CREATE TABLE environment (
   name VARCHAR(128) NOT NULL,
   base_url VARCHAR(512) NOT NULL,
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  variables_json CLOB NOT NULL,
+  default_headers_json CLOB NOT NULL,
   created_by BIGINT NOT NULL
 );
 
@@ -107,4 +109,21 @@ CREATE TABLE api_version (
   snapshot_json CLOB NOT NULL,
   change_summary TEXT,
   created_by BIGINT NOT NULL
+);
+
+CREATE TABLE debug_history (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  environment_id BIGINT NOT NULL,
+  endpoint_id BIGINT NOT NULL,
+  http_method VARCHAR(16) NOT NULL,
+  final_url VARCHAR(1024) NOT NULL,
+  request_headers_json CLOB NOT NULL,
+  request_body CLOB,
+  response_status_code INT NOT NULL,
+  response_headers_json CLOB NOT NULL,
+  response_body CLOB,
+  duration_ms BIGINT NOT NULL,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

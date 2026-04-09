@@ -76,6 +76,8 @@ CREATE TABLE environment (
   name VARCHAR(128) NOT NULL,
   base_url VARCHAR(512) NOT NULL,
   is_default TINYINT(1) NOT NULL DEFAULT 0,
+  variables_json JSON NOT NULL,
+  default_headers_json JSON NOT NULL,
   created_by BIGINT NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -174,4 +176,27 @@ CREATE TABLE api_version (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_api_version_endpoint_revision (endpoint_id, revision_no)
+);
+
+CREATE TABLE debug_history (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  environment_id BIGINT NOT NULL,
+  endpoint_id BIGINT NOT NULL,
+  http_method VARCHAR(16) NOT NULL,
+  final_url VARCHAR(1024) NOT NULL,
+  request_headers_json JSON NOT NULL,
+  request_body LONGTEXT,
+  response_status_code INT NOT NULL,
+  response_headers_json JSON NOT NULL,
+  response_body LONGTEXT,
+  duration_ms BIGINT NOT NULL,
+  created_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY idx_debug_history_project_created (project_id, created_at DESC),
+  KEY idx_debug_history_endpoint_created (endpoint_id, created_at DESC),
+  CONSTRAINT fk_debug_history_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
+  CONSTRAINT fk_debug_history_environment FOREIGN KEY (environment_id) REFERENCES environment (id) ON DELETE CASCADE,
+  CONSTRAINT fk_debug_history_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
+  CONSTRAINT fk_debug_history_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
 );

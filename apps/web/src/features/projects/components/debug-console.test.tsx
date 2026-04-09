@@ -16,8 +16,34 @@ describe("DebugConsole", () => {
 
     render(
       <DebugConsole
+        history={[
+          {
+            createdAt: "2026-04-09T12:10:00Z",
+            durationMs: 35,
+            endpointId: 31,
+            environmentId: 41,
+            finalUrl: "https://local.dev/api/users/31?cached=true",
+            id: 101,
+            method: "GET",
+            projectId: 1,
+            requestBody: "",
+            requestHeaders: [{ name: "X-App", value: "ApiHub" }],
+            responseBody: "{\"cached\":true}",
+            responseHeaders: [{ name: "content-type", value: "application/json" }],
+            statusCode: 200
+          }
+        ]}
         endpoint={{ description: "Load user", groupId: 21, id: 31, method: "GET", name: "Get User", path: "/users/31" }}
-        environment={{ baseUrl: "https://local.dev/api", id: 41, isDefault: true, name: "Local", projectId: 1 }}
+        environment={{
+          baseUrl: "https://local.dev/api",
+          defaultHeaders: [{ name: "X-App", value: "ApiHub" }],
+          id: 41,
+          isDefault: true,
+          name: "Local",
+          projectId: 1,
+          variables: []
+        }}
+        isLoadingHistory={false}
         onExecute={onExecute}
       />
     );
@@ -38,7 +64,10 @@ describe("DebugConsole", () => {
       })
     );
 
-    expect(await screen.findByText("200")).toBeInTheDocument();
+    await screen.findByText("{\"ok\":true}");
+    expect(screen.getAllByText("200")).toHaveLength(2);
     expect(screen.getByText("{\"ok\":true}")).toBeInTheDocument();
+    expect(screen.getByText("Recent history")).toBeInTheDocument();
+    expect(screen.getByText("https://local.dev/api/users/31?cached=true")).toBeInTheDocument();
   });
 });
