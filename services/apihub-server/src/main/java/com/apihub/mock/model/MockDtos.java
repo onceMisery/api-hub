@@ -1,5 +1,6 @@
 package com.apihub.mock.model;
 
+import java.time.Instant;
 import java.util.List;
 
 public final class MockDtos {
@@ -33,6 +34,16 @@ public final class MockDtos {
             int statusCode,
             String mediaType,
             String body
+    ) {
+    }
+
+    public record MockReleaseDetail(
+            Long id,
+            Long endpointId,
+            int releaseNo,
+            String responseSnapshotJson,
+            String rulesSnapshotJson,
+            Instant createdAt
     ) {
     }
 }

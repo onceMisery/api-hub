@@ -204,6 +204,20 @@ CREATE TABLE mock_rule (
   CONSTRAINT fk_mock_rule_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user (id)
 );
 
+CREATE TABLE mock_release (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  release_no INT NOT NULL,
+  response_snapshot_json JSON NOT NULL,
+  rules_snapshot_json JSON NOT NULL,
+  created_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uk_mock_release_endpoint_release_no (endpoint_id, release_no),
+  KEY idx_mock_release_endpoint_created (endpoint_id, created_at DESC, id DESC),
+  CONSTRAINT fk_mock_release_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
+  CONSTRAINT fk_mock_release_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+);
+
 CREATE TABLE debug_history (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,

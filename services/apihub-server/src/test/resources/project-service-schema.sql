@@ -131,6 +131,17 @@ CREATE TABLE mock_rule (
   updated_by BIGINT NOT NULL
 );
 
+CREATE TABLE mock_release (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  release_no INT NOT NULL,
+  response_snapshot_json CLOB NOT NULL,
+  rules_snapshot_json CLOB NOT NULL,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (endpoint_id, release_no)
+);
+
 CREATE TABLE debug_history (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,

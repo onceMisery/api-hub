@@ -10,6 +10,7 @@ import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
+import com.apihub.mock.model.MockDtos.MockReleaseDetail;
 import com.apihub.mock.model.MockDtos.MockRuleDetail;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.project.repository.ProjectRepository.GroupReference;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
@@ -83,6 +85,13 @@ public class EndpointRepository {
             rs.getInt("status_code"),
             rs.getString("media_type"),
             rs.getString("body_json"));
+    private static final RowMapper<MockReleaseDetail> MOCK_RELEASE_ROW_MAPPER = (rs, rowNum) -> new MockReleaseDetail(
+            rs.getLong("id"),
+            rs.getLong("endpoint_id"),
+            rs.getInt("release_no"),
+            rs.getString("response_snapshot_json"),
+            rs.getString("rules_snapshot_json"),
+            rs.getTimestamp("created_at").toInstant());
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -318,6 +327,57 @@ public class EndpointRepository {
         }
     }
 
+    public List<MockReleaseDetail> listMockReleases(Long endpointId) {
+        return jdbcTemplate.query("""
+                select id,
+                       endpoint_id,
+                       release_no,
+                       response_snapshot_json,
+                       rules_snapshot_json,
+                       created_at
+                from mock_release
+                where endpoint_id = ?
+                order by release_no desc, id desc
+                """, MOCK_RELEASE_ROW_MAPPER, endpointId);
+    }
+
+    public Optional<MockReleaseDetail> findLatestMockRelease(Long endpointId) {
+        return jdbcTemplate.query("""
+                select id,
+                       endpoint_id,
+                       release_no,
+                       response_snapshot_json,
+                       rules_snapshot_json,
+                       created_at
+                from mock_release
+                where endpoint_id = ?
+                order by release_no desc, id desc
+                limit 1
+                """, MOCK_RELEASE_ROW_MAPPER, endpointId).stream().findFirst();
+    }
+
+    public MockReleaseDetail createMockRelease(Long endpointId, String responseSnapshotJson, String rulesSnapshotJson) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into mock_release (
+                        endpoint_id,
+                        release_no,
+                        response_snapshot_json,
+                        rules_snapshot_json,
+                        created_by
+                    ) values (?, ?, ?, ?, ?)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            statement.setLong(1, endpointId);
+            statement.setInt(2, nextMockReleaseNo(endpointId));
+            statement.setString(3, responseSnapshotJson);
+            statement.setString(4, rulesSnapshotJson);
+            statement.setLong(5, DEFAULT_USER_ID);
+            return statement;
+        }, keyHolder);
+        return findMockRelease(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
     public List<VersionDetail> listVersions(Long endpointId) {
         return jdbcTemplate.query("""
                 select id,
@@ -366,6 +426,19 @@ public class EndpointRepository {
                 """, VERSION_ROW_MAPPER, versionId).stream().findFirst();
     }
 
+    private Optional<MockReleaseDetail> findMockRelease(Long releaseId) {
+        return jdbcTemplate.query("""
+                select id,
+                       endpoint_id,
+                       release_no,
+                       response_snapshot_json,
+                       rules_snapshot_json,
+                       created_at
+                from mock_release
+                where id = ?
+                """, MOCK_RELEASE_ROW_MAPPER, releaseId).stream().findFirst();
+    }
+
     private int nextEndpointSortOrder(Long groupId) {
         Integer maxSort = jdbcTemplate.queryForObject(
                 "select coalesce(max(sort_order), -1) from api_endpoint where group_id = ?",
@@ -382,12 +455,33 @@ public class EndpointRepository {
         return maxRevision == null ? 1 : maxRevision + 1;
     }
 
+    private int nextMockReleaseNo(Long endpointId) {
+        Integer maxRelease = jdbcTemplate.queryForObject(
+                "select coalesce(max(release_no), 0) from mock_release where endpoint_id = ?",
+                Integer.class,
+                endpointId);
+        return maxRelease == null ? 1 : maxRelease + 1;
+    }
+
     private long requireGeneratedId(GeneratedKeyHolder keyHolder) {
-        Number key = keyHolder.getKey();
-        if (key == null) {
-            throw new IllegalStateException("Failed to generate primary key");
+        for (Map<String, Object> keyMap : keyHolder.getKeyList()) {
+            Object id = keyMap.get("id");
+            if (id instanceof Number number) {
+                return number.longValue();
+            }
+
+            Object uppercaseId = keyMap.get("ID");
+            if (uppercaseId instanceof Number number) {
+                return number.longValue();
+            }
         }
-        return key.longValue();
+
+        Number key = keyHolder.getKey();
+        if (key != null) {
+            return key.longValue();
+        }
+
+        throw new IllegalStateException("Failed to generate primary key");
     }
 
     private String routeKey(String method, String path) {
