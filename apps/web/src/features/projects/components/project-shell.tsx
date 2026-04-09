@@ -2,6 +2,7 @@
 
 import {
   createEndpoint,
+  executeDebug,
   createEnvironment,
   createGroup,
   createModule,
@@ -25,6 +26,7 @@ import {
   updateModule,
   type EnvironmentDetail,
   type CreateEnvironmentPayload,
+  type DebugExecutionResult,
   type EndpointDetail,
   type ModuleTreeItem,
   type ParameterDetail,
@@ -39,6 +41,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { EndpointEditor } from "./endpoint-editor";
+import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
 import { ProjectSidebar } from "./project-sidebar";
 
@@ -139,6 +142,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     };
   }, [modules]);
   const filteredModules = useMemo(() => filterModules(modules, searchQuery), [modules, searchQuery]);
+  const selectedEnvironment = useMemo(
+    () => environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
+    [environments, selectedEnvironmentId]
+  );
   const filteredStats = useMemo(() => {
     const groupCount = filteredModules.reduce((count, module) => count + module.groups.length, 0);
     const endpointCount = filteredModules.reduce(
@@ -228,6 +235,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onUpdateEnvironment={handleUpdateEnvironment}
             selectedEnvironmentId={selectedEnvironmentId}
           />
+          <DebugConsole endpoint={endpoint} environment={selectedEnvironment} onExecute={handleExecuteDebug} />
           <EndpointEditor
             endpoint={endpoint}
             isLoading={isLoadingEndpoint}
@@ -591,6 +599,28 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
       setError(saveError instanceof Error ? saveError.message : "Failed to save version snapshot");
       throw saveError;
+    }
+  }
+
+  async function handleExecuteDebug(payload: {
+    environmentId: number;
+    endpointId: number;
+    queryString: string;
+    headers: { name: string; value: string }[];
+    body: string;
+  }): Promise<DebugExecutionResult> {
+    setError(null);
+
+    try {
+      const response = await executeDebug(payload);
+      return response.data;
+    } catch (executionError) {
+      if (handleUnauthorized(executionError)) {
+        throw executionError;
+      }
+
+      setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request");
+      throw executionError;
     }
   }
 

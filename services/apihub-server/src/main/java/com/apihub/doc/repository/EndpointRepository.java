@@ -121,12 +121,13 @@ public class EndpointRepository {
 
     public Optional<EndpointReference> findEndpointReference(Long endpointId) {
         return jdbcTemplate.query("""
-                select id, group_id
+                select id, group_id, project_id
                 from api_endpoint
                 where id = ?
                 """, (rs, rowNum) -> new EndpointReference(
                 rs.getLong("id"),
-                rs.getLong("group_id")), endpointId).stream().findFirst();
+                rs.getLong("group_id"),
+                rs.getLong("project_id")), endpointId).stream().findFirst();
     }
 
     public EndpointDetail updateEndpoint(Long endpointId, UpdateEndpointRequest request) {
@@ -302,6 +303,6 @@ public class EndpointRepository {
         return method.toUpperCase() + ":" + path;
     }
 
-    public record EndpointReference(Long id, Long groupId) {
+    public record EndpointReference(Long id, Long groupId, Long projectId) {
     }
 }

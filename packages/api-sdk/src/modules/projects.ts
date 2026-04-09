@@ -157,6 +157,28 @@ export type CreateVersionPayload = {
   snapshotJson: string;
 };
 
+export type DebugHeader = {
+  name: string;
+  value: string;
+};
+
+export type ExecuteDebugPayload = {
+  environmentId: number;
+  endpointId: number;
+  queryString: string;
+  headers: DebugHeader[];
+  body: string;
+};
+
+export type DebugExecutionResult = {
+  method: string;
+  finalUrl: string;
+  statusCode: number;
+  responseHeaders: DebugHeader[];
+  responseBody: string;
+  durationMs: number;
+};
+
 export function fetchProjects() {
   return apiFetch<ProjectSummary[]>("/api/v1/projects");
 }
@@ -281,6 +303,13 @@ export function fetchEndpointVersions(endpointId: number) {
 
 export function createVersion(endpointId: number, payload: CreateVersionPayload) {
   return apiFetch<VersionDetail>(`/api/v1/endpoints/${endpointId}/versions`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function executeDebug(payload: ExecuteDebugPayload) {
+  return apiFetch<DebugExecutionResult>("/api/v1/debug/execute", {
     method: "POST",
     body: JSON.stringify(payload)
   });

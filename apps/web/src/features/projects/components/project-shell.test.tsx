@@ -9,6 +9,7 @@ const {
   fetchEndpointResponses,
   fetchEndpointVersions,
   fetchEnvironments,
+  executeDebug,
   createModule,
   createEnvironment,
   updateModule,
@@ -32,6 +33,7 @@ const {
   fetchEndpointResponses: vi.fn(),
   fetchEndpointVersions: vi.fn(),
   fetchEnvironments: vi.fn(),
+  executeDebug: vi.fn(),
   createModule: vi.fn(),
   createEnvironment: vi.fn(),
   updateModule: vi.fn(),
@@ -62,6 +64,7 @@ vi.mock("@api-hub/api-sdk", () => ({
   fetchEndpointResponses,
   fetchEndpointVersions,
   fetchEnvironments,
+  executeDebug,
   createModule,
   createEnvironment,
   updateModule,
@@ -141,6 +144,16 @@ describe("ProjectShell", () => {
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     fetchEnvironments.mockResolvedValue({
       data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true }]
+    });
+    executeDebug.mockResolvedValue({
+      data: {
+        durationMs: 48,
+        finalUrl: "https://local.dev/users/{id}?verbose=true",
+        method: "GET",
+        responseBody: "{\"ok\":true}",
+        responseHeaders: [{ name: "content-type", value: "application/json" }],
+        statusCode: 200
+      }
     });
     createModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
     createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false } });
