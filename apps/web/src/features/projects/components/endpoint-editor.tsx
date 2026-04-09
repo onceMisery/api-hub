@@ -226,6 +226,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => buildMockPreview(activePreviewRows, selectedPreviewKey),
     [activePreviewRows, selectedPreviewKey]
   );
+  const previewDetails = useMemo(
+    () => buildPreviewDetails(previewSource, mockRuleRows, selectedPreviewKey, mockPreview),
+    [mockPreview, mockRuleRows, previewSource, selectedPreviewKey]
+  );
 
   if (isLoading) {
     return (
@@ -710,6 +714,23 @@ export function EndpointEditor(props: EndpointEditorProps) {
             </Field>
           ) : null}
 
+          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview source details</p>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{previewDetails.badge}</span>
+              {previewDetails.priorityLabel ? (
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
+                  {previewDetails.priorityLabel}
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-3 space-y-2 text-sm text-slate-600">
+              {previewDetails.lines.map((line, index) => (
+                <p key={`${line}-${index}`}>{line}</p>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <PreviewMetric label="Mock URL" value={buildMockUrl(projectId, formState.path)} mono />
             <PreviewMetric label="Status" value={String(mockPreview.statusCode)} />
@@ -1108,6 +1129,45 @@ function buildRuleSummary(rule: MockRuleDraft) {
   }
 
   return conditions;
+}
+
+function buildPreviewDetails(
+  previewSource: PreviewSource,
+  mockRuleRows: MockRuleDraft[],
+  selectedPreviewKey: string,
+  mockPreview: { statusCode: number; mediaType: string; body: string }
+) {
+  const activeKey = selectedPreviewKey || `${mockPreview.statusCode}:${mockPreview.mediaType}`;
+  const matchingRule = mockRuleRows.find((rule) => {
+    if (!rule.enabled) {
+      return false;
+    }
+
+    const ruleKey = `${rule.statusCode}:${rule.mediaType || "application/json"}`;
+    return ruleKey === activeKey;
+  });
+
+  if (matchingRule) {
+    return {
+      badge: "Conditional rule override",
+      lines: [`Rule: ${matchingRule.ruleName || "Unnamed rule"}`, ...buildRuleSummary(matchingRule)],
+      priorityLabel: `Priority ${matchingRule.priority}`
+    };
+  }
+
+  if (previewSource === "latest-version") {
+    return {
+      badge: "Latest saved version",
+      lines: ["Preview is generated from the latest saved version snapshot.", `Status group: ${activeKey}`],
+      priorityLabel: null
+    };
+  }
+
+  return {
+    badge: "Current draft",
+    lines: ["Preview is generated from the current draft response rows.", `Status group: ${activeKey}`],
+    priorityLabel: null
+  };
 }
 
 function formatRulePreviewBody(body: string) {

@@ -463,4 +463,71 @@ describe("EndpointEditor", () => {
     const previewBody = previewBlocks[0].parentElement?.querySelector("pre");
     expect(previewBody).toHaveTextContent('"error": "token expired"');
   });
+
+  it("shows mock preview source details when a rule overrides the selected preview group", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          },
+          {
+            id: 2,
+            httpStatusCode: 401,
+            mediaType: "application/json",
+            name: "error",
+            dataType: "string",
+            required: true,
+            description: "Unauthorized",
+            exampleValue: "unauthorized",
+            sortOrder: 0
+          }
+        ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Preview status"), { target: { value: "401:application/json" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Preview source details")).toBeInTheDocument();
+      expect(screen.getByText("Conditional rule override")).toBeInTheDocument();
+      expect(screen.getByText("Rule: Unauthorized")).toBeInTheDocument();
+      expect(screen.getByText("Priority 100")).toBeInTheDocument();
+      expect(screen.getAllByText("query mode=strict").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("header x-scenario=unauthorized").length).toBeGreaterThan(0);
+    });
+  });
 });
