@@ -27,7 +27,6 @@ CREATE TABLE space (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_space_space_key (space_key),
-  CONSTRAINT fk_space_owner FOREIGN KEY (owner_id) REFERENCES sys_user (id),
   CONSTRAINT ck_space_status CHECK (status IN ('active', 'archived'))
 );
 
@@ -40,8 +39,6 @@ CREATE TABLE space_member (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_space_member_space_user (space_id, user_id),
-  CONSTRAINT fk_space_member_space FOREIGN KEY (space_id) REFERENCES space (id) ON DELETE CASCADE,
-  CONSTRAINT fk_space_member_user FOREIGN KEY (user_id) REFERENCES sys_user (id) ON DELETE CASCADE,
   CONSTRAINT ck_space_member_role CHECK (role_code IN ('space_admin', 'project_admin', 'editor', 'tester', 'viewer')),
   CONSTRAINT ck_space_member_status CHECK (member_status IN ('active', 'inactive'))
 );
@@ -57,8 +54,6 @@ CREATE TABLE project (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_project_space_key (space_id, project_key),
-  CONSTRAINT fk_project_space FOREIGN KEY (space_id) REFERENCES space (id) ON DELETE CASCADE,
-  CONSTRAINT fk_project_owner FOREIGN KEY (owner_id) REFERENCES sys_user (id),
   CONSTRAINT ck_project_status CHECK (status IN ('active', 'archived'))
 );
 
@@ -71,8 +66,6 @@ CREATE TABLE project_member (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_project_member_project_user (project_id, user_id),
-  CONSTRAINT fk_project_member_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
-  CONSTRAINT fk_project_member_user FOREIGN KEY (user_id) REFERENCES sys_user (id) ON DELETE CASCADE,
   CONSTRAINT ck_project_member_role CHECK (role_code IN ('project_admin', 'editor', 'tester', 'viewer')),
   CONSTRAINT ck_project_member_status CHECK (member_status IN ('active', 'inactive'))
 );
@@ -86,9 +79,7 @@ CREATE TABLE environment (
   created_by BIGINT NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY uk_environment_project_name (project_id, name),
-  CONSTRAINT fk_environment_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
-  CONSTRAINT fk_environment_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+  UNIQUE KEY uk_environment_project_name (project_id, name)
 );
 
 CREATE TABLE module (
@@ -100,9 +91,7 @@ CREATE TABLE module (
   created_by BIGINT NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY uk_module_project_key (project_id, module_key),
-  CONSTRAINT fk_module_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
-  CONSTRAINT fk_module_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+  UNIQUE KEY uk_module_project_key (project_id, module_key)
 );
 
 CREATE TABLE api_group (
@@ -114,9 +103,7 @@ CREATE TABLE api_group (
   created_by BIGINT NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY uk_api_group_module_key (module_id, group_key),
-  CONSTRAINT fk_api_group_module FOREIGN KEY (module_id) REFERENCES module (id) ON DELETE CASCADE,
-  CONSTRAINT fk_api_group_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+  UNIQUE KEY uk_api_group_module_key (module_id, group_key)
 );
 
 CREATE TABLE api_endpoint (
@@ -136,11 +123,6 @@ CREATE TABLE api_endpoint (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_api_endpoint_route (project_id, route_key),
-  CONSTRAINT fk_api_endpoint_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
-  CONSTRAINT fk_api_endpoint_module FOREIGN KEY (module_id) REFERENCES module (id) ON DELETE CASCADE,
-  CONSTRAINT fk_api_endpoint_group FOREIGN KEY (group_id) REFERENCES api_group (id) ON DELETE SET NULL,
-  CONSTRAINT fk_api_endpoint_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id),
-  CONSTRAINT fk_api_endpoint_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user (id),
   CONSTRAINT ck_api_endpoint_http_method CHECK (http_method IN ('GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS')),
   CONSTRAINT ck_api_endpoint_status CHECK (status IN ('draft', 'review', 'released', 'deprecated', 'archived'))
 );
@@ -160,8 +142,6 @@ CREATE TABLE api_parameter (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_api_parameter_node (endpoint_id, section_type, node_path),
-  CONSTRAINT fk_api_parameter_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
-  CONSTRAINT fk_api_parameter_parent FOREIGN KEY (parent_id) REFERENCES api_parameter (id) ON DELETE CASCADE,
   CONSTRAINT ck_api_parameter_section_type CHECK (section_type IN ('path', 'query', 'header', 'cookie', 'body'))
 );
 
@@ -180,9 +160,7 @@ CREATE TABLE api_response (
   sort_order INT NOT NULL DEFAULT 0,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY uk_api_response_node (endpoint_id, http_status_code, media_type, node_path),
-  CONSTRAINT fk_api_response_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
-  CONSTRAINT fk_api_response_parent FOREIGN KEY (parent_id) REFERENCES api_response (id) ON DELETE CASCADE
+  UNIQUE KEY uk_api_response_node (endpoint_id, http_status_code, media_type, node_path)
 );
 
 CREATE TABLE api_version (
@@ -195,7 +173,5 @@ CREATE TABLE api_version (
   created_by BIGINT NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY uk_api_version_endpoint_revision (endpoint_id, revision_no),
-  CONSTRAINT fk_api_version_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
-  CONSTRAINT fk_api_version_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+  UNIQUE KEY uk_api_version_endpoint_revision (endpoint_id, revision_no)
 );
