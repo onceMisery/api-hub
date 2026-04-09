@@ -283,4 +283,60 @@ describe("ProjectShell", () => {
     await waitFor(() => expect(fetchProjectTree).toHaveBeenCalledTimes(3));
     expect(screen.getByText("Pick an endpoint")).toBeInTheDocument();
   });
+
+  it("filters modules, groups, and endpoints from the tree search", async () => {
+    fetchProjectTree.mockReset().mockResolvedValueOnce({
+      data: {
+        modules: [
+          {
+            id: 11,
+            name: "Core",
+            groups: [
+              {
+                id: 21,
+                name: "Users",
+                endpoints: [{ id: 31, name: "Get User", method: "GET", path: "/users/{id}" }]
+              }
+            ]
+          },
+          {
+            id: 12,
+            name: "Analytics",
+            groups: [
+              {
+                id: 22,
+                name: "Dashboards",
+                endpoints: [{ id: 32, name: "Billing Overview", method: "GET", path: "/billing/overview" }]
+              }
+            ]
+          }
+        ]
+      }
+    });
+
+    fetchEndpoint.mockImplementation(async (endpointId: number) => ({
+      data: {
+        id: endpointId,
+        groupId: endpointId === 32 ? 22 : 21,
+        name: endpointId === 32 ? "Billing Overview" : "Get User",
+        method: "GET",
+        path: endpointId === 32 ? "/billing/overview" : "/users/{id}",
+        description: "Endpoint detail"
+      }
+    }));
+
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("Get User")).toBeInTheDocument();
+    expect(screen.getByText("Billing Overview")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search tree"), { target: { value: "billing" } });
+
+    expect(await screen.findByText("Billing Overview")).toBeInTheDocument();
+    expect(screen.queryByText("Get User")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search tree"), { target: { value: "missing" } });
+
+    expect(await screen.findByText("No matching nodes.")).toBeInTheDocument();
+  });
 });

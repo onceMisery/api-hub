@@ -41,6 +41,7 @@ type ProjectShellProps = {
 export function ProjectShell({ projectId }: ProjectShellProps) {
   const router = useRouter();
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
   const [endpoint, setEndpoint] = useState<EndpointDetail | null>(null);
   const [parameters, setParameters] = useState<ParameterDetail[]>([]);
@@ -123,6 +124,31 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       moduleCount: modules.length
     };
   }, [modules]);
+  const filteredModules = useMemo(() => filterModules(modules, searchQuery), [modules, searchQuery]);
+  const filteredStats = useMemo(() => {
+    const groupCount = filteredModules.reduce((count, module) => count + module.groups.length, 0);
+    const endpointCount = filteredModules.reduce(
+      (count, module) => count + module.groups.reduce((groupTotal, group) => groupTotal + group.endpoints.length, 0),
+      0
+    );
+
+    return {
+      endpointCount,
+      groupCount,
+      moduleCount: filteredModules.length
+    };
+  }, [filteredModules]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      return;
+    }
+
+    const visibleEndpointId = findExistingEndpointId(filteredModules, selectedEndpointId) ?? findFirstEndpointId(filteredModules);
+    if (visibleEndpointId !== selectedEndpointId) {
+      setSelectedEndpointId(visibleEndpointId);
+    }
+  }, [filteredModules, searchQuery, selectedEndpointId]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6 text-slate-900">
@@ -134,11 +160,21 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
               Card-based workspace for modules, grouped endpoints, and version snapshots backed by the phase 1 MySQL data model.
             </p>
+            <label className="mt-5 block max-w-md space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Search tree</span>
+              <input
+                aria-label="Search tree"
+                className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search modules, groups, endpoints, or paths"
+                value={searchQuery}
+              />
+            </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <StatCard label="Modules" value={treeStats.moduleCount} />
-            <StatCard label="Groups" value={treeStats.groupCount} />
-            <StatCard label="Endpoints" value={treeStats.endpointCount} />
+            <StatCard label="Modules" value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
+            <StatCard label="Groups" value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
+            <StatCard label="Endpoints" value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount} />
           </div>
         </div>
       </section>
@@ -154,7 +190,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           </aside>
         ) : (
           <ProjectSidebar
-            modules={modules}
+            emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
+            modules={filteredModules}
             onCreateEndpoint={handleCreateEndpoint}
             onCreateGroup={handleCreateGroup}
             onCreateModule={handleCreateModule}
@@ -514,4 +551,51 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );
+}
+
+function filterModules(modules: ModuleTreeItem[], rawQuery: string) {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) {
+    return modules;
+  }
+
+  return modules
+    .map((module) => {
+      const moduleMatches = module.name.toLowerCase().includes(query);
+      if (moduleMatches) {
+        return module;
+      }
+
+      const filteredGroups = module.groups
+        .map((group) => {
+          const groupMatches = group.name.toLowerCase().includes(query);
+          if (groupMatches) {
+            return group;
+          }
+
+          const filteredEndpoints = group.endpoints.filter((endpoint) =>
+            `${endpoint.name} ${endpoint.method} ${endpoint.path}`.toLowerCase().includes(query)
+          );
+
+          if (filteredEndpoints.length === 0) {
+            return null;
+          }
+
+          return {
+            ...group,
+            endpoints: filteredEndpoints
+          };
+        })
+        .filter((group): group is ModuleTreeItem["groups"][number] => group !== null);
+
+      if (filteredGroups.length === 0) {
+        return null;
+      }
+
+      return {
+        ...module,
+        groups: filteredGroups
+      };
+    })
+    .filter((module): module is ModuleTreeItem => module !== null);
 }

@@ -4,6 +4,7 @@ import type { ModuleTreeItem } from "@api-hub/api-sdk";
 import { useState } from "react";
 
 type ProjectSidebarProps = {
+  emptyStateMessage?: string | null;
   modules: ModuleTreeItem[];
   selectedEndpointId: number | null;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
@@ -19,6 +20,7 @@ type ProjectSidebarProps = {
 };
 
 export function ProjectSidebar({
+  emptyStateMessage = null,
   modules,
   onCreateEndpoint,
   onCreateGroup,
@@ -69,22 +71,28 @@ export function ProjectSidebar({
       </form>
 
       <div className="space-y-4">
-        {modules.map((module) => (
-          <ModuleSection
-            key={module.id}
-            module={module}
-            onCreateEndpoint={onCreateEndpoint}
-            onCreateGroup={onCreateGroup}
-            onDeleteEndpoint={onDeleteEndpoint}
-            onDeleteGroup={onDeleteGroup}
-            onDeleteModule={onDeleteModule}
-            onRenameEndpoint={onRenameEndpoint}
-            onRenameGroup={onRenameGroup}
-            onRenameModule={onRenameModule}
-            onSelectEndpoint={onSelectEndpoint}
-            selectedEndpointId={selectedEndpointId}
-          />
-        ))}
+        {modules.length === 0 ? (
+          <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
+            {emptyStateMessage ?? "No matching nodes."}
+          </div>
+        ) : (
+          modules.map((module) => (
+            <ModuleSection
+              key={module.id}
+              module={module}
+              onCreateEndpoint={onCreateEndpoint}
+              onCreateGroup={onCreateGroup}
+              onDeleteEndpoint={onDeleteEndpoint}
+              onDeleteGroup={onDeleteGroup}
+              onDeleteModule={onDeleteModule}
+              onRenameEndpoint={onRenameEndpoint}
+              onRenameGroup={onRenameGroup}
+              onRenameModule={onRenameModule}
+              onSelectEndpoint={onSelectEndpoint}
+              selectedEndpointId={selectedEndpointId}
+            />
+          ))
+        )}
       </div>
     </aside>
   );
