@@ -31,7 +31,7 @@ describe("EndpointEditor", () => {
 
     expect(screen.getByDisplayValue("Get User")).toBeInTheDocument();
     expect(screen.getByDisplayValue("/users/{id}")).toBeInTheDocument();
-    expect(screen.getByText("/mock/1/users/{id}")).toBeInTheDocument();
+    expect(screen.getAllByText("/mock/1/users/{id}")).toHaveLength(2);
     expect(screen.getByText("Request Parameters")).toBeInTheDocument();
     expect(screen.getByText("Versions")).toBeInTheDocument();
     expect(screen.getByText("Initial release")).toBeInTheDocument();
@@ -220,5 +220,60 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("query.id")).toBeInTheDocument();
     expect(screen.getByText("Added response field")).toBeInTheDocument();
     expect(screen.getByText("200 application/json userId")).toBeInTheDocument();
+  });
+
+  it("shows a live mock preview from response examples and fallback defaults", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          },
+          {
+            id: 2,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "count",
+            dataType: "integer",
+            required: true,
+            description: "Count",
+            exampleValue: "",
+            sortOrder: 1
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Mock Preview")).toBeInTheDocument();
+    expect(screen.getByText("200")).toBeInTheDocument();
+    expect(screen.getByText("application/json")).toBeInTheDocument();
+    const previewBody = screen.getByText("Preview Body").parentElement?.querySelector("pre");
+    expect(previewBody).toHaveTextContent('"userId": "u_1001"');
+    expect(previewBody).toHaveTextContent('"count": 0');
+
+    fireEvent.change(screen.getByLabelText("Response 1 example"), { target: { value: "u_2002" } });
+
+    await waitFor(() => {
+      expect(previewBody).toHaveTextContent('"userId": "u_2002"');
+    });
   });
 });

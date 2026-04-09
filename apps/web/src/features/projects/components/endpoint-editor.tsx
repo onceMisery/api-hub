@@ -57,9 +57,9 @@ type SnapshotShape = {
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
-  endpoint,
-  projectId,
-  isLoading = false,
+    endpoint,
+    projectId,
+    isLoading = false,
     onDelete,
     onSave,
     onSaveParameters,
@@ -170,6 +170,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
+  const mockPreview = useMemo(() => buildMockPreview(responseRows), [responseRows]);
 
   if (isLoading) {
     return (
@@ -482,6 +483,21 @@ export function EndpointEditor(props: EndpointEditorProps) {
         </div>
       </EditorPanel>
 
+      <EditorPanel title="Mock Preview">
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <PreviewMetric label="Mock URL" value={buildMockUrl(projectId, formState.path)} mono />
+            <PreviewMetric label="Status" value={String(mockPreview.statusCode)} />
+            <PreviewMetric label="Content-Type" value={mockPreview.mediaType} />
+          </div>
+
+          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview Body</p>
+            <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{mockPreview.body}</pre>
+          </div>
+        </div>
+      </EditorPanel>
+
       <EditorPanel title="Versions">
         <div className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
@@ -674,6 +690,100 @@ function buildMockUrl(projectId: number, path: string) {
   return `/mock/${projectId}${normalizedPath}`;
 }
 
+function buildMockPreview(responseRows: ResponseDraft[]) {
+  if (responseRows.length === 0) {
+    return {
+      body: "{}",
+      mediaType: "application/json",
+      statusCode: 200
+    };
+  }
+
+  const firstRow = responseRows[0];
+  const activeRows = responseRows.filter(
+    (response) =>
+      response.httpStatusCode === firstRow.httpStatusCode &&
+      response.mediaType === firstRow.mediaType
+  );
+
+  return {
+    body: JSON.stringify(buildMockPayload(activeRows), null, 2),
+    mediaType: firstRow.mediaType || "application/json",
+    statusCode: firstRow.httpStatusCode || 200
+  };
+}
+
+function buildMockPayload(responseRows: ResponseDraft[]) {
+  if (responseRows.length === 1 && !responseRows[0].name.trim()) {
+    return resolveMockValue(responseRows[0]);
+  }
+
+  return responseRows.reduce<Record<string, unknown>>((payload, response) => {
+    const fieldName = response.name.trim();
+    if (!fieldName) {
+      return payload;
+    }
+
+    payload[fieldName] = resolveMockValue(response);
+    return payload;
+  }, {});
+}
+
+function resolveMockValue(response: ResponseDraft) {
+  if (response.exampleValue.trim()) {
+    return parseMockExample(response.dataType, response.exampleValue.trim());
+  }
+
+  return defaultMockValue(response.dataType);
+}
+
+function parseMockExample(dataType: string, exampleValue: string) {
+  try {
+    switch (dataType.toLowerCase()) {
+      case "integer":
+      case "int":
+      case "long":
+        return Number.parseInt(exampleValue, 10);
+      case "number":
+      case "float":
+      case "double":
+      case "decimal":
+        return Number.parseFloat(exampleValue);
+      case "boolean":
+        return exampleValue === "true";
+      case "array":
+      case "object":
+        return JSON.parse(exampleValue);
+      default:
+        return exampleValue;
+    }
+  } catch {
+    return defaultMockValue(dataType);
+  }
+}
+
+function defaultMockValue(dataType: string) {
+  switch (dataType.toLowerCase()) {
+    case "integer":
+    case "int":
+    case "long":
+      return 0;
+    case "number":
+    case "float":
+    case "double":
+    case "decimal":
+      return 0;
+    case "boolean":
+      return true;
+    case "array":
+      return [];
+    case "object":
+      return {};
+    default:
+      return "";
+  }
+}
+
 function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {
   if (!snapshotJson) {
     return emptySnapshot();
@@ -806,5 +916,14 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
       <span className="text-sm font-medium text-slate-700">{label}</span>
       {children}
     </label>
+  );
+}
+
+function PreviewMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className={`mt-3 text-sm text-slate-700 ${mono ? "break-all font-mono" : ""}`}>{value}</p>
+    </div>
   );
 }
