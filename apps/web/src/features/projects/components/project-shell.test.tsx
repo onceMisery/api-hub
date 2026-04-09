@@ -8,8 +8,11 @@ const {
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
+  fetchEnvironments,
   createModule,
+  createEnvironment,
   updateModule,
+  updateEnvironment,
   deleteModule,
   createGroup,
   updateGroup,
@@ -17,6 +20,7 @@ const {
   createEndpoint,
   updateEndpoint,
   deleteEndpoint,
+  deleteEnvironment,
   replaceEndpointParameters,
   replaceEndpointResponses,
   createVersion
@@ -27,8 +31,11 @@ const {
   fetchEndpointParameters: vi.fn(),
   fetchEndpointResponses: vi.fn(),
   fetchEndpointVersions: vi.fn(),
+  fetchEnvironments: vi.fn(),
   createModule: vi.fn(),
+  createEnvironment: vi.fn(),
   updateModule: vi.fn(),
+  updateEnvironment: vi.fn(),
   deleteModule: vi.fn(),
   createGroup: vi.fn(),
   updateGroup: vi.fn(),
@@ -36,6 +43,7 @@ const {
   createEndpoint: vi.fn(),
   updateEndpoint: vi.fn(),
   deleteEndpoint: vi.fn(),
+  deleteEnvironment: vi.fn(),
   replaceEndpointParameters: vi.fn(),
   replaceEndpointResponses: vi.fn(),
   createVersion: vi.fn()
@@ -53,8 +61,11 @@ vi.mock("@api-hub/api-sdk", () => ({
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
+  fetchEnvironments,
   createModule,
+  createEnvironment,
   updateModule,
+  updateEnvironment,
   deleteModule,
   createGroup,
   updateGroup,
@@ -62,6 +73,7 @@ vi.mock("@api-hub/api-sdk", () => ({
   createEndpoint,
   updateEndpoint,
   deleteEndpoint,
+  deleteEnvironment,
   replaceEndpointParameters,
   replaceEndpointResponses,
   createVersion,
@@ -127,8 +139,13 @@ describe("ProjectShell", () => {
     fetchEndpointParameters.mockResolvedValue({ data: [] });
     fetchEndpointResponses.mockResolvedValue({ data: [] });
     fetchEndpointVersions.mockResolvedValue({ data: [] });
+    fetchEnvironments.mockResolvedValue({
+      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true }]
+    });
     createModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
+    createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false } });
     updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
+    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true } });
     deleteModule.mockResolvedValue({ data: null });
     createGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
     updateGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
@@ -154,6 +171,7 @@ describe("ProjectShell", () => {
       }
     });
     deleteEndpoint.mockResolvedValue({ data: null });
+    deleteEnvironment.mockResolvedValue({ data: null });
     replaceEndpointParameters.mockResolvedValue({ data: null });
     replaceEndpointResponses.mockResolvedValue({ data: null });
     createVersion.mockResolvedValue({
@@ -338,5 +356,40 @@ describe("ProjectShell", () => {
     fireEvent.change(screen.getByLabelText("Search tree"), { target: { value: "missing" } });
 
     expect(await screen.findByText("No matching nodes.")).toBeInTheDocument();
+  });
+
+  it("loads and manages project environments", async () => {
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("Local")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("New environment name"), { target: { value: "Staging" } });
+    fireEvent.change(screen.getByLabelText("New environment base URL"), { target: { value: "https://staging.dev" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add environment" }));
+
+    await waitFor(() =>
+      expect(createEnvironment).toHaveBeenCalledWith(1, {
+        baseUrl: "https://staging.dev",
+        isDefault: false,
+        name: "Staging"
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Use environment 41" }));
+    expect(screen.getByText("Active")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Environment 41 name"), { target: { value: "Production" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save environment 41" }));
+
+    await waitFor(() =>
+      expect(updateEnvironment).toHaveBeenCalledWith(41, {
+        baseUrl: "https://local.dev",
+        isDefault: true,
+        name: "Production"
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete environment 41" }));
+    await waitFor(() => expect(deleteEnvironment).toHaveBeenCalledWith(41));
   });
 });

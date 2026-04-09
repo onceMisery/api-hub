@@ -77,6 +77,20 @@ CREATE TABLE project_member (
   CONSTRAINT ck_project_member_status CHECK (member_status IN ('active', 'inactive'))
 );
 
+CREATE TABLE environment (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  base_url VARCHAR(512) NOT NULL,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uk_environment_project_name (project_id, name),
+  CONSTRAINT fk_environment_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
+  CONSTRAINT fk_environment_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+);
+
 CREATE TABLE module (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,

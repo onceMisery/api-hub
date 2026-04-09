@@ -5,8 +5,10 @@ import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
+import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
+import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
@@ -41,6 +43,8 @@ class ProjectServiceTest {
 
         var project = projectService.createProject(new CreateProjectRequest("Demo", "demo", "first project"));
         var updatedProject = projectService.updateProject(project.id(), new UpdateProjectRequest("Demo Updated", "desc"));
+        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest("Local", "https://local.dev", true));
+        var updatedEnvironment = projectService.updateEnvironment(environment.id(), new UpdateEnvironmentRequest("Staging", "https://staging.dev", true));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -78,6 +82,9 @@ class ProjectServiceTest {
                 "{\"path\":\"/users/{id}\"}"));
 
         assertThat(updatedProject.name()).isEqualTo("Demo Updated");
+        assertThat(environment.name()).isEqualTo("Local");
+        assertThat(updatedEnvironment.baseUrl()).isEqualTo("https://staging.dev");
+        assertThat(projectService.listEnvironments(project.id())).extracting("name").containsExactly("Staging");
         assertThat(renamedModule.name()).isEqualTo("Core Services");
         assertThat(renamedGroup.name()).isEqualTo("User Management");
         assertThat(projectService.getProject(project.id()).projectKey()).isEqualTo("demo");
@@ -96,6 +103,7 @@ class ProjectServiceTest {
     @Test
     void shouldDeleteEndpointGroupAndModule() {
         var project = projectService.createProject(new CreateProjectRequest("Cleanup", "cleanup", "cleanup project"));
+        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest("Local", "https://cleanup.dev", false));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Legacy"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("Deprecated"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -112,5 +120,8 @@ class ProjectServiceTest {
 
         projectService.deleteModule(module.id());
         assertThat(projectService.listModules(project.id())).isEmpty();
+
+        projectService.deleteEnvironment(environment.id());
+        assertThat(projectService.listEnvironments(project.id())).isEmpty();
     }
 }

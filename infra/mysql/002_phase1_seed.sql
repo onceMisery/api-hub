@@ -48,6 +48,22 @@ INSERT INTO project (
   'active'
 );
 
+INSERT INTO environment (
+  id,
+  project_id,
+  name,
+  base_url,
+  is_default,
+  created_by
+) VALUES (
+  1,
+  1,
+  'Local',
+  'https://local.dev',
+  1,
+  1
+);
+
 INSERT INTO module (
   id,
   project_id,

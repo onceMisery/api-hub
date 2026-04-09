@@ -13,6 +13,8 @@ import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
+import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.EndpointTreeItem;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.GroupTreeItem;
@@ -20,6 +22,7 @@ import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleTreeItem;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
+import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
@@ -130,6 +133,27 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    public List<EnvironmentDetail> listEnvironments(Long projectId) {
+        requireProject(projectId);
+        return projectRepository.listEnvironments(projectId);
+    }
+
+    public EnvironmentDetail createEnvironment(Long projectId, CreateEnvironmentRequest request) {
+        requireProject(projectId);
+        return projectRepository.createEnvironment(projectId, request);
+    }
+
+    public EnvironmentDetail updateEnvironment(Long environmentId, UpdateEnvironmentRequest request) {
+        requireEnvironment(environmentId);
+        return projectRepository.updateEnvironment(environmentId, request);
+    }
+
+    public void deleteEnvironment(Long environmentId) {
+        requireEnvironment(environmentId);
+        projectRepository.deleteEnvironment(environmentId);
+    }
+
+    @Transactional(readOnly = true)
     public List<EndpointDetail> listEndpoints(Long groupId) {
         requireGroup(groupId);
         return endpointRepository.listEndpoints(groupId);
@@ -209,5 +233,10 @@ public class ProjectService {
     private EndpointDetail requireEndpoint(Long endpointId) {
         return endpointRepository.findEndpoint(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
+    }
+
+    private EnvironmentDetail requireEnvironment(Long environmentId) {
+        return projectRepository.findEnvironment(environmentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
     }
 }

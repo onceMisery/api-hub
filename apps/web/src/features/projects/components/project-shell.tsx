@@ -2,13 +2,16 @@
 
 import {
   createEndpoint,
+  createEnvironment,
   createGroup,
   createModule,
   createVersion,
   deleteEndpoint,
+  deleteEnvironment,
   deleteGroup,
   deleteModule,
   fetchEndpoint,
+  fetchEnvironments,
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
@@ -17,8 +20,11 @@ import {
   replaceEndpointParameters,
   replaceEndpointResponses,
   updateEndpoint,
+  updateEnvironment,
   updateGroup,
   updateModule,
+  type EnvironmentDetail,
+  type CreateEnvironmentPayload,
   type EndpointDetail,
   type ModuleTreeItem,
   type ParameterDetail,
@@ -26,12 +32,14 @@ import {
   type ResponseDetail,
   type ResponseUpsertItem,
   type UpdateEndpointPayload,
+  type UpdateEnvironmentPayload,
   type VersionDetail
 } from "@api-hub/api-sdk";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { EndpointEditor } from "./endpoint-editor";
+import { EnvironmentPanel } from "./environment-panel";
 import { ProjectSidebar } from "./project-sidebar";
 
 type ProjectShellProps = {
@@ -41,7 +49,9 @@ type ProjectShellProps = {
 export function ProjectShell({ projectId }: ProjectShellProps) {
   const router = useRouter();
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
+  const [environments, setEnvironments] = useState<EnvironmentDetail[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<number | null>(null);
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
   const [endpoint, setEndpoint] = useState<EndpointDetail | null>(null);
   const [parameters, setParameters] = useState<ParameterDetail[]>([]);
@@ -53,6 +63,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   useEffect(() => {
     void reloadTree();
+  }, [projectId]);
+
+  useEffect(() => {
+    void reloadEnvironments();
   }, [projectId]);
 
   useEffect(() => {
@@ -205,18 +219,28 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             selectedEndpointId={selectedEndpointId}
           />
         )}
-        <EndpointEditor
-          endpoint={endpoint}
-          isLoading={isLoadingEndpoint}
-          onDelete={handleDeleteEndpoint}
-          onSave={handleSaveEndpoint}
-          onSaveParameters={handleSaveParameters}
-          onSaveResponses={handleSaveResponses}
-          onSaveVersion={handleSaveVersion}
-          parameters={parameters}
-          responses={responses}
-          versions={versions}
-        />
+        <div className="space-y-6">
+          <EnvironmentPanel
+            environments={environments}
+            onCreateEnvironment={handleCreateEnvironment}
+            onDeleteEnvironment={handleDeleteEnvironment}
+            onSelectEnvironment={setSelectedEnvironmentId}
+            onUpdateEnvironment={handleUpdateEnvironment}
+            selectedEnvironmentId={selectedEnvironmentId}
+          />
+          <EndpointEditor
+            endpoint={endpoint}
+            isLoading={isLoadingEndpoint}
+            onDelete={handleDeleteEndpoint}
+            onSave={handleSaveEndpoint}
+            onSaveParameters={handleSaveParameters}
+            onSaveResponses={handleSaveResponses}
+            onSaveVersion={handleSaveVersion}
+            parameters={parameters}
+            responses={responses}
+            versions={versions}
+          />
+        </div>
       </section>
     </main>
   );
@@ -243,6 +267,25 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  async function reloadEnvironments(preferredEnvironmentId?: number | null) {
+    try {
+      const response = await fetchEnvironments(projectId);
+      setEnvironments(response.data);
+      const nextEnvironmentId =
+        preferredEnvironmentId ??
+        response.data.find((environment) => environment.isDefault)?.id ??
+        response.data[0]?.id ??
+        null;
+      setSelectedEnvironmentId(nextEnvironmentId);
+    } catch (loadError) {
+      if (handleUnauthorized(loadError)) {
+        return;
+      }
+
+      setError(loadError instanceof Error ? loadError.message : "Failed to load environments");
+    }
+  }
+
   async function handleCreateModule(payload: { name: string }) {
     setError(null);
 
@@ -255,6 +298,51 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       }
 
       setError(creationError instanceof Error ? creationError.message : "Failed to create module");
+    }
+  }
+
+  async function handleCreateEnvironment(payload: CreateEnvironmentPayload) {
+    setError(null);
+
+    try {
+      const response = await createEnvironment(projectId, payload);
+      await reloadEnvironments(response.data.id);
+    } catch (creationError) {
+      if (handleUnauthorized(creationError)) {
+        return;
+      }
+
+      setError(creationError instanceof Error ? creationError.message : "Failed to create environment");
+    }
+  }
+
+  async function handleUpdateEnvironment(environmentId: number, payload: UpdateEnvironmentPayload) {
+    setError(null);
+
+    try {
+      const response = await updateEnvironment(environmentId, payload);
+      await reloadEnvironments(response.data.id);
+    } catch (updateError) {
+      if (handleUnauthorized(updateError)) {
+        return;
+      }
+
+      setError(updateError instanceof Error ? updateError.message : "Failed to update environment");
+    }
+  }
+
+  async function handleDeleteEnvironment(environmentId: number) {
+    setError(null);
+
+    try {
+      await deleteEnvironment(environmentId);
+      await reloadEnvironments(selectedEnvironmentId === environmentId ? null : selectedEnvironmentId);
+    } catch (deleteError) {
+      if (handleUnauthorized(deleteError)) {
+        return;
+      }
+
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete environment");
     }
   }
 

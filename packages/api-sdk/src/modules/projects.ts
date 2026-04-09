@@ -59,6 +59,14 @@ export type GroupDetail = {
   name: string;
 };
 
+export type EnvironmentDetail = {
+  id: number;
+  projectId: number;
+  name: string;
+  baseUrl: string;
+  isDefault: boolean;
+};
+
 export type CreateModulePayload = {
   name: string;
 };
@@ -87,6 +95,18 @@ export type UpdateModulePayload = {
 
 export type UpdateGroupPayload = {
   name: string;
+};
+
+export type CreateEnvironmentPayload = {
+  name: string;
+  baseUrl: string;
+  isDefault: boolean;
+};
+
+export type UpdateEnvironmentPayload = {
+  name: string;
+  baseUrl: string;
+  isDefault: boolean;
 };
 
 export type ParameterDetail = {
@@ -169,6 +189,30 @@ export function createGroup(moduleId: number, payload: CreateGroupPayload) {
   return apiFetch<GroupDetail>(`/api/v1/modules/${moduleId}/groups`, {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export function fetchEnvironments(projectId: number) {
+  return apiFetch<EnvironmentDetail[]>(`/api/v1/projects/${projectId}/environments`);
+}
+
+export function createEnvironment(projectId: number, payload: CreateEnvironmentPayload) {
+  return apiFetch<EnvironmentDetail>(`/api/v1/projects/${projectId}/environments`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateEnvironment(environmentId: number, payload: UpdateEnvironmentPayload) {
+  return apiFetch<EnvironmentDetail>(`/api/v1/environments/${environmentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteEnvironment(environmentId: number) {
+  return apiFetch<null>(`/api/v1/environments/${environmentId}`, {
+    method: "DELETE"
   });
 }
 
