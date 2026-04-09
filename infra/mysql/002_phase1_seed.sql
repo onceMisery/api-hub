@@ -56,6 +56,10 @@ INSERT INTO environment (
   is_default,
   variables_json,
   default_headers_json,
+  default_query_json,
+  auth_mode,
+  auth_key,
+  auth_value,
   created_by
 ) VALUES (
   1,
@@ -65,6 +69,10 @@ INSERT INTO environment (
   1,
   JSON_ARRAY(),
   JSON_ARRAY(),
+  JSON_ARRAY(),
+  'none',
+  '',
+  '',
   1
 );
 

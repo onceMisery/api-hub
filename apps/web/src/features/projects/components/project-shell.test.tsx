@@ -147,7 +147,7 @@ describe("ProjectShell", () => {
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     fetchDebugHistory.mockResolvedValue({ data: [] });
     fetchEnvironments.mockResolvedValue({
-      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] }]
+      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" }]
     });
     executeDebug.mockResolvedValue({
       data: {
@@ -160,9 +160,9 @@ describe("ProjectShell", () => {
       }
     });
     createModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
-    createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [] } });
+    createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" } });
     updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
-    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] } });
+    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" } });
     deleteModule.mockResolvedValue({ data: null });
     createGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
     updateGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
@@ -388,6 +388,10 @@ describe("ProjectShell", () => {
       expect(createEnvironment).toHaveBeenCalledWith(1, {
         baseUrl: "https://staging.dev",
         defaultHeaders: [],
+        defaultQuery: [],
+        authKey: "",
+        authMode: "none",
+        authValue: "",
         isDefault: false,
         name: "Staging",
         variables: []
@@ -404,6 +408,10 @@ describe("ProjectShell", () => {
       expect(updateEnvironment).toHaveBeenCalledWith(41, {
         baseUrl: "https://local.dev",
         defaultHeaders: [],
+        defaultQuery: [],
+        authKey: "",
+        authMode: "none",
+        authValue: "",
         isDefault: true,
         name: "Production",
         variables: []
@@ -417,8 +425,8 @@ describe("ProjectShell", () => {
   it("replays debug history and switches to the history environment", async () => {
     fetchEnvironments.mockResolvedValue({
       data: [
-        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] },
-        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [] }
+        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" },
+        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" }
       ]
     });
     fetchDebugHistory.mockResolvedValue({
@@ -458,8 +466,8 @@ describe("ProjectShell", () => {
   it("runs a debug history item again through the execute pipeline", async () => {
     fetchEnvironments.mockResolvedValue({
       data: [
-        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] },
-        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [] }
+        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" },
+        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" }
       ]
     });
     fetchDebugHistory

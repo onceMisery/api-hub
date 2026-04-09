@@ -49,13 +49,21 @@ class ProjectServiceTest {
                 "https://local.dev",
                 true,
                 java.util.List.of(new EnvironmentEntry("token", "dev-token")),
-                java.util.List.of(new EnvironmentEntry("Authorization", "Bearer {{token}}"))));
+                java.util.List.of(new EnvironmentEntry("Authorization", "Bearer {{token}}")),
+                java.util.List.of(new EnvironmentEntry("locale", "zh-CN")),
+                "bearer",
+                "Authorization",
+                "dev-token"));
         var updatedEnvironment = projectService.updateEnvironment(environment.id(), new UpdateEnvironmentRequest(
                 "Staging",
                 "https://staging.dev",
                 true,
                 java.util.List.of(new EnvironmentEntry("token", "staging-token")),
-                java.util.List.of(new EnvironmentEntry("X-App", "apihub"))));
+                java.util.List.of(new EnvironmentEntry("X-App", "apihub")),
+                java.util.List.of(new EnvironmentEntry("region", "cn")),
+                "api_key_header",
+                "X-API-Key",
+                "staging-key"));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -97,6 +105,10 @@ class ProjectServiceTest {
         assertThat(updatedEnvironment.baseUrl()).isEqualTo("https://staging.dev");
         assertThat(updatedEnvironment.variables()).containsExactly(new EnvironmentEntry("token", "staging-token"));
         assertThat(updatedEnvironment.defaultHeaders()).containsExactly(new EnvironmentEntry("X-App", "apihub"));
+        assertThat(updatedEnvironment.defaultQuery()).containsExactly(new EnvironmentEntry("region", "cn"));
+        assertThat(updatedEnvironment.authMode()).isEqualTo("api_key_header");
+        assertThat(updatedEnvironment.authKey()).isEqualTo("X-API-Key");
+        assertThat(updatedEnvironment.authValue()).isEqualTo("staging-key");
         assertThat(projectService.listEnvironments(project.id())).extracting("name").containsExactly("Staging");
         assertThat(renamedModule.name()).isEqualTo("Core Services");
         assertThat(renamedGroup.name()).isEqualTo("User Management");
@@ -121,7 +133,11 @@ class ProjectServiceTest {
                 "https://cleanup.dev",
                 false,
                 java.util.List.of(),
-                java.util.List.of()));
+                java.util.List.of(),
+                java.util.List.of(),
+                "none",
+                "",
+                ""));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Legacy"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("Deprecated"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(

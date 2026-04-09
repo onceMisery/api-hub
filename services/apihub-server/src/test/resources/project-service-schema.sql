@@ -35,6 +35,10 @@ CREATE TABLE environment (
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   variables_json CLOB NOT NULL,
   default_headers_json CLOB NOT NULL,
+  default_query_json CLOB NOT NULL,
+  auth_mode VARCHAR(32) NOT NULL DEFAULT 'none',
+  auth_key VARCHAR(128) NOT NULL DEFAULT '',
+  auth_value VARCHAR(512) NOT NULL DEFAULT '',
   created_by BIGINT NOT NULL
 );
 

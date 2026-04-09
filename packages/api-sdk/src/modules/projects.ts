@@ -72,6 +72,10 @@ export type EnvironmentDetail = {
   isDefault: boolean;
   variables: EnvironmentEntry[];
   defaultHeaders: EnvironmentEntry[];
+  defaultQuery: EnvironmentEntry[];
+  authMode: "none" | "bearer" | "api_key_header";
+  authKey: string;
+  authValue: string;
 };
 
 export type CreateModulePayload = {
@@ -110,6 +114,10 @@ export type CreateEnvironmentPayload = {
   isDefault: boolean;
   variables: EnvironmentEntry[];
   defaultHeaders: EnvironmentEntry[];
+  defaultQuery: EnvironmentEntry[];
+  authMode: "none" | "bearer" | "api_key_header";
+  authKey: string;
+  authValue: string;
 };
 
 export type UpdateEnvironmentPayload = {
@@ -118,6 +126,10 @@ export type UpdateEnvironmentPayload = {
   isDefault: boolean;
   variables: EnvironmentEntry[];
   defaultHeaders: EnvironmentEntry[];
+  defaultQuery: EnvironmentEntry[];
+  authMode: "none" | "bearer" | "api_key_header";
+  authKey: string;
+  authValue: string;
 };
 
 export type ParameterDetail = {

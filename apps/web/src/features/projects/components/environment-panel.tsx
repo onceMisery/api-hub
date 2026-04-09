@@ -23,12 +23,17 @@ export function EnvironmentPanel({
   const [createForm, setCreateForm] = useState<CreateEnvironmentPayload>({
     baseUrl: "",
     defaultHeaders: [],
+    defaultQuery: [],
+    authKey: "",
+    authMode: "none",
+    authValue: "",
     isDefault: false,
     name: "",
     variables: []
   });
   const [createVariablesText, setCreateVariablesText] = useState("");
   const [createHeadersText, setCreateHeadersText] = useState("");
+  const [createQueryText, setCreateQueryText] = useState("");
 
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -50,18 +55,27 @@ export function EnvironmentPanel({
             ...createForm,
             baseUrl: createForm.baseUrl.trim(),
             defaultHeaders: parseEntries(createHeadersText, ":"),
+            defaultQuery: parseEntries(createQueryText, "="),
+            authKey: createForm.authKey.trim(),
+            authMode: createForm.authMode,
+            authValue: createForm.authValue.trim(),
             name: createForm.name.trim(),
             variables: parseEntries(createVariablesText, "=")
           }).then(() => {
             setCreateForm({
               baseUrl: "",
               defaultHeaders: [],
+              defaultQuery: [],
+              authKey: "",
+              authMode: "none",
+              authValue: "",
               isDefault: false,
               name: "",
               variables: []
             });
             setCreateVariablesText("");
             setCreateHeadersText("");
+            setCreateQueryText("");
           });
         }}
       >
@@ -99,6 +113,45 @@ export function EnvironmentPanel({
             onChange={(event) => setCreateHeadersText(event.target.value)}
             placeholder={"Authorization: Bearer {{token}}\nX-App: ApiHub"}
             value={createHeadersText}
+          />
+        </Field>
+        <Field label="New environment query">
+          <textarea
+            aria-label="New environment query"
+            className="min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setCreateQueryText(event.target.value)}
+            placeholder={"locale=zh-CN\nregion=cn"}
+            value={createQueryText}
+          />
+        </Field>
+        <Field label="New environment auth mode">
+          <select
+            aria-label="New environment auth mode"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setCreateForm((current) => ({ ...current, authMode: event.target.value as CreateEnvironmentPayload["authMode"] }))}
+            value={createForm.authMode}
+          >
+            <option value="none">No auth preset</option>
+            <option value="bearer">Bearer token</option>
+            <option value="api_key_header">API key header</option>
+          </select>
+        </Field>
+        <Field label="New environment auth key">
+          <input
+            aria-label="New environment auth key"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setCreateForm((current) => ({ ...current, authKey: event.target.value }))}
+            placeholder="Authorization"
+            value={createForm.authKey}
+          />
+        </Field>
+        <Field label="New environment auth value">
+          <input
+            aria-label="New environment auth value"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setCreateForm((current) => ({ ...current, authValue: event.target.value }))}
+            placeholder="dev-token"
+            value={createForm.authValue}
           />
         </Field>
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
@@ -152,12 +205,17 @@ function EnvironmentCard({
   const [draft, setDraft] = useState<UpdateEnvironmentPayload>({
     baseUrl: environment.baseUrl,
     defaultHeaders: environment.defaultHeaders,
+    defaultQuery: environment.defaultQuery,
+    authKey: environment.authKey,
+    authMode: environment.authMode,
+    authValue: environment.authValue,
     isDefault: environment.isDefault,
     name: environment.name,
     variables: environment.variables
   });
   const [variablesText, setVariablesText] = useState(formatEntries(environment.variables, "="));
   const [headersText, setHeadersText] = useState(formatEntries(environment.defaultHeaders, ":"));
+  const [queryText, setQueryText] = useState(formatEntries(environment.defaultQuery, "="));
 
   return (
     <div className={`rounded-[1.6rem] border p-4 transition ${isSelected ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-white"}`}>
@@ -220,6 +278,45 @@ function EnvironmentCard({
             value={headersText}
           />
         </Field>
+        <Field label={`Environment ${environment.id} query`} dark={isSelected}>
+          <textarea
+            aria-label={`Environment ${environment.id} query`}
+            className={`min-h-20 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) => {
+              setQueryText(event.target.value);
+              setDraft((current) => ({ ...current, defaultQuery: parseEntries(event.target.value, "=") }));
+            }}
+            value={queryText}
+          />
+        </Field>
+        <Field label={`Environment ${environment.id} auth mode`} dark={isSelected}>
+          <select
+            aria-label={`Environment ${environment.id} auth mode`}
+            className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) => setDraft((current) => ({ ...current, authMode: event.target.value as UpdateEnvironmentPayload["authMode"] }))}
+            value={draft.authMode}
+          >
+            <option value="none">No auth preset</option>
+            <option value="bearer">Bearer token</option>
+            <option value="api_key_header">API key header</option>
+          </select>
+        </Field>
+        <Field label={`Environment ${environment.id} auth key`} dark={isSelected}>
+          <input
+            aria-label={`Environment ${environment.id} auth key`}
+            className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) => setDraft((current) => ({ ...current, authKey: event.target.value }))}
+            value={draft.authKey}
+          />
+        </Field>
+        <Field label={`Environment ${environment.id} auth value`} dark={isSelected}>
+          <input
+            aria-label={`Environment ${environment.id} auth value`}
+            className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) => setDraft((current) => ({ ...current, authValue: event.target.value }))}
+            value={draft.authValue}
+          />
+        </Field>
         <label className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isSelected ? "border-white/15 bg-white/10 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
           <input
             aria-label={`Environment ${environment.id} default`}
@@ -239,6 +336,10 @@ function EnvironmentCard({
             void onUpdateEnvironment(environment.id, {
               baseUrl: draft.baseUrl.trim(),
               defaultHeaders: draft.defaultHeaders,
+              defaultQuery: draft.defaultQuery,
+              authKey: draft.authKey.trim(),
+              authMode: draft.authMode,
+              authValue: draft.authValue.trim(),
               isDefault: draft.isDefault,
               name: draft.name.trim(),
               variables: draft.variables

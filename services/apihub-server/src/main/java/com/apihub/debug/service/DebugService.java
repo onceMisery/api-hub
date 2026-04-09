@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,8 +60,8 @@ public class DebugService {
         URI targetUri = buildTargetUri(
                 substituteVariables(environment.baseUrl(), variables),
                 substituteVariables(endpoint.path(), variables),
-                substituteVariables(request.queryString(), variables));
-        List<DebugHeader> headers = mergeHeaders(environment.defaultHeaders(), request.headers(), variables);
+                mergeQueryString(environment.defaultQuery(), request.queryString(), variables));
+        List<DebugHeader> headers = mergeHeaders(environment.defaultHeaders(), request.headers(), environment, variables);
         String requestBody = substituteVariables(request.body(), variables);
 
         DebugHttpResult result = debugHttpExecutor.execute(new DebugHttpRequest(
@@ -125,6 +126,7 @@ public class DebugService {
 
     private List<DebugHeader> mergeHeaders(List<EnvironmentEntry> defaultHeaders,
                                            List<DebugHeader> requestHeaders,
+                                           EnvironmentDetail environment,
                                            Map<String, String> variables) {
         LinkedHashMap<String, DebugHeader> mergedHeaders = new LinkedHashMap<>();
 
@@ -138,6 +140,8 @@ public class DebugService {
                     substituteVariables(header.value(), variables)));
         }
 
+        injectAuthHeader(mergedHeaders, environment, variables);
+
         List<DebugHeader> safeRequestHeaders = requestHeaders == null ? List.of() : requestHeaders;
         for (DebugHeader header : safeRequestHeaders) {
             if (header.name() == null || header.name().isBlank()) {
@@ -149,6 +153,74 @@ public class DebugService {
         }
 
         return List.copyOf(mergedHeaders.values());
+    }
+
+    private String mergeQueryString(List<EnvironmentEntry> defaultQuery, String requestQueryString, Map<String, String> variables) {
+        LinkedHashMap<String, String> mergedQuery = new LinkedHashMap<>();
+        List<EnvironmentEntry> safeDefaultQuery = defaultQuery == null ? List.of() : defaultQuery;
+        for (EnvironmentEntry entry : safeDefaultQuery) {
+            if (entry.name() == null || entry.name().isBlank()) {
+                continue;
+            }
+            mergedQuery.put(entry.name().trim(), substituteVariables(entry.value(), variables));
+        }
+
+        for (EnvironmentEntry entry : parseQueryString(requestQueryString)) {
+            mergedQuery.put(entry.name(), substituteVariables(entry.value(), variables));
+        }
+
+        UriComponentsBuilder builder = UriComponentsBuilder.newInstance();
+        mergedQuery.forEach(builder::queryParam);
+        String query = builder.build().getQuery();
+        return query == null ? "" : query;
+    }
+
+    private List<EnvironmentEntry> parseQueryString(String queryString) {
+        if (queryString == null || queryString.isBlank()) {
+            return List.of();
+        }
+
+        String normalizedQuery = queryString.trim();
+        if (normalizedQuery.startsWith("?")) {
+            normalizedQuery = normalizedQuery.substring(1);
+        }
+
+        List<EnvironmentEntry> entries = new ArrayList<>();
+        for (String pair : normalizedQuery.split("&")) {
+            String trimmed = pair.trim();
+            if (trimmed.isBlank()) {
+                continue;
+            }
+            int separatorIndex = trimmed.indexOf('=');
+            if (separatorIndex == -1) {
+                entries.add(new EnvironmentEntry(trimmed, ""));
+                continue;
+            }
+            entries.add(new EnvironmentEntry(trimmed.substring(0, separatorIndex), trimmed.substring(separatorIndex + 1)));
+        }
+        return entries;
+    }
+
+    private void injectAuthHeader(Map<String, DebugHeader> mergedHeaders, EnvironmentDetail environment, Map<String, String> variables) {
+        String authMode = environment.authMode() == null ? "none" : environment.authMode().trim().toLowerCase();
+        if ("none".equals(authMode) || authMode.isBlank()) {
+            return;
+        }
+
+        String authKey = environment.authKey() == null || environment.authKey().isBlank() ? "Authorization" : environment.authKey().trim();
+        String authValue = substituteVariables(environment.authValue(), variables);
+        if (authValue.isBlank()) {
+            return;
+        }
+
+        if ("bearer".equals(authMode)) {
+            mergedHeaders.put(authKey.toLowerCase(), new DebugHeader(authKey, "Bearer " + authValue));
+            return;
+        }
+
+        if ("api_key_header".equals(authMode)) {
+            mergedHeaders.put(authKey.toLowerCase(), new DebugHeader(authKey, authValue));
+        }
     }
 
     private String substituteVariables(String template, Map<String, String> variables) {

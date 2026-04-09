@@ -56,7 +56,11 @@ public final class ProjectDtos {
             String baseUrl,
             Boolean isDefault,
             List<EnvironmentEntry> variables,
-            List<EnvironmentEntry> defaultHeaders
+            List<EnvironmentEntry> defaultHeaders,
+            List<EnvironmentEntry> defaultQuery,
+            String authMode,
+            String authKey,
+            String authValue
     ) {
     }
 
@@ -65,7 +69,11 @@ public final class ProjectDtos {
             String baseUrl,
             Boolean isDefault,
             List<EnvironmentEntry> variables,
-            List<EnvironmentEntry> defaultHeaders
+            List<EnvironmentEntry> defaultHeaders,
+            List<EnvironmentEntry> defaultQuery,
+            String authMode,
+            String authKey,
+            String authValue
     ) {
     }
 
@@ -76,7 +84,11 @@ public final class ProjectDtos {
             String baseUrl,
             boolean isDefault,
             List<EnvironmentEntry> variables,
-            List<EnvironmentEntry> defaultHeaders
+            List<EnvironmentEntry> defaultHeaders,
+            List<EnvironmentEntry> defaultQuery,
+            String authMode,
+            String authKey,
+            String authValue
     ) {
     }
 

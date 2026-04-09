@@ -47,7 +47,10 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
     setError(null);
   }, [replayDraft]);
 
-  const previewUrl = useMemo(() => buildPreviewUrl(environment?.baseUrl, endpoint?.path, queryString), [environment?.baseUrl, endpoint?.path, queryString]);
+  const previewUrl = useMemo(
+    () => buildPreviewUrl(environment?.baseUrl, endpoint?.path, environment?.defaultQuery ?? [], queryString),
+    [environment?.baseUrl, environment?.defaultQuery, endpoint?.path, queryString]
+  );
   const canExecute = Boolean(endpoint && environment);
 
   return (
@@ -253,16 +256,37 @@ function parseHeaders(value: string) {
     .filter((header) => header.name);
 }
 
-function buildPreviewUrl(baseUrl?: string, path?: string, queryString?: string) {
+function buildPreviewUrl(baseUrl?: string, path?: string, defaultQuery?: { name: string; value: string }[], queryString?: string) {
   if (!baseUrl || !path) {
     return null;
   }
 
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const normalizedQuery = queryString?.trim().replace(/^\?/, "") ?? "";
+  const mergedQuery = new URLSearchParams();
 
-  return normalizedQuery ? `${normalizedBaseUrl}${normalizedPath}?${normalizedQuery}` : `${normalizedBaseUrl}${normalizedPath}`;
+  for (const entry of defaultQuery ?? []) {
+    if (!entry.name?.trim()) {
+      continue;
+    }
+    mergedQuery.set(entry.name.trim(), entry.value ?? "");
+  }
+
+  const normalizedQuery = queryString?.trim().replace(/^\?/, "") ?? "";
+  for (const pair of normalizedQuery.split("&")) {
+    if (!pair.trim()) {
+      continue;
+    }
+    const [name, ...valueParts] = pair.split("=");
+    if (!name?.trim()) {
+      continue;
+    }
+    mergedQuery.set(name.trim(), valueParts.join("="));
+  }
+
+  const finalQuery = mergedQuery.toString();
+
+  return finalQuery ? `${normalizedBaseUrl}${normalizedPath}?${finalQuery}` : `${normalizedBaseUrl}${normalizedPath}`;
 }
 
 function formatHeaderEntries(entries: { name: string; value: string }[]) {

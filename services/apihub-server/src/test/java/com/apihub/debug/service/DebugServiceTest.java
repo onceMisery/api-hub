@@ -58,7 +58,11 @@ class DebugServiceTest {
                         "https://local.dev/api",
                         true,
                         List.of(new EnvironmentEntry("userId", "31"), new EnvironmentEntry("include", "profile"), new EnvironmentEntry("token", "env-token")),
-                        List.of(new EnvironmentEntry("Authorization", "Bearer {{token}}"), new EnvironmentEntry("X-App", "ApiHub")))));
+                        List.of(new EnvironmentEntry("Authorization", "Bearer {{token}}"), new EnvironmentEntry("X-App", "ApiHub")),
+                        List.of(new EnvironmentEntry("locale", "zh-CN"), new EnvironmentEntry("include", "summary")),
+                        "bearer",
+                        "Authorization",
+                        "env-token")));
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
@@ -81,20 +85,20 @@ class DebugServiceTest {
 
         DebugHttpRequest request = requestCaptor.getValue();
         assertThat(request.method()).isEqualTo("GET");
-        assertThat(request.uri()).isEqualTo(URI.create("https://local.dev/api/users/31?verbose=true&include=profile"));
+        assertThat(request.uri()).isEqualTo(URI.create("https://local.dev/api/users/31?locale=zh-CN&include=profile&verbose=true"));
         assertThat(request.headers()).containsExactly(
                 new DebugHeader("Authorization", "Bearer manual-token"),
                 new DebugHeader("X-App", "ApiHub"),
                 new DebugHeader("X-Trace", "abc"));
         assertThat(request.body()).isEqualTo("{\"user\":\"31\"}");
-        assertThat(response.finalUrl()).isEqualTo("https://local.dev/api/users/31?verbose=true&include=profile");
+        assertThat(response.finalUrl()).isEqualTo("https://local.dev/api/users/31?locale=zh-CN&include=profile&verbose=true");
         assertThat(response.statusCode()).isEqualTo(200);
         verify(debugHistoryRepository).saveHistory(
                 1L,
                 41L,
                 31L,
                 "GET",
-                "https://local.dev/api/users/31?verbose=true&include=profile",
+                "https://local.dev/api/users/31?locale=zh-CN&include=profile&verbose=true",
                 request.headers(),
                 "{\"user\":\"31\"}",
                 200,
@@ -104,9 +108,43 @@ class DebugServiceTest {
     }
 
     @Test
+    void shouldInjectBearerAuthWhenRequestDoesNotOverrideAuthorization() {
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(
+                        41L,
+                        1L,
+                        "Local",
+                        "https://local.dev/api",
+                        true,
+                        List.of(),
+                        List.of(new EnvironmentEntry("X-App", "ApiHub")),
+                        List.of(),
+                        "bearer",
+                        "Authorization",
+                        "env-token")));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user")));
+        given(debugHttpExecutor.execute(any())).willReturn(new DebugHttpResult(
+                200,
+                List.of(new DebugHeader("Content-Type", "application/json")),
+                "{\"ok\":true}",
+                20));
+
+        debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), ""));
+
+        ArgumentCaptor<DebugHttpRequest> requestCaptor = ArgumentCaptor.forClass(DebugHttpRequest.class);
+        verify(debugHttpExecutor).execute(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().headers()).containsExactly(
+                new DebugHeader("X-App", "ApiHub"),
+                new DebugHeader("Authorization", "Bearer env-token"));
+    }
+
+    @Test
     void shouldRejectUnsupportedBaseUrlScheme() {
         given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
-                new EnvironmentDetail(41L, 1L, "Local", "ftp://local.dev/api", true, List.of(), List.of())));
+                new EnvironmentDetail(41L, 1L, "Local", "ftp://local.dev/api", true, List.of(), List.of(), List.of(), "none", "", "")));
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(

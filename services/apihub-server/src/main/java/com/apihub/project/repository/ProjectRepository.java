@@ -55,7 +55,11 @@ public class ProjectRepository {
             rs.getString("base_url"),
             rs.getBoolean("is_default"),
             deserializeEntries(rs.getString("variables_json")),
-            deserializeEntries(rs.getString("default_headers_json")));
+            deserializeEntries(rs.getString("default_headers_json")),
+            deserializeEntries(rs.getString("default_query_json")),
+            rs.getString("auth_mode"),
+            rs.getString("auth_key"),
+            rs.getString("auth_value"));
 
     private final JdbcTemplate jdbcTemplate;
     public ProjectRepository(JdbcTemplate jdbcTemplate) {
@@ -227,6 +231,7 @@ public class ProjectRepository {
     public List<EnvironmentDetail> listEnvironments(Long projectId) {
         return jdbcTemplate.query("""
                 select id, project_id, name, base_url, is_default, variables_json, default_headers_json
+                     , default_query_json, auth_mode, auth_key, auth_value
                 from environment
                 where project_id = ?
                 order by is_default desc, id
@@ -236,6 +241,7 @@ public class ProjectRepository {
     public Optional<EnvironmentDetail> findEnvironment(Long environmentId) {
         return jdbcTemplate.query("""
                 select id, project_id, name, base_url, is_default, variables_json, default_headers_json
+                     , default_query_json, auth_mode, auth_key, auth_value
                 from environment
                 where id = ?
                 """, ENVIRONMENT_ROW_MAPPER, environmentId).stream().findFirst();
@@ -249,8 +255,8 @@ public class ProjectRepository {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
-                    insert into environment (project_id, name, base_url, is_default, variables_json, default_headers_json, created_by)
-                    values (?, ?, ?, ?, ?, ?, ?)
+                    insert into environment (project_id, name, base_url, is_default, variables_json, default_headers_json, default_query_json, auth_mode, auth_key, auth_value, created_by)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, projectId);
             statement.setString(2, request.name());
@@ -258,7 +264,11 @@ public class ProjectRepository {
             statement.setBoolean(4, Boolean.TRUE.equals(request.isDefault()));
             statement.setString(5, serializeEntries(request.variables()));
             statement.setString(6, serializeEntries(request.defaultHeaders()));
-            statement.setLong(7, DEFAULT_USER_ID);
+            statement.setString(7, serializeEntries(request.defaultQuery()));
+            statement.setString(8, normalizeAuthMode(request.authMode()));
+            statement.setString(9, normalizeNullableString(request.authKey()));
+            statement.setString(10, normalizeNullableString(request.authValue()));
+            statement.setLong(11, DEFAULT_USER_ID);
             return statement;
         }, keyHolder);
         return findEnvironment(requireGeneratedId(keyHolder)).orElseThrow();
@@ -272,7 +282,7 @@ public class ProjectRepository {
 
         jdbcTemplate.update("""
                 update environment
-                set name = ?, base_url = ?, is_default = ?, variables_json = ?, default_headers_json = ?
+                set name = ?, base_url = ?, is_default = ?, variables_json = ?, default_headers_json = ?, default_query_json = ?, auth_mode = ?, auth_key = ?, auth_value = ?
                 where id = ?
                 """,
                 request.name(),
@@ -280,6 +290,10 @@ public class ProjectRepository {
                 Boolean.TRUE.equals(request.isDefault()),
                 serializeEntries(request.variables()),
                 serializeEntries(request.defaultHeaders()),
+                serializeEntries(request.defaultQuery()),
+                normalizeAuthMode(request.authMode()),
+                normalizeNullableString(request.authKey()),
+                normalizeNullableString(request.authValue()),
                 environmentId);
         return findEnvironment(environmentId).orElseThrow();
     }
@@ -345,6 +359,20 @@ public class ProjectRepository {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize environment JSON", exception);
         }
+    }
+
+    private String normalizeAuthMode(String value) {
+        if (value == null || value.isBlank()) {
+            return "none";
+        }
+        return value.trim().toLowerCase();
+    }
+
+    private String normalizeNullableString(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim();
     }
 
     public record ModuleReference(Long id, Long projectId) {

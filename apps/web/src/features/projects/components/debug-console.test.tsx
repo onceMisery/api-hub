@@ -39,6 +39,10 @@ describe("DebugConsole", () => {
         environment={{
           baseUrl: "https://local.dev/api",
           defaultHeaders: [{ name: "X-App", value: "ApiHub" }],
+          defaultQuery: [],
+          authKey: "",
+          authMode: "none",
+          authValue: "",
           id: 41,
           isDefault: true,
           name: "Local",
@@ -113,6 +117,10 @@ describe("DebugConsole", () => {
           environment={{
             baseUrl: environmentId === 42 ? "https://staging.dev/api" : "https://local.dev/api",
             defaultHeaders: [{ name: "X-App", value: "ApiHub" }],
+            defaultQuery: environmentId === 42 ? [{ name: "locale", value: "zh-CN" }] : [],
+            authKey: "",
+            authMode: "none",
+            authValue: "",
             id: environmentId,
             isDefault: environmentId === 41,
             name: environmentId === 42 ? "Staging" : "Local",
@@ -180,6 +188,10 @@ describe("DebugConsole", () => {
         environment={{
           baseUrl: "https://staging.dev/api",
           defaultHeaders: [],
+          defaultQuery: [],
+          authKey: "",
+          authMode: "none",
+          authValue: "",
           id: 42,
           isDefault: false,
           name: "Staging",
