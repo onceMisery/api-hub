@@ -635,6 +635,28 @@ export function EndpointEditor(props: EndpointEditorProps) {
                       </button>
                     </div>
                   </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Match summary</p>
+                      <div className="mt-3 space-y-2 text-sm text-slate-600">
+                        {buildRuleSummary(rule).map((item, itemIndex) => (
+                          <p key={`${item}-${itemIndex}`}>{item}</p>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Rule response preview</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span className="rounded-full border border-slate-200 px-3 py-1">{rule.statusCode}</span>
+                        <span className="rounded-full border border-slate-200 px-3 py-1">{rule.mediaType}</span>
+                      </div>
+                      <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
+                        {formatRulePreviewBody(rule.body)}
+                      </pre>
+                    </div>
+                  </div>
                 </div>
               ))
             )}
@@ -1070,6 +1092,34 @@ function parseConditions(text: string): MockConditionEntry[] {
       };
     })
     .filter((condition) => condition.name);
+}
+
+function buildRuleSummary(rule: MockRuleDraft) {
+  const queryConditions = parseConditions(rule.queryConditionsText).map(
+    (condition) => `query ${condition.name}=${condition.value}`
+  );
+  const headerConditions = parseConditions(rule.headerConditionsText).map(
+    (condition) => `header ${condition.name}=${condition.value}`
+  );
+  const conditions = [...queryConditions, ...headerConditions];
+
+  if (conditions.length === 0) {
+    return ["Matches any request for this endpoint."];
+  }
+
+  return conditions;
+}
+
+function formatRulePreviewBody(body: string) {
+  if (!body.trim()) {
+    return "{}";
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body;
+  }
 }
 
 function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {

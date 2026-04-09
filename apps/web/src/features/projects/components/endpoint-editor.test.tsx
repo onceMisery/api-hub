@@ -422,4 +422,45 @@ describe("EndpointEditor", () => {
       expect(previewBody).toHaveTextContent('"error": "saved-error"');
     });
   });
+
+  it("shows mock rule match summary and formatted rule response preview", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Match summary")).toBeInTheDocument();
+    expect(screen.getByText("query mode=strict")).toBeInTheDocument();
+    expect(screen.getByText("header x-scenario=unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("Rule response preview")).toBeInTheDocument();
+
+    const previewBlocks = screen.getAllByText("Rule response preview");
+    const previewBody = previewBlocks[0].parentElement?.querySelector("pre");
+    expect(previewBody).toHaveTextContent('"error": "token expired"');
+  });
 });
