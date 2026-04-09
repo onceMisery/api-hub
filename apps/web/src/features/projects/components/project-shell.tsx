@@ -291,6 +291,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             isLoadingHistory={isLoadingHistory}
             onExecute={handleExecuteDebug}
             onReplayHistory={handleReplayHistory}
+            onRunHistory={handleRunHistory}
             replayDraft={replayDraft}
           />
           <EndpointEditor
@@ -683,6 +684,24 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request");
       throw executionError;
     }
+  }
+
+  function handleRunHistory(historyItem: DebugHistoryItem) {
+    setSelectedEnvironmentId(historyItem.environmentId);
+    setReplayDraft({
+      body: historyItem.requestBody ?? "",
+      headersText: formatHeaderText(historyItem.requestHeaders),
+      historyId: historyItem.id,
+      queryString: extractQueryString(historyItem.finalUrl)
+    });
+
+    return handleExecuteDebug({
+      body: historyItem.requestBody ?? "",
+      endpointId: historyItem.endpointId,
+      environmentId: historyItem.environmentId,
+      headers: historyItem.requestHeaders,
+      queryString: extractQueryString(historyItem.finalUrl)
+    });
   }
 
   function handleReplayHistory(historyItem: DebugHistoryItem) {

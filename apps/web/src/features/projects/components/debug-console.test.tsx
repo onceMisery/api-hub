@@ -48,6 +48,7 @@ describe("DebugConsole", () => {
         isLoadingHistory={false}
         onExecute={onExecute}
         onReplayHistory={onReplayHistory}
+        onRunHistory={vi.fn()}
         replayDraft={null}
       />
     );
@@ -130,6 +131,7 @@ describe("DebugConsole", () => {
               queryString: new URL(item.finalUrl).search.replace(/^\?/, "")
             });
           }}
+          onRunHistory={vi.fn()}
           replayDraft={replayDraft}
         />
       );
@@ -144,5 +146,58 @@ describe("DebugConsole", () => {
     expect(screen.getByLabelText("Body")).toHaveValue("{\"user\":\"31\"}");
     expect(screen.getByText("https://staging.dev/api")).toBeInTheDocument();
     expect(onReplayHistory).toHaveBeenCalledWith(historyItem);
+  });
+
+  it("should execute a history item again and render the new response", async () => {
+    const historyItem = {
+      createdAt: "2026-04-09T12:10:00Z",
+      durationMs: 35,
+      endpointId: 31,
+      environmentId: 42,
+      finalUrl: "https://staging.dev/api/users/31?cached=true",
+      id: 101,
+      method: "GET",
+      projectId: 1,
+      requestBody: "{\"user\":\"31\"}",
+      requestHeaders: [{ name: "Authorization", value: "Bearer history-token" }],
+      responseBody: "{\"cached\":true}",
+      responseHeaders: [{ name: "content-type", value: "application/json" }],
+      statusCode: 200
+    };
+    const onRunHistory = vi.fn().mockResolvedValue({
+      durationMs: 28,
+      finalUrl: "https://staging.dev/api/users/31?cached=true",
+      method: "GET",
+      responseBody: "{\"rerun\":true}",
+      responseHeaders: [{ name: "content-type", value: "application/json" }],
+      statusCode: 202
+    });
+
+    render(
+      <DebugConsole
+        history={[historyItem]}
+        endpoint={{ description: "Load user", groupId: 21, id: 31, method: "GET", name: "Get User", path: "/users/31" }}
+        environment={{
+          baseUrl: "https://staging.dev/api",
+          defaultHeaders: [],
+          id: 42,
+          isDefault: false,
+          name: "Staging",
+          projectId: 1,
+          variables: []
+        }}
+        isLoadingHistory={false}
+        onExecute={vi.fn()}
+        onReplayHistory={vi.fn()}
+        onRunHistory={onRunHistory}
+        replayDraft={null}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run history 101" }));
+
+    await waitFor(() => expect(onRunHistory).toHaveBeenCalledWith(historyItem));
+    expect(await screen.findByText("{\"rerun\":true}")).toBeInTheDocument();
+    expect(screen.getByText("202")).toBeInTheDocument();
   });
 });

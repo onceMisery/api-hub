@@ -454,4 +454,79 @@ describe("ProjectShell", () => {
       expect(screen.getByLabelText("Body")).toHaveValue("{\"user\":\"31\"}");
     });
   });
+
+  it("runs a debug history item again through the execute pipeline", async () => {
+    fetchEnvironments.mockResolvedValue({
+      data: [
+        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] },
+        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [] }
+      ]
+    });
+    fetchDebugHistory
+      .mockResolvedValueOnce({
+        data: [
+          {
+            createdAt: "2026-04-09T12:10:00Z",
+            durationMs: 35,
+            endpointId: 31,
+            environmentId: 42,
+            finalUrl: "https://staging.dev/users/{id}?cached=true",
+            id: 101,
+            method: "GET",
+            projectId: 1,
+            requestBody: "{\"user\":\"31\"}",
+            requestHeaders: [{ name: "Authorization", value: "Bearer history-token" }],
+            responseBody: "{\"cached\":true}",
+            responseHeaders: [{ name: "content-type", value: "application/json" }],
+            statusCode: 200
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            createdAt: "2026-04-09T12:12:00Z",
+            durationMs: 20,
+            endpointId: 31,
+            environmentId: 42,
+            finalUrl: "https://staging.dev/users/{id}?cached=true",
+            id: 102,
+            method: "GET",
+            projectId: 1,
+            requestBody: "{\"user\":\"31\"}",
+            requestHeaders: [{ name: "Authorization", value: "Bearer history-token" }],
+            responseBody: "{\"rerun\":true}",
+            responseHeaders: [{ name: "content-type", value: "application/json" }],
+            statusCode: 202
+          }
+        ]
+      });
+    executeDebug.mockResolvedValueOnce({
+      data: {
+        durationMs: 20,
+        finalUrl: "https://staging.dev/users/{id}?cached=true",
+        method: "GET",
+        responseBody: "{\"rerun\":true}",
+        responseHeaders: [{ name: "content-type", value: "application/json" }],
+        statusCode: 202
+      }
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("https://staging.dev/users/{id}?cached=true")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Run history 101" }));
+
+    await waitFor(() =>
+      expect(executeDebug).toHaveBeenCalledWith({
+        body: "{\"user\":\"31\"}",
+        endpointId: 31,
+        environmentId: 42,
+        headers: [{ name: "Authorization", value: "Bearer history-token" }],
+        queryString: "cached=true"
+      })
+    );
+    expect(await screen.findByText("{\"rerun\":true}")).toBeInTheDocument();
+  });
 });

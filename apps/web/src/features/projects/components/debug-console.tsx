@@ -9,6 +9,7 @@ type DebugConsoleProps = {
   history: DebugHistoryItem[];
   isLoadingHistory: boolean;
   onReplayHistory: (historyItem: DebugHistoryItem) => void;
+  onRunHistory: (historyItem: DebugHistoryItem) => Promise<DebugExecutionResult>;
   replayDraft: {
     historyId: number;
     queryString: string;
@@ -18,7 +19,7 @@ type DebugConsoleProps = {
   onExecute: (payload: ExecuteDebugPayload) => Promise<DebugExecutionResult>;
 };
 
-export function DebugConsole({ endpoint, environment, history, isLoadingHistory, onExecute, onReplayHistory, replayDraft }: DebugConsoleProps) {
+export function DebugConsole({ endpoint, environment, history, isLoadingHistory, onExecute, onReplayHistory, onRunHistory, replayDraft }: DebugConsoleProps) {
   const [queryString, setQueryString] = useState("");
   const [headersText, setHeadersText] = useState("");
   const [body, setBody] = useState("");
@@ -202,6 +203,22 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
                     type="button"
                   >
                     Replay
+                  </button>
+                  <button
+                    aria-label={`Run history ${item.id}`}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-white"
+                    onClick={() => {
+                      setIsExecuting(true);
+                      setError(null);
+
+                      void onRunHistory(item)
+                        .then((response) => setResult(response))
+                        .catch((executionError) => setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request"))
+                        .finally(() => setIsExecuting(false));
+                    }}
+                    type="button"
+                  >
+                    Run again
                   </button>
                 </div>
                 <p className="mt-2 font-mono text-xs text-slate-600">{item.finalUrl}</p>
