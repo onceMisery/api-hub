@@ -80,6 +80,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [responseRows, setResponseRows] = useState<ResponseDraft[]>([]);
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
   const [compareVersionId, setCompareVersionId] = useState("");
+  const [previewSelection, setPreviewSelection] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [parameterMessage, setParameterMessage] = useState<string | null>(null);
@@ -100,6 +101,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     });
     setVersionForm({ changeSummary: "", version: "" });
     setCompareVersionId("");
+    setPreviewSelection("");
     setSaveMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
@@ -170,7 +172,12 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
-  const mockPreview = useMemo(() => buildMockPreview(responseRows), [responseRows]);
+  const previewOptions = useMemo(() => buildPreviewOptions(responseRows), [responseRows]);
+  const selectedPreviewKey = previewSelection || previewOptions[0]?.key || "";
+  const mockPreview = useMemo(
+    () => buildMockPreview(responseRows, selectedPreviewKey),
+    [responseRows, selectedPreviewKey]
+  );
 
   if (isLoading) {
     return (
@@ -485,6 +492,22 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
       <EditorPanel title="Mock Preview">
         <div className="space-y-4">
+          {previewOptions.length > 1 ? (
+            <Field label="Preview status">
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => setPreviewSelection(event.target.value)}
+                value={selectedPreviewKey}
+              >
+                {previewOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-3">
             <PreviewMetric label="Mock URL" value={buildMockUrl(projectId, formState.path)} mono />
             <PreviewMetric label="Status" value={String(mockPreview.statusCode)} />
@@ -690,7 +713,24 @@ function buildMockUrl(projectId: number, path: string) {
   return `/mock/${projectId}${normalizedPath}`;
 }
 
-function buildMockPreview(responseRows: ResponseDraft[]) {
+function buildPreviewOptions(responseRows: ResponseDraft[]) {
+  const options = new Map<string, { key: string; label: string }>();
+
+  for (const response of responseRows) {
+    const mediaType = response.mediaType || "application/json";
+    const key = `${response.httpStatusCode}:${mediaType}`;
+    if (!options.has(key)) {
+      options.set(key, {
+        key,
+        label: `${response.httpStatusCode} ${mediaType}`
+      });
+    }
+  }
+
+  return [...options.values()];
+}
+
+function buildMockPreview(responseRows: ResponseDraft[], previewKey: string) {
   if (responseRows.length === 0) {
     return {
       body: "{}",
@@ -699,17 +739,22 @@ function buildMockPreview(responseRows: ResponseDraft[]) {
     };
   }
 
-  const firstRow = responseRows[0];
-  const activeRows = responseRows.filter(
-    (response) =>
-      response.httpStatusCode === firstRow.httpStatusCode &&
-      response.mediaType === firstRow.mediaType
-  );
+  const fallbackRow = responseRows[0];
+  const [selectedStatus, selectedMediaType] = previewKey.split(":");
+  const activeRows = responseRows.filter((response) => {
+    const mediaType = response.mediaType || "application/json";
+    if (!previewKey) {
+      return response.httpStatusCode === fallbackRow.httpStatusCode && mediaType === fallbackRow.mediaType;
+    }
+
+    return String(response.httpStatusCode) === selectedStatus && mediaType === selectedMediaType;
+  });
+  const activeRow = activeRows[0] ?? fallbackRow;
 
   return {
     body: JSON.stringify(buildMockPayload(activeRows), null, 2),
-    mediaType: firstRow.mediaType || "application/json",
-    statusCode: firstRow.httpStatusCode || 200
+    mediaType: activeRow.mediaType || "application/json",
+    statusCode: activeRow.httpStatusCode || 200
   };
 }
 

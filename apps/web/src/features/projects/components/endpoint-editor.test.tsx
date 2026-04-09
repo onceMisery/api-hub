@@ -276,4 +276,57 @@ describe("EndpointEditor", () => {
       expect(previewBody).toHaveTextContent('"userId": "u_2002"');
     });
   });
+
+  it("switches mock preview between response status groups", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          },
+          {
+            id: 2,
+            httpStatusCode: 400,
+            mediaType: "application/json",
+            name: "error",
+            dataType: "string",
+            required: true,
+            description: "Error message",
+            exampleValue: "bad request",
+            sortOrder: 0
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    const previewBody = screen.getByText("Preview Body").parentElement?.querySelector("pre");
+    expect(previewBody).toHaveTextContent('"userId": "u_1001"');
+
+    const previewStatus = screen.getByLabelText("Preview status");
+    fireEvent.change(previewStatus, { target: { value: "400:application/json" } });
+
+    await waitFor(() => {
+      expect(previewStatus).toHaveValue("400:application/json");
+      expect(previewBody).toHaveTextContent('"error": "bad request"');
+    });
+  });
 });
