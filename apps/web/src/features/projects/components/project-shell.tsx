@@ -1,12 +1,17 @@
 "use client";
 
 import {
+  createEndpoint,
+  createGroup,
+  createModule,
   fetchEndpoint,
   fetchEndpointVersions,
   fetchProjectTree,
   isApiRequestError,
+  updateEndpoint,
   type EndpointDetail,
   type ModuleTreeItem,
+  type UpdateEndpointPayload,
   type VersionDetail
 } from "@api-hub/api-sdk";
 import { useRouter } from "next/navigation";
@@ -30,44 +35,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadTree() {
-      setIsLoadingTree(true);
-      setError(null);
-
-      try {
-        const response = await fetchProjectTree(projectId);
-        if (!isMounted) {
-          return;
-        }
-
-        setModules(response.data.modules);
-        setSelectedEndpointId(findFirstEndpointId(response.data.modules));
-      } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-
-        if (isApiRequestError(loadError) && loadError.status === 401) {
-          router.replace("/login");
-          return;
-        }
-
-        setError(loadError instanceof Error ? loadError.message : "Failed to load project tree");
-      } finally {
-        if (isMounted) {
-          setIsLoadingTree(false);
-        }
-      }
-    }
-
-    void loadTree();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [projectId, router]);
+    void reloadTree();
+  }, [projectId]);
 
   useEffect(() => {
     if (!selectedEndpointId) {
@@ -100,8 +69,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           return;
         }
 
-        if (isApiRequestError(loadError) && loadError.status === 401) {
-          router.replace("/login");
+        if (handleUnauthorized(loadError)) {
           return;
         }
 
@@ -118,7 +86,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     return () => {
       isMounted = false;
     };
-  }, [router, selectedEndpointId]);
+  }, [selectedEndpointId]);
 
   const treeStats = useMemo(() => {
     const groupCount = modules.reduce((count, module) => count + module.groups.length, 0);
@@ -142,8 +110,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Project Workbench</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Project #{projectId}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              Card-based workspace for modules, grouped endpoints, and version snapshots. Phase 1 runs on top of the
-              in-memory backend skeleton.
+              Card-based workspace for modules, grouped endpoints, and version snapshots backed by the phase 1 MySQL data model.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -164,12 +131,119 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             Loading project tree...
           </aside>
         ) : (
-          <ProjectSidebar modules={modules} onSelectEndpoint={setSelectedEndpointId} selectedEndpointId={selectedEndpointId} />
+          <ProjectSidebar
+            modules={modules}
+            onCreateEndpoint={handleCreateEndpoint}
+            onCreateGroup={handleCreateGroup}
+            onCreateModule={handleCreateModule}
+            onSelectEndpoint={setSelectedEndpointId}
+            selectedEndpointId={selectedEndpointId}
+          />
         )}
-        <EndpointEditor endpoint={endpoint} isLoading={isLoadingEndpoint} versions={versions} />
+        <EndpointEditor endpoint={endpoint} isLoading={isLoadingEndpoint} onSave={handleSaveEndpoint} versions={versions} />
       </section>
     </main>
   );
+
+  async function reloadTree(preferredEndpointId?: number | null) {
+    setIsLoadingTree(true);
+    setError(null);
+
+    try {
+      const response = await fetchProjectTree(projectId);
+      setModules(response.data.modules);
+
+      const availableEndpointId = preferredEndpointId ?? selectedEndpointId;
+      const nextEndpointId = findExistingEndpointId(response.data.modules, availableEndpointId) ?? findFirstEndpointId(response.data.modules);
+      setSelectedEndpointId(nextEndpointId);
+    } catch (loadError) {
+      if (handleUnauthorized(loadError)) {
+        return;
+      }
+
+      setError(loadError instanceof Error ? loadError.message : "Failed to load project tree");
+    } finally {
+      setIsLoadingTree(false);
+    }
+  }
+
+  async function handleCreateModule(payload: { name: string }) {
+    setError(null);
+
+    try {
+      await createModule(projectId, payload);
+      await reloadTree();
+    } catch (creationError) {
+      if (handleUnauthorized(creationError)) {
+        return;
+      }
+
+      setError(creationError instanceof Error ? creationError.message : "Failed to create module");
+    }
+  }
+
+  async function handleCreateGroup(moduleId: number, payload: { name: string }) {
+    setError(null);
+
+    try {
+      await createGroup(moduleId, payload);
+      await reloadTree();
+    } catch (creationError) {
+      if (handleUnauthorized(creationError)) {
+        return;
+      }
+
+      setError(creationError instanceof Error ? creationError.message : "Failed to create group");
+    }
+  }
+
+  async function handleCreateEndpoint(
+    groupId: number,
+    payload: { name: string; method: string; path: string; description: string }
+  ) {
+    setError(null);
+
+    try {
+      const response = await createEndpoint(groupId, payload);
+      await reloadTree(response.data.id);
+    } catch (creationError) {
+      if (handleUnauthorized(creationError)) {
+        return;
+      }
+
+      setError(creationError instanceof Error ? creationError.message : "Failed to create endpoint");
+    }
+  }
+
+  async function handleSaveEndpoint(payload: UpdateEndpointPayload) {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const response = await updateEndpoint(selectedEndpointId, payload);
+      setEndpoint(response.data);
+      await reloadTree(response.data.id);
+    } catch (saveError) {
+      if (handleUnauthorized(saveError)) {
+        return;
+      }
+
+      setError(saveError instanceof Error ? saveError.message : "Failed to save endpoint");
+      throw saveError;
+    }
+  }
+
+  function handleUnauthorized(loadError: unknown) {
+    if (isApiRequestError(loadError) && loadError.status === 401) {
+      router.replace("/login");
+      return true;
+    }
+
+    return false;
+  }
 }
 
 function findFirstEndpointId(modules: ModuleTreeItem[]) {
@@ -177,6 +251,22 @@ function findFirstEndpointId(modules: ModuleTreeItem[]) {
     for (const group of module.groups) {
       if (group.endpoints.length > 0) {
         return group.endpoints[0].id;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findExistingEndpointId(modules: ModuleTreeItem[], endpointId?: number | null) {
+  if (!endpointId) {
+    return null;
+  }
+
+  for (const module of modules) {
+    for (const group of module.groups) {
+      if (group.endpoints.some((endpoint) => endpoint.id === endpointId)) {
+        return endpointId;
       }
     }
   }
