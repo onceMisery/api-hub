@@ -1,3 +1,5 @@
+DROP ALL OBJECTS;
+
 CREATE TABLE sys_user (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(64) NOT NULL,
@@ -57,6 +59,35 @@ CREATE TABLE api_endpoint (
   sort_order INT NOT NULL DEFAULT 0,
   created_by BIGINT NOT NULL,
   updated_by BIGINT NOT NULL
+);
+
+CREATE TABLE api_parameter (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  parent_id BIGINT NULL,
+  section_type VARCHAR(16) NOT NULL,
+  node_path VARCHAR(512) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  data_type VARCHAR(64) NOT NULL,
+  required BOOLEAN NOT NULL DEFAULT FALSE,
+  description TEXT,
+  example_value TEXT,
+  sort_order INT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE api_response (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  parent_id BIGINT NULL,
+  http_status_code INT NOT NULL DEFAULT 200,
+  media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
+  node_path VARCHAR(512) NOT NULL,
+  name VARCHAR(128),
+  data_type VARCHAR(64) NOT NULL,
+  required BOOLEAN NOT NULL DEFAULT FALSE,
+  description TEXT,
+  example_value TEXT,
+  sort_order INT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE api_version (

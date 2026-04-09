@@ -9,6 +9,10 @@ type ProjectSidebarProps = {
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
   onCreateModule: (payload: { name: string }) => Promise<void>;
+  onDeleteGroup: (groupId: number) => Promise<void>;
+  onDeleteModule: (moduleId: number) => Promise<void>;
+  onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
+  onRenameModule: (moduleId: number, payload: { name: string }) => Promise<void>;
   onSelectEndpoint: (endpointId: number) => void;
 };
 
@@ -17,6 +21,10 @@ export function ProjectSidebar({
   onCreateEndpoint,
   onCreateGroup,
   onCreateModule,
+  onDeleteGroup,
+  onDeleteModule,
+  onRenameGroup,
+  onRenameModule,
   onSelectEndpoint,
   selectedEndpointId
 }: ProjectSidebarProps) {
@@ -63,6 +71,10 @@ export function ProjectSidebar({
             module={module}
             onCreateEndpoint={onCreateEndpoint}
             onCreateGroup={onCreateGroup}
+            onDeleteGroup={onDeleteGroup}
+            onDeleteModule={onDeleteModule}
+            onRenameGroup={onRenameGroup}
+            onRenameModule={onRenameModule}
             onSelectEndpoint={onSelectEndpoint}
             selectedEndpointId={selectedEndpointId}
           />
@@ -76,20 +88,64 @@ function ModuleSection({
   module,
   onCreateEndpoint,
   onCreateGroup,
+  onDeleteGroup,
+  onDeleteModule,
+  onRenameGroup,
+  onRenameModule,
   onSelectEndpoint,
   selectedEndpointId
 }: {
   module: ModuleTreeItem;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
+  onDeleteGroup: (groupId: number) => Promise<void>;
+  onDeleteModule: (moduleId: number) => Promise<void>;
+  onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
+  onRenameModule: (moduleId: number, payload: { name: string }) => Promise<void>;
   onSelectEndpoint: (endpointId: number) => void;
   selectedEndpointId: number | null;
 }) {
   const [groupName, setGroupName] = useState("");
+  const [moduleDraftName, setModuleDraftName] = useState(module.name);
 
   return (
-    <section className="space-y-3">
-      <div className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white">{module.name}</div>
+    <section className="space-y-3 rounded-[1.7rem] border border-slate-200/70 bg-white/70 p-3">
+      <div className="rounded-[1.4rem] bg-slate-950 px-4 py-4 text-white">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold">{module.name}</p>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200">
+            module
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <label className="space-y-2 text-slate-100">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Module {module.id} name</span>
+            <input
+              aria-label={`Module ${module.id} name`}
+              className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-300/70 focus:border-white/30"
+              onChange={(event) => setModuleDraftName(event.target.value)}
+              value={moduleDraftName}
+            />
+          </label>
+          <button
+            aria-label={`Rename module ${module.id}`}
+            className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+            onClick={() => void onRenameModule(module.id, { name: moduleDraftName.trim() || module.name })}
+            type="button"
+          >
+            Rename
+          </button>
+          <button
+            aria-label={`Delete module ${module.id}`}
+            className="rounded-2xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20"
+            onClick={() => void onDeleteModule(module.id)}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
 
       <form
         className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
@@ -126,6 +182,8 @@ function ModuleSection({
             key={group.id}
             group={group}
             onCreateEndpoint={onCreateEndpoint}
+            onDeleteGroup={onDeleteGroup}
+            onRenameGroup={onRenameGroup}
             onSelectEndpoint={onSelectEndpoint}
             selectedEndpointId={selectedEndpointId}
           />
@@ -138,21 +196,52 @@ function ModuleSection({
 function GroupSection({
   group,
   onCreateEndpoint,
+  onDeleteGroup,
+  onRenameGroup,
   onSelectEndpoint,
   selectedEndpointId
 }: {
   group: ModuleTreeItem["groups"][number];
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
+  onDeleteGroup: (groupId: number) => Promise<void>;
+  onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
   onSelectEndpoint: (endpointId: number) => void;
   selectedEndpointId: number | null;
 }) {
   const [endpointName, setEndpointName] = useState("");
   const [endpointMethod, setEndpointMethod] = useState("GET");
   const [endpointPath, setEndpointPath] = useState("");
+  const [groupDraftName, setGroupDraftName] = useState(group.name);
 
   return (
-    <div className="space-y-2 pl-2">
-      <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{group.name}</p>
+    <div className="space-y-3 rounded-[1.5rem] border border-slate-200/70 bg-slate-50/70 p-3">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Group {group.id} name</span>
+          <input
+            aria-label={`Group ${group.id} name`}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => setGroupDraftName(event.target.value)}
+            value={groupDraftName}
+          />
+        </label>
+        <button
+          aria-label={`Rename group ${group.id}`}
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300"
+          onClick={() => void onRenameGroup(group.id, { name: groupDraftName.trim() || group.name })}
+          type="button"
+        >
+          Rename
+        </button>
+        <button
+          aria-label={`Delete group ${group.id}`}
+          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+          onClick={() => void onDeleteGroup(group.id)}
+          type="button"
+        >
+          Delete
+        </button>
+      </div>
 
       <form
         className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
@@ -224,7 +313,7 @@ function GroupSection({
               className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                 isActive
                   ? "border-slate-900 bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.18)]"
-                  : "border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               }`}
               onClick={() => onSelectEndpoint(endpoint.id)}
               type="button"

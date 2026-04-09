@@ -81,6 +81,62 @@ export type UpdateEndpointPayload = {
   description: string;
 };
 
+export type UpdateModulePayload = {
+  name: string;
+};
+
+export type UpdateGroupPayload = {
+  name: string;
+};
+
+export type ParameterDetail = {
+  id: number;
+  sectionType: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  description: string | null;
+  exampleValue: string | null;
+  sortOrder: number;
+};
+
+export type ResponseDetail = {
+  id: number;
+  httpStatusCode: number;
+  mediaType: string;
+  name: string | null;
+  dataType: string;
+  required: boolean;
+  description: string | null;
+  exampleValue: string | null;
+  sortOrder: number;
+};
+
+export type ParameterUpsertItem = {
+  sectionType: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  description: string;
+  exampleValue: string;
+};
+
+export type ResponseUpsertItem = {
+  httpStatusCode: number;
+  mediaType: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  description: string;
+  exampleValue: string;
+};
+
+export type CreateVersionPayload = {
+  version: string;
+  changeSummary: string;
+  snapshotJson: string;
+};
+
 export function fetchProjects() {
   return apiFetch<ProjectSummary[]>("/api/v1/projects");
 }
@@ -96,10 +152,36 @@ export function createModule(projectId: number, payload: CreateModulePayload) {
   });
 }
 
+export function updateModule(moduleId: number, payload: UpdateModulePayload) {
+  return apiFetch<ModuleDetail>(`/api/v1/modules/${moduleId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteModule(moduleId: number) {
+  return apiFetch<null>(`/api/v1/modules/${moduleId}`, {
+    method: "DELETE"
+  });
+}
+
 export function createGroup(moduleId: number, payload: CreateGroupPayload) {
   return apiFetch<GroupDetail>(`/api/v1/modules/${moduleId}/groups`, {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export function updateGroup(groupId: number, payload: UpdateGroupPayload) {
+  return apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteGroup(groupId: number) {
+  return apiFetch<null>(`/api/v1/groups/${groupId}`, {
+    method: "DELETE"
   });
 }
 
@@ -121,6 +203,41 @@ export function updateEndpoint(endpointId: number, payload: UpdateEndpointPayloa
   });
 }
 
+export function deleteEndpoint(endpointId: number) {
+  return apiFetch<null>(`/api/v1/endpoints/${endpointId}`, {
+    method: "DELETE"
+  });
+}
+
+export function fetchEndpointParameters(endpointId: number) {
+  return apiFetch<ParameterDetail[]>(`/api/v1/endpoints/${endpointId}/parameters`);
+}
+
+export function replaceEndpointParameters(endpointId: number, payload: ParameterUpsertItem[]) {
+  return apiFetch<null>(`/api/v1/endpoints/${endpointId}/parameters`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchEndpointResponses(endpointId: number) {
+  return apiFetch<ResponseDetail[]>(`/api/v1/endpoints/${endpointId}/responses`);
+}
+
+export function replaceEndpointResponses(endpointId: number, payload: ResponseUpsertItem[]) {
+  return apiFetch<null>(`/api/v1/endpoints/${endpointId}/responses`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function fetchEndpointVersions(endpointId: number) {
   return apiFetch<VersionDetail[]>(`/api/v1/endpoints/${endpointId}/versions`);
+}
+
+export function createVersion(endpointId: number, payload: CreateVersionPayload) {
+  return apiFetch<VersionDetail>(`/api/v1/endpoints/${endpointId}/versions`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }

@@ -4,13 +4,27 @@ import {
   createEndpoint,
   createGroup,
   createModule,
+  createVersion,
+  deleteEndpoint,
+  deleteGroup,
+  deleteModule,
   fetchEndpoint,
+  fetchEndpointParameters,
+  fetchEndpointResponses,
   fetchEndpointVersions,
   fetchProjectTree,
   isApiRequestError,
+  replaceEndpointParameters,
+  replaceEndpointResponses,
   updateEndpoint,
+  updateGroup,
+  updateModule,
   type EndpointDetail,
   type ModuleTreeItem,
+  type ParameterDetail,
+  type ParameterUpsertItem,
+  type ResponseDetail,
+  type ResponseUpsertItem,
   type UpdateEndpointPayload,
   type VersionDetail
 } from "@api-hub/api-sdk";
@@ -29,6 +43,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
   const [endpoint, setEndpoint] = useState<EndpointDetail | null>(null);
+  const [parameters, setParameters] = useState<ParameterDetail[]>([]);
+  const [responses, setResponses] = useState<ResponseDetail[]>([]);
   const [versions, setVersions] = useState<VersionDetail[]>([]);
   const [isLoadingTree, setIsLoadingTree] = useState(true);
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
@@ -41,6 +57,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   useEffect(() => {
     if (!selectedEndpointId) {
       setEndpoint(null);
+      setParameters([]);
+      setResponses([]);
       setVersions([]);
       return;
     }
@@ -53,8 +71,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setError(null);
 
       try {
-        const [endpointResponse, versionsResponse] = await Promise.all([
+        const [endpointResponse, parameterResponse, responseResponse, versionsResponse] = await Promise.all([
           fetchEndpoint(endpointId),
+          fetchEndpointParameters(endpointId),
+          fetchEndpointResponses(endpointId),
           fetchEndpointVersions(endpointId)
         ]);
 
@@ -63,6 +83,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         }
 
         setEndpoint(endpointResponse.data);
+        setParameters(parameterResponse.data);
+        setResponses(responseResponse.data);
         setVersions(versionsResponse.data);
       } catch (loadError) {
         if (!isMounted) {
@@ -136,11 +158,26 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onCreateEndpoint={handleCreateEndpoint}
             onCreateGroup={handleCreateGroup}
             onCreateModule={handleCreateModule}
+            onDeleteGroup={handleDeleteGroup}
+            onDeleteModule={handleDeleteModule}
+            onRenameGroup={handleRenameGroup}
+            onRenameModule={handleRenameModule}
             onSelectEndpoint={setSelectedEndpointId}
             selectedEndpointId={selectedEndpointId}
           />
         )}
-        <EndpointEditor endpoint={endpoint} isLoading={isLoadingEndpoint} onSave={handleSaveEndpoint} versions={versions} />
+        <EndpointEditor
+          endpoint={endpoint}
+          isLoading={isLoadingEndpoint}
+          onDelete={handleDeleteEndpoint}
+          onSave={handleSaveEndpoint}
+          onSaveParameters={handleSaveParameters}
+          onSaveResponses={handleSaveResponses}
+          onSaveVersion={handleSaveVersion}
+          parameters={parameters}
+          responses={responses}
+          versions={versions}
+        />
       </section>
     </main>
   );
@@ -182,18 +219,78 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  async function handleRenameModule(moduleId: number, payload: { name: string }) {
+    setError(null);
+
+    try {
+      await updateModule(moduleId, payload);
+      await reloadTree(selectedEndpointId);
+    } catch (updateError) {
+      if (handleUnauthorized(updateError)) {
+        return;
+      }
+
+      setError(updateError instanceof Error ? updateError.message : "Failed to rename module");
+    }
+  }
+
+  async function handleDeleteModule(moduleId: number) {
+    setError(null);
+
+    try {
+      await deleteModule(moduleId);
+      await reloadTree();
+    } catch (deleteError) {
+      if (handleUnauthorized(deleteError)) {
+        return;
+      }
+
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete module");
+    }
+  }
+
   async function handleCreateGroup(moduleId: number, payload: { name: string }) {
     setError(null);
 
     try {
       await createGroup(moduleId, payload);
-      await reloadTree();
+      await reloadTree(selectedEndpointId);
     } catch (creationError) {
       if (handleUnauthorized(creationError)) {
         return;
       }
 
       setError(creationError instanceof Error ? creationError.message : "Failed to create group");
+    }
+  }
+
+  async function handleRenameGroup(groupId: number, payload: { name: string }) {
+    setError(null);
+
+    try {
+      await updateGroup(groupId, payload);
+      await reloadTree(selectedEndpointId);
+    } catch (updateError) {
+      if (handleUnauthorized(updateError)) {
+        return;
+      }
+
+      setError(updateError instanceof Error ? updateError.message : "Failed to rename group");
+    }
+  }
+
+  async function handleDeleteGroup(groupId: number) {
+    setError(null);
+
+    try {
+      await deleteGroup(groupId);
+      await reloadTree();
+    } catch (deleteError) {
+      if (handleUnauthorized(deleteError)) {
+        return;
+      }
+
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete group");
     }
   }
 
@@ -232,6 +329,101 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       }
 
       setError(saveError instanceof Error ? saveError.message : "Failed to save endpoint");
+      throw saveError;
+    }
+  }
+
+  async function handleDeleteEndpoint() {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await deleteEndpoint(selectedEndpointId);
+      await reloadTree();
+    } catch (deleteError) {
+      if (handleUnauthorized(deleteError)) {
+        return;
+      }
+
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete endpoint");
+      throw deleteError;
+    }
+  }
+
+  async function handleSaveParameters(payload: ParameterUpsertItem[]) {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await replaceEndpointParameters(selectedEndpointId, payload);
+      const response = await fetchEndpointParameters(selectedEndpointId);
+      setParameters(response.data);
+    } catch (saveError) {
+      if (handleUnauthorized(saveError)) {
+        return;
+      }
+
+      setError(saveError instanceof Error ? saveError.message : "Failed to save parameters");
+      throw saveError;
+    }
+  }
+
+  async function handleSaveResponses(payload: ResponseUpsertItem[]) {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await replaceEndpointResponses(selectedEndpointId, payload);
+      const response = await fetchEndpointResponses(selectedEndpointId);
+      setResponses(response.data);
+    } catch (saveError) {
+      if (handleUnauthorized(saveError)) {
+        return;
+      }
+
+      setError(saveError instanceof Error ? saveError.message : "Failed to save responses");
+      throw saveError;
+    }
+  }
+
+  async function handleSaveVersion(payload: { version: string; changeSummary: string }) {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await createVersion(selectedEndpointId, {
+        changeSummary: payload.changeSummary,
+        snapshotJson: JSON.stringify(
+          {
+            endpoint,
+            parameters,
+            responses
+          },
+          null,
+          2
+        ),
+        version: payload.version
+      });
+      const response = await fetchEndpointVersions(selectedEndpointId);
+      setVersions(response.data);
+    } catch (saveError) {
+      if (handleUnauthorized(saveError)) {
+        return;
+      }
+
+      setError(saveError instanceof Error ? saveError.message : "Failed to save version snapshot");
       throw saveError;
     }
   }

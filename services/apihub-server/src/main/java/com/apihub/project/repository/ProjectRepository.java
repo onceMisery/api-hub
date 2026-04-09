@@ -6,6 +6,8 @@ import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
+import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
+import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -132,6 +134,19 @@ public class ProjectRepository {
                 """, MODULE_ROW_MAPPER, moduleId).stream().findFirst();
     }
 
+    public ModuleDetail updateModule(Long moduleId, UpdateModuleRequest request) {
+        jdbcTemplate.update("""
+                update module
+                set name = ?
+                where id = ?
+                """, request.name(), moduleId);
+        return findModule(moduleId).orElseThrow();
+    }
+
+    public void deleteModule(Long moduleId) {
+        jdbcTemplate.update("delete from module where id = ?", moduleId);
+    }
+
     public List<GroupDetail> listGroups(Long moduleId) {
         return jdbcTemplate.query("""
                 select id, module_id, name
@@ -178,6 +193,19 @@ public class ProjectRepository {
                 from api_group
                 where id = ?
                 """, GROUP_ROW_MAPPER, groupId).stream().findFirst();
+    }
+
+    public GroupDetail updateGroup(Long groupId, UpdateGroupRequest request) {
+        jdbcTemplate.update("""
+                update api_group
+                set name = ?
+                where id = ?
+                """, request.name(), groupId);
+        return findGroup(groupId).orElseThrow();
+    }
+
+    public void deleteGroup(Long groupId) {
+        jdbcTemplate.update("delete from api_group where id = ?", groupId);
     }
 
     private String nextModuleKey(Long projectId, String name) {

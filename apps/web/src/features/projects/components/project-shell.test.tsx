@@ -5,20 +5,40 @@ const {
   mockReplace,
   fetchProjectTree,
   fetchEndpoint,
+  fetchEndpointParameters,
+  fetchEndpointResponses,
   fetchEndpointVersions,
   createModule,
+  updateModule,
+  deleteModule,
   createGroup,
+  updateGroup,
+  deleteGroup,
   createEndpoint,
-  updateEndpoint
+  updateEndpoint,
+  deleteEndpoint,
+  replaceEndpointParameters,
+  replaceEndpointResponses,
+  createVersion
 } = vi.hoisted(() => ({
   mockReplace: vi.fn(),
   fetchProjectTree: vi.fn(),
   fetchEndpoint: vi.fn(),
+  fetchEndpointParameters: vi.fn(),
+  fetchEndpointResponses: vi.fn(),
   fetchEndpointVersions: vi.fn(),
   createModule: vi.fn(),
+  updateModule: vi.fn(),
+  deleteModule: vi.fn(),
   createGroup: vi.fn(),
+  updateGroup: vi.fn(),
+  deleteGroup: vi.fn(),
   createEndpoint: vi.fn(),
-  updateEndpoint: vi.fn()
+  updateEndpoint: vi.fn(),
+  deleteEndpoint: vi.fn(),
+  replaceEndpointParameters: vi.fn(),
+  replaceEndpointResponses: vi.fn(),
+  createVersion: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -30,11 +50,21 @@ vi.mock("next/navigation", () => ({
 vi.mock("@api-hub/api-sdk", () => ({
   fetchProjectTree,
   fetchEndpoint,
+  fetchEndpointParameters,
+  fetchEndpointResponses,
   fetchEndpointVersions,
   createModule,
+  updateModule,
+  deleteModule,
   createGroup,
+  updateGroup,
+  deleteGroup,
   createEndpoint,
   updateEndpoint,
+  deleteEndpoint,
+  replaceEndpointParameters,
+  replaceEndpointResponses,
+  createVersion,
   isApiRequestError: () => false
 }));
 
@@ -55,9 +85,7 @@ describe("ProjectShell", () => {
                 {
                   id: 21,
                   name: "Users",
-                  endpoints: [
-                    { id: 31, name: "Get User", method: "GET", path: "/users/{id}" }
-                  ]
+                  endpoints: [{ id: 31, name: "Get User", method: "GET", path: "/users/{id}" }]
                 }
               ]
             }
@@ -96,9 +124,15 @@ describe("ProjectShell", () => {
       }
     }));
 
+    fetchEndpointParameters.mockResolvedValue({ data: [] });
+    fetchEndpointResponses.mockResolvedValue({ data: [] });
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     createModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
+    updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
+    deleteModule.mockResolvedValue({ data: null });
     createGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
+    updateGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
+    deleteGroup.mockResolvedValue({ data: null });
     createEndpoint.mockResolvedValue({
       data: {
         id: 99,
@@ -117,6 +151,18 @@ describe("ProjectShell", () => {
         method: "GET",
         path: "/users/{id}",
         description: "Updated"
+      }
+    });
+    deleteEndpoint.mockResolvedValue({ data: null });
+    replaceEndpointParameters.mockResolvedValue({ data: null });
+    replaceEndpointResponses.mockResolvedValue({ data: null });
+    createVersion.mockResolvedValue({
+      data: {
+        id: 2,
+        endpointId: 31,
+        version: "v2",
+        changeSummary: "Added editable schema",
+        snapshotJson: "{}"
       }
     });
   });

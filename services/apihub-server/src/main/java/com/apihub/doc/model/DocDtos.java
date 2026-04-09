@@ -13,4 +13,25 @@ public final class DocDtos {
 
     public record CreateVersionRequest(String version, String changeSummary, String snapshotJson) {
     }
+
+    public record ParameterUpsertItem(
+            String sectionType,
+            String name,
+            String dataType,
+            boolean required,
+            String description,
+            String exampleValue
+    ) {
+    }
+
+    public record ResponseUpsertItem(
+            int httpStatusCode,
+            String mediaType,
+            String name,
+            String dataType,
+            boolean required,
+            String description,
+            String exampleValue
+    ) {
+    }
 }

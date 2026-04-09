@@ -2,8 +2,12 @@ package com.apihub.doc.repository;
 
 import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
+import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
+import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.doc.model.EndpointDetail;
+import com.apihub.doc.model.ParameterDetail;
+import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.project.repository.ProjectRepository.GroupReference;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +39,27 @@ public class EndpointRepository {
             rs.getString("version_label"),
             rs.getString("change_summary"),
             rs.getString("snapshot_json"));
+
+    private static final RowMapper<ParameterDetail> PARAMETER_ROW_MAPPER = (rs, rowNum) -> new ParameterDetail(
+            rs.getLong("id"),
+            rs.getString("section_type"),
+            rs.getString("name"),
+            rs.getString("data_type"),
+            rs.getBoolean("required"),
+            rs.getString("description"),
+            rs.getString("example_value"),
+            rs.getInt("sort_order"));
+
+    private static final RowMapper<ResponseDetail> RESPONSE_ROW_MAPPER = (rs, rowNum) -> new ResponseDetail(
+            rs.getLong("id"),
+            rs.getInt("http_status_code"),
+            rs.getString("media_type"),
+            rs.getString("name"),
+            rs.getString("data_type"),
+            rs.getBoolean("required"),
+            rs.getString("description"),
+            rs.getString("example_value"),
+            rs.getInt("sort_order"));
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -118,6 +143,92 @@ public class EndpointRepository {
                 DEFAULT_USER_ID,
                 endpointId);
         return findEndpoint(endpointId).orElseThrow();
+    }
+
+    public void deleteEndpoint(Long endpointId) {
+        jdbcTemplate.update("delete from api_endpoint where id = ?", endpointId);
+    }
+
+    public List<ParameterDetail> listParameters(Long endpointId) {
+        return jdbcTemplate.query("""
+                select id, section_type, name, data_type, required, description, example_value, sort_order
+                from api_parameter
+                where endpoint_id = ?
+                order by sort_order, id
+                """, PARAMETER_ROW_MAPPER, endpointId);
+    }
+
+    public void replaceParameters(Long endpointId, List<ParameterUpsertItem> items) {
+        jdbcTemplate.update("delete from api_parameter where endpoint_id = ?", endpointId);
+
+        for (int i = 0; i < items.size(); i++) {
+            ParameterUpsertItem item = items.get(i);
+            jdbcTemplate.update("""
+                    insert into api_parameter (
+                        endpoint_id,
+                        parent_id,
+                        section_type,
+                        node_path,
+                        name,
+                        data_type,
+                        required,
+                        description,
+                        example_value,
+                        sort_order
+                    ) values (?, null, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    endpointId,
+                    item.sectionType(),
+                    item.sectionType() + "-" + i,
+                    item.name(),
+                    item.dataType(),
+                    item.required(),
+                    item.description(),
+                    item.exampleValue(),
+                    i);
+        }
+    }
+
+    public List<ResponseDetail> listResponses(Long endpointId) {
+        return jdbcTemplate.query("""
+                select id, http_status_code, media_type, name, data_type, required, description, example_value, sort_order
+                from api_response
+                where endpoint_id = ?
+                order by sort_order, id
+                """, RESPONSE_ROW_MAPPER, endpointId);
+    }
+
+    public void replaceResponses(Long endpointId, List<ResponseUpsertItem> items) {
+        jdbcTemplate.update("delete from api_response where endpoint_id = ?", endpointId);
+
+        for (int i = 0; i < items.size(); i++) {
+            ResponseUpsertItem item = items.get(i);
+            jdbcTemplate.update("""
+                    insert into api_response (
+                        endpoint_id,
+                        parent_id,
+                        http_status_code,
+                        media_type,
+                        node_path,
+                        name,
+                        data_type,
+                        required,
+                        description,
+                        example_value,
+                        sort_order
+                    ) values (?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    endpointId,
+                    item.httpStatusCode(),
+                    item.mediaType(),
+                    "response-" + item.httpStatusCode() + "-" + i,
+                    item.name(),
+                    item.dataType(),
+                    item.required(),
+                    item.description(),
+                    item.exampleValue(),
+                    i);
+        }
     }
 
     public List<VersionDetail> listVersions(Long endpointId) {

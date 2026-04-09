@@ -2,8 +2,12 @@ package com.apihub.project.service;
 
 import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
+import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
+import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.doc.model.EndpointDetail;
+import com.apihub.doc.model.ParameterDetail;
+import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
@@ -16,6 +20,8 @@ import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleTreeItem;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
+import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
+import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
 import com.apihub.project.repository.ProjectRepository;
 import org.springframework.http.HttpStatus;
@@ -92,6 +98,16 @@ public class ProjectService {
         return projectRepository.createModule(projectId, request);
     }
 
+    public ModuleDetail updateModule(Long moduleId, UpdateModuleRequest request) {
+        requireModule(moduleId);
+        return projectRepository.updateModule(moduleId, request);
+    }
+
+    public void deleteModule(Long moduleId) {
+        requireModule(moduleId);
+        projectRepository.deleteModule(moduleId);
+    }
+
     @Transactional(readOnly = true)
     public List<GroupDetail> listGroups(Long moduleId) {
         requireModule(moduleId);
@@ -101,6 +117,16 @@ public class ProjectService {
     public GroupDetail createGroup(Long moduleId, CreateGroupRequest request) {
         requireModule(moduleId);
         return projectRepository.createGroup(moduleId, request);
+    }
+
+    public GroupDetail updateGroup(Long groupId, UpdateGroupRequest request) {
+        requireGroup(groupId);
+        return projectRepository.updateGroup(groupId, request);
+    }
+
+    public void deleteGroup(Long groupId) {
+        requireGroup(groupId);
+        projectRepository.deleteGroup(groupId);
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +151,33 @@ public class ProjectService {
                 request.method() != null ? request.method() : current.method(),
                 request.path() != null ? request.path() : current.path(),
                 request.description() != null ? request.description() : current.description()));
+    }
+
+    public void deleteEndpoint(Long endpointId) {
+        requireEndpoint(endpointId);
+        endpointRepository.deleteEndpoint(endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ParameterDetail> listParameters(Long endpointId) {
+        requireEndpoint(endpointId);
+        return endpointRepository.listParameters(endpointId);
+    }
+
+    public void replaceParameters(Long endpointId, List<ParameterUpsertItem> items) {
+        requireEndpoint(endpointId);
+        endpointRepository.replaceParameters(endpointId, items);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ResponseDetail> listResponses(Long endpointId) {
+        requireEndpoint(endpointId);
+        return endpointRepository.listResponses(endpointId);
+    }
+
+    public void replaceResponses(Long endpointId, List<ResponseUpsertItem> items) {
+        requireEndpoint(endpointId);
+        endpointRepository.replaceResponses(endpointId, items);
     }
 
     @Transactional(readOnly = true)

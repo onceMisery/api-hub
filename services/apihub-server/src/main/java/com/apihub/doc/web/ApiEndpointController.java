@@ -5,6 +5,7 @@ import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.project.service.ProjectService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,5 +45,11 @@ public class ApiEndpointController {
     public ApiResponse<EndpointDetail> updateEndpoint(@PathVariable Long endpointId,
                                                       @RequestBody UpdateEndpointRequest request) {
         return ApiResponse.success(projectService.updateEndpoint(endpointId, request));
+    }
+
+    @DeleteMapping("/api/v1/endpoints/{endpointId}")
+    public ApiResponse<Void> deleteEndpoint(@PathVariable Long endpointId) {
+        projectService.deleteEndpoint(endpointId);
+        return ApiResponse.success(null);
     }
 }

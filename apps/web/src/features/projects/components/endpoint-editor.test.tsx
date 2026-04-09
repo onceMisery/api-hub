@@ -65,4 +65,82 @@ describe("EndpointEditor", () => {
       })
     );
   });
+
+  it("saves parameter and response rows, creates versions, and deletes the endpoint", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const onSaveParameters = vi.fn().mockResolvedValue(undefined);
+    const onSaveResponses = vi.fn().mockResolvedValue(undefined);
+    const onSaveVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user"
+        }}
+        onDelete={onDelete}
+        onSaveParameters={onSaveParameters}
+        onSaveResponses={onSaveResponses}
+        onSaveVersion={onSaveVersion}
+        parameters={[]}
+        responses={[]}
+        versions={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add parameter row" }));
+    fireEvent.change(screen.getByLabelText("Parameter 1 name"), { target: { value: "id" } });
+    fireEvent.change(screen.getByLabelText("Parameter 1 type"), { target: { value: "string" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save parameters" }));
+
+    await waitFor(() =>
+      expect(onSaveParameters).toHaveBeenCalledWith([
+        {
+          dataType: "string",
+          description: "",
+          exampleValue: "",
+          name: "id",
+          required: false,
+          sectionType: "query"
+        }
+      ])
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add response row" }));
+    fireEvent.change(screen.getByLabelText("Response 1 name"), { target: { value: "userId" } });
+    fireEvent.change(screen.getByLabelText("Response 1 type"), { target: { value: "string" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save responses" }));
+
+    await waitFor(() =>
+      expect(onSaveResponses).toHaveBeenCalledWith([
+        {
+          dataType: "string",
+          description: "",
+          exampleValue: "",
+          httpStatusCode: 200,
+          mediaType: "application/json",
+          name: "userId",
+          required: false
+        }
+      ])
+    );
+
+    fireEvent.change(screen.getByLabelText("Version label"), { target: { value: "v2" } });
+    fireEvent.change(screen.getByLabelText("Version summary"), { target: { value: "Added editable schema" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save version snapshot" }));
+
+    await waitFor(() =>
+      expect(onSaveVersion).toHaveBeenCalledWith({
+        changeSummary: "Added editable schema",
+        version: "v2"
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete endpoint" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalled());
+  });
 });

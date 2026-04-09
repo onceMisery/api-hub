@@ -33,10 +33,16 @@ public final class ProjectDtos {
     public record CreateModuleRequest(String name) {
     }
 
+    public record UpdateModuleRequest(String name) {
+    }
+
     public record ModuleDetail(Long id, Long projectId, String name) {
     }
 
     public record CreateGroupRequest(String name) {
+    }
+
+    public record UpdateGroupRequest(String name) {
     }
 
     public record GroupDetail(Long id, Long moduleId, String name) {
