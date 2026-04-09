@@ -183,6 +183,27 @@ CREATE TABLE api_version (
   UNIQUE KEY uk_api_version_endpoint_revision (endpoint_id, revision_no)
 );
 
+CREATE TABLE mock_rule (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  rule_name VARCHAR(128) NOT NULL,
+  priority INT NOT NULL DEFAULT 0,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  query_conditions_json JSON NOT NULL,
+  header_conditions_json JSON NOT NULL,
+  status_code INT NOT NULL DEFAULT 200,
+  media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
+  body_json LONGTEXT NOT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY idx_mock_rule_endpoint_priority (endpoint_id, priority DESC, id ASC),
+  CONSTRAINT fk_mock_rule_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
+  CONSTRAINT fk_mock_rule_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id),
+  CONSTRAINT fk_mock_rule_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user (id)
+);
+
 CREATE TABLE debug_history (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,

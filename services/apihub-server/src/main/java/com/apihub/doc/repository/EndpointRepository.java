@@ -9,7 +9,13 @@ import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
+import com.apihub.mock.model.MockDtos.MockConditionEntry;
+import com.apihub.mock.model.MockDtos.MockRuleDetail;
+import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.project.repository.ProjectRepository.GroupReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -18,6 +24,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +32,9 @@ import java.util.Optional;
 public class EndpointRepository {
 
     private static final long DEFAULT_USER_ID = 1L;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<List<MockConditionEntry>> MOCK_CONDITION_LIST = new TypeReference<>() {
+    };
 
     private static final RowMapper<EndpointDetail> ENDPOINT_ROW_MAPPER = (rs, rowNum) -> new EndpointDetail(
             rs.getLong("id"),
@@ -62,6 +72,17 @@ public class EndpointRepository {
             rs.getString("description"),
             rs.getString("example_value"),
             rs.getInt("sort_order"));
+    private static final RowMapper<MockRuleDetail> MOCK_RULE_ROW_MAPPER = (rs, rowNum) -> new MockRuleDetail(
+            rs.getLong("id"),
+            rs.getLong("endpoint_id"),
+            rs.getString("rule_name"),
+            rs.getInt("priority"),
+            rs.getBoolean("enabled"),
+            parseConditionEntries(rs.getString("query_conditions_json")),
+            parseConditionEntries(rs.getString("header_conditions_json")),
+            rs.getInt("status_code"),
+            rs.getString("media_type"),
+            rs.getString("body_json"));
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -246,6 +267,57 @@ public class EndpointRepository {
         }
     }
 
+    public List<MockRuleDetail> listMockRules(Long endpointId) {
+        return jdbcTemplate.query("""
+                select id,
+                       endpoint_id,
+                       rule_name,
+                       priority,
+                       enabled,
+                       query_conditions_json,
+                       header_conditions_json,
+                       status_code,
+                       media_type,
+                       body_json
+                from mock_rule
+                where endpoint_id = ?
+                order by priority desc, id
+                """, MOCK_RULE_ROW_MAPPER, endpointId);
+    }
+
+    public void replaceMockRules(Long endpointId, List<MockRuleUpsertItem> items) {
+        jdbcTemplate.update("delete from mock_rule where endpoint_id = ?", endpointId);
+
+        for (MockRuleUpsertItem item : items) {
+            jdbcTemplate.update("""
+                    insert into mock_rule (
+                        endpoint_id,
+                        rule_name,
+                        priority,
+                        enabled,
+                        query_conditions_json,
+                        header_conditions_json,
+                        status_code,
+                        media_type,
+                        body_json,
+                        created_by,
+                        updated_by
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    endpointId,
+                    item.ruleName(),
+                    item.priority(),
+                    item.enabled(),
+                    writeConditionEntries(item.queryConditions()),
+                    writeConditionEntries(item.headerConditions()),
+                    item.statusCode(),
+                    item.mediaType(),
+                    item.body(),
+                    DEFAULT_USER_ID,
+                    DEFAULT_USER_ID);
+        }
+    }
+
     public List<VersionDetail> listVersions(Long endpointId) {
         return jdbcTemplate.query("""
                 select id,
@@ -323,5 +395,25 @@ public class EndpointRepository {
     }
 
     public record EndpointReference(Long id, Long groupId, Long projectId) {
+    }
+
+    private static List<MockConditionEntry> parseConditionEntries(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return OBJECT_MAPPER.readValue(rawJson, MOCK_CONDITION_LIST);
+        } catch (JsonProcessingException exception) {
+            return List.of();
+        }
+    }
+
+    private String writeConditionEntries(List<MockConditionEntry> entries) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(entries == null ? Collections.emptyList() : entries);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize mock conditions", exception);
+        }
     }
 }

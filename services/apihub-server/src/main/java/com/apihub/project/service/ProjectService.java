@@ -10,6 +10,8 @@ import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.mock.model.MockDtos.MockRuleDetail;
+import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
@@ -203,6 +205,17 @@ public class ProjectService {
     public void replaceResponses(Long endpointId, List<ResponseUpsertItem> items) {
         requireEndpoint(endpointId);
         endpointRepository.replaceResponses(endpointId, items);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MockRuleDetail> listMockRules(Long endpointId) {
+        requireEndpoint(endpointId);
+        return endpointRepository.listMockRules(endpointId);
+    }
+
+    public void replaceMockRules(Long endpointId, List<MockRuleUpsertItem> items) {
+        requireEndpoint(endpointId);
+        endpointRepository.replaceMockRules(endpointId, items);
     }
 
     @Transactional(readOnly = true)

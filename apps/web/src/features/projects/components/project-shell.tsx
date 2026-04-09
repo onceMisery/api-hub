@@ -12,6 +12,7 @@ import {
   deleteGroup,
   deleteModule,
   fetchEndpoint,
+  fetchEndpointMockRules,
   fetchEnvironments,
   fetchDebugHistory,
   fetchEndpointParameters,
@@ -20,6 +21,7 @@ import {
   fetchProjectTree,
   isApiRequestError,
   replaceEndpointParameters,
+  replaceEndpointMockRules,
   replaceEndpointResponses,
   updateEndpoint,
   updateEnvironment,
@@ -31,6 +33,8 @@ import {
   type DebugHistoryItem,
   type EndpointDetail,
   type ModuleTreeItem,
+  type MockRuleDetail,
+  type MockRuleUpsertItem,
   type ParameterDetail,
   type ParameterUpsertItem,
   type ResponseDetail,
@@ -68,6 +72,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   } | null>(null);
   const [parameters, setParameters] = useState<ParameterDetail[]>([]);
   const [responses, setResponses] = useState<ResponseDetail[]>([]);
+  const [mockRules, setMockRules] = useState<MockRuleDetail[]>([]);
   const [versions, setVersions] = useState<VersionDetail[]>([]);
   const [isLoadingTree, setIsLoadingTree] = useState(true);
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
@@ -89,6 +94,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setReplayDraft(null);
       setParameters([]);
       setResponses([]);
+      setMockRules([]);
       setVersions([]);
       return;
     }
@@ -101,10 +107,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setError(null);
 
       try {
-        const [endpointResponse, parameterResponse, responseResponse, versionsResponse] = await Promise.all([
+        const [endpointResponse, parameterResponse, responseResponse, mockRuleResponse, versionsResponse] = await Promise.all([
           fetchEndpoint(endpointId),
           fetchEndpointParameters(endpointId),
           fetchEndpointResponses(endpointId),
+          fetchEndpointMockRules(endpointId),
           fetchEndpointVersions(endpointId)
         ]);
 
@@ -115,6 +122,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         setEndpoint(endpointResponse.data);
         setParameters(parameterResponse.data);
         setResponses(responseResponse.data);
+        setMockRules(mockRuleResponse.data);
         setVersions(versionsResponse.data);
       } catch (loadError) {
         if (!isMounted) {
@@ -299,9 +307,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             isLoading={isLoadingEndpoint}
             onDelete={handleDeleteEndpoint}
             onSave={handleSaveEndpoint}
+            onSaveMockRules={handleSaveMockRules}
             onSaveParameters={handleSaveParameters}
             onSaveResponses={handleSaveResponses}
             onSaveVersion={handleSaveVersion}
+            mockRules={mockRules}
             parameters={parameters}
             projectId={projectId}
             responses={responses}
@@ -625,6 +635,27 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       }
 
       setError(saveError instanceof Error ? saveError.message : "Failed to save responses");
+      throw saveError;
+    }
+  }
+
+  async function handleSaveMockRules(payload: MockRuleUpsertItem[]) {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await replaceEndpointMockRules(selectedEndpointId, payload);
+      const response = await fetchEndpointMockRules(selectedEndpointId);
+      setMockRules(response.data);
+    } catch (saveError) {
+      if (handleUnauthorized(saveError)) {
+        return;
+      }
+
+      setError(saveError instanceof Error ? saveError.message : "Failed to save mock rules");
       throw saveError;
     }
   }

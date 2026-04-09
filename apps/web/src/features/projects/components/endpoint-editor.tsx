@@ -1,5 +1,8 @@
 import type {
   EndpointDetail,
+  MockConditionEntry,
+  MockRuleDetail,
+  MockRuleUpsertItem,
   ParameterDetail,
   ParameterUpsertItem,
   ResponseDetail,
@@ -15,9 +18,11 @@ type EndpointEditorProps = {
   isLoading?: boolean;
   onDelete?: () => Promise<void>;
   onSave?: (payload: UpdateEndpointPayload) => Promise<void>;
+  onSaveMockRules?: (payload: MockRuleUpsertItem[]) => Promise<void>;
   onSaveParameters?: (payload: ParameterUpsertItem[]) => Promise<void>;
   onSaveResponses?: (payload: ResponseUpsertItem[]) => Promise<void>;
   onSaveVersion?: (payload: { version: string; changeSummary: string }) => Promise<void>;
+  mockRules?: MockRuleDetail[];
   parameters?: ParameterDetail[];
   responses?: ResponseDetail[];
   versions: VersionDetail[];
@@ -42,8 +47,20 @@ type ResponseDraft = {
   exampleValue: string;
 };
 
+type MockRuleDraft = {
+  ruleName: string;
+  priority: number;
+  enabled: boolean;
+  queryConditionsText: string;
+  headerConditionsText: string;
+  statusCode: number;
+  mediaType: string;
+  body: string;
+};
+
 const EMPTY_PARAMETERS: ParameterDetail[] = [];
 const EMPTY_RESPONSES: ResponseDetail[] = [];
+const EMPTY_MOCK_RULES: MockRuleDetail[] = [];
 type SnapshotShape = {
   endpoint: {
     name: string;
@@ -63,9 +80,11 @@ export function EndpointEditor(props: EndpointEditorProps) {
     isLoading = false,
     onDelete,
     onSave,
+    onSaveMockRules,
     onSaveParameters,
     onSaveResponses,
     onSaveVersion,
+    mockRules = EMPTY_MOCK_RULES,
     parameters = EMPTY_PARAMETERS,
     responses = EMPTY_RESPONSES,
     versions
@@ -79,12 +98,14 @@ export function EndpointEditor(props: EndpointEditorProps) {
   });
   const [parameterRows, setParameterRows] = useState<ParameterDraft[]>([]);
   const [responseRows, setResponseRows] = useState<ResponseDraft[]>([]);
+  const [mockRuleRows, setMockRuleRows] = useState<MockRuleDraft[]>([]);
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
   const [compareVersionId, setCompareVersionId] = useState("");
   const [previewSelection, setPreviewSelection] = useState("");
   const [previewSource, setPreviewSource] = useState<PreviewSource>("draft");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [mockRuleMessage, setMockRuleMessage] = useState<string | null>(null);
   const [parameterMessage, setParameterMessage] = useState<string | null>(null);
   const [responseMessage, setResponseMessage] = useState<string | null>(null);
   const [versionMessage, setVersionMessage] = useState<string | null>(null);
@@ -106,6 +127,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setPreviewSelection("");
     setPreviewSource("draft");
     setSaveMessage(null);
+    setMockRuleMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
     setVersionMessage(null);
@@ -137,6 +159,21 @@ export function EndpointEditor(props: EndpointEditorProps) {
       }))
     );
   }, [responses]);
+
+  useEffect(() => {
+    setMockRuleRows(
+      mockRules.map((rule) => ({
+        body: rule.body ?? "{}",
+        enabled: rule.enabled,
+        headerConditionsText: formatConditions(rule.headerConditions),
+        mediaType: rule.mediaType,
+        priority: rule.priority,
+        queryConditionsText: formatConditions(rule.queryConditions),
+        ruleName: rule.ruleName,
+        statusCode: rule.statusCode
+      }))
+    );
+  }, [mockRules]);
 
   const latestSnapshot = useMemo(
     () =>
@@ -501,6 +538,122 @@ export function EndpointEditor(props: EndpointEditorProps) {
         </div>
       </EditorPanel>
 
+      <EditorPanel title="Mock Rules">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">Match exact query or header values before falling back to the default mock preview.</p>
+            <button
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
+              onClick={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
+              type="button"
+            >
+              Add mock rule
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {mockRuleRows.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
+                No conditional mock rules yet.
+              </p>
+            ) : (
+              mockRuleRows.map((rule, index) => (
+                <div key={`mock-rule-${index}`} className="space-y-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <Field label={`Mock rule ${index + 1} name`}>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "ruleName", event.target.value)}
+                        value={rule.ruleName}
+                      />
+                    </Field>
+                    <Field label={`Mock rule ${index + 1} priority`}>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "priority", Number(event.target.value) || 0)}
+                        value={rule.priority}
+                      />
+                    </Field>
+                    <Field label={`Mock rule ${index + 1} response status`}>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "statusCode", Number(event.target.value) || 200)}
+                        value={rule.statusCode}
+                      />
+                    </Field>
+                    <Field label={`Mock rule ${index + 1} media type`}>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "mediaType", event.target.value)}
+                        value={rule.mediaType}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <Field label={`Mock rule ${index + 1} query conditions`}>
+                      <textarea
+                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "queryConditionsText", event.target.value)}
+                        placeholder="mode=strict"
+                        value={rule.queryConditionsText}
+                      />
+                    </Field>
+                    <Field label={`Mock rule ${index + 1} header conditions`}>
+                      <textarea
+                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "headerConditionsText", event.target.value)}
+                        placeholder="x-scenario=unauthorized"
+                        value={rule.headerConditionsText}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                    <Field label={`Mock rule ${index + 1} body`}>
+                      <textarea
+                        className="min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                        onChange={(event) => updateMockRuleRow(index, "body", event.target.value)}
+                        value={rule.body}
+                      />
+                    </Field>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                        <input
+                          checked={rule.enabled}
+                          onChange={(event) => updateMockRuleRow(index, "enabled", event.target.checked)}
+                          type="checkbox"
+                        />
+                        Enabled
+                      </label>
+                      <button
+                        className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                        onClick={() => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+                        type="button"
+                      >
+                        Remove mock rule {index + 1}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={!onSaveMockRules}
+              onClick={() => void handleSaveMockRules()}
+              type="button"
+            >
+              Save mock rules
+            </button>
+            {mockRuleMessage ? <p className="text-sm text-emerald-600">{mockRuleMessage}</p> : null}
+          </div>
+        </div>
+      </EditorPanel>
+
       <EditorPanel title="Mock Preview">
         <div className="space-y-4">
           {versions.length > 0 ? (
@@ -687,6 +840,26 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setResponseMessage("Saved");
   }
 
+  async function handleSaveMockRules() {
+    if (!onSaveMockRules) {
+      return;
+    }
+
+    await onSaveMockRules(
+      mockRuleRows.map((rule) => ({
+        body: rule.body,
+        enabled: rule.enabled,
+        headerConditions: parseConditions(rule.headerConditionsText),
+        mediaType: rule.mediaType,
+        priority: rule.priority,
+        queryConditions: parseConditions(rule.queryConditionsText),
+        ruleName: rule.ruleName,
+        statusCode: rule.statusCode
+      }))
+    );
+    setMockRuleMessage("Saved");
+  }
+
   async function handleSaveVersion() {
     if (!onSaveVersion) {
       return;
@@ -710,6 +883,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
   function updateResponseRow<K extends keyof ResponseDraft>(index: number, field: K, value: ResponseDraft[K]) {
     setResponseRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
   }
+
+  function updateMockRuleRow<K extends keyof MockRuleDraft>(index: number, field: K, value: MockRuleDraft[K]) {
+    setMockRuleRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
+  }
 }
 
 function createParameterDraft(): ParameterDraft {
@@ -732,6 +909,19 @@ function createResponseDraft(): ResponseDraft {
     mediaType: "application/json",
     name: "",
     required: false
+  };
+}
+
+function createMockRuleDraft(): MockRuleDraft {
+  return {
+    body: "{}",
+    enabled: true,
+    headerConditionsText: "",
+    mediaType: "application/json",
+    priority: 100,
+    queryConditionsText: "",
+    ruleName: "",
+    statusCode: 200
   };
 }
 
@@ -854,6 +1044,32 @@ function defaultMockValue(dataType: string) {
     default:
       return "";
   }
+}
+
+function formatConditions(conditions: MockConditionEntry[]) {
+  return conditions.map((condition) => `${condition.name}=${condition.value}`).join("\n");
+}
+
+function parseConditions(text: string): MockConditionEntry[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex === -1) {
+        return {
+          name: line,
+          value: ""
+        };
+      }
+
+      return {
+        name: line.slice(0, separatorIndex).trim(),
+        value: line.slice(separatorIndex + 1).trim()
+      };
+    })
+    .filter((condition) => condition.name);
 }
 
 function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {

@@ -177,6 +177,35 @@ export type ResponseUpsertItem = {
   exampleValue: string;
 };
 
+export type MockConditionEntry = {
+  name: string;
+  value: string;
+};
+
+export type MockRuleDetail = {
+  id: number;
+  endpointId: number;
+  ruleName: string;
+  priority: number;
+  enabled: boolean;
+  queryConditions: MockConditionEntry[];
+  headerConditions: MockConditionEntry[];
+  statusCode: number;
+  mediaType: string;
+  body: string;
+};
+
+export type MockRuleUpsertItem = {
+  ruleName: string;
+  priority: number;
+  enabled: boolean;
+  queryConditions: MockConditionEntry[];
+  headerConditions: MockConditionEntry[];
+  statusCode: number;
+  mediaType: string;
+  body: string;
+};
+
 export type CreateVersionPayload = {
   version: string;
   changeSummary: string;
@@ -341,6 +370,17 @@ export function replaceEndpointResponses(endpointId: number, payload: ResponseUp
 
 export function fetchEndpointVersions(endpointId: number) {
   return apiFetch<VersionDetail[]>(`/api/v1/endpoints/${endpointId}/versions`);
+}
+
+export function fetchEndpointMockRules(endpointId: number) {
+  return apiFetch<MockRuleDetail[]>(`/api/v1/endpoints/${endpointId}/mock-rules`);
+}
+
+export function replaceEndpointMockRules(endpointId: number, payload: MockRuleUpsertItem[]) {
+  return apiFetch<null>(`/api/v1/endpoints/${endpointId}/mock-rules`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function createVersion(endpointId: number, payload: CreateVersionPayload) {

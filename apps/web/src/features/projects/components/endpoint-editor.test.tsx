@@ -75,6 +75,7 @@ describe("EndpointEditor", () => {
 
   it("saves parameter and response rows, creates versions, and deletes the endpoint", async () => {
     const onDelete = vi.fn().mockResolvedValue(undefined);
+    const onSaveMockRules = vi.fn().mockResolvedValue(undefined);
     const onSaveParameters = vi.fn().mockResolvedValue(undefined);
     const onSaveResponses = vi.fn().mockResolvedValue(undefined);
     const onSaveVersion = vi.fn().mockResolvedValue(undefined);
@@ -92,6 +93,7 @@ describe("EndpointEditor", () => {
         }}
         projectId={1}
         onDelete={onDelete}
+        onSaveMockRules={onSaveMockRules}
         onSaveParameters={onSaveParameters}
         onSaveResponses={onSaveResponses}
         onSaveVersion={onSaveVersion}
@@ -134,6 +136,29 @@ describe("EndpointEditor", () => {
           mediaType: "application/json",
           name: "userId",
           required: false
+        }
+      ])
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add mock rule" }));
+    fireEvent.change(screen.getByLabelText("Mock rule 1 name"), { target: { value: "Unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 query conditions"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 header conditions"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 response status"), { target: { value: "401" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 body"), { target: { value: "{\"error\":\"token expired\"}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save mock rules" }));
+
+    await waitFor(() =>
+      expect(onSaveMockRules).toHaveBeenCalledWith([
+        {
+          body: "{\"error\":\"token expired\"}",
+          enabled: true,
+          headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+          mediaType: "application/json",
+          priority: 100,
+          queryConditions: [{ name: "mode", value: "strict" }],
+          ruleName: "Unauthorized",
+          statusCode: 401
         }
       ])
     );

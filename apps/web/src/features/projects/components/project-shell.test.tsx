@@ -5,6 +5,7 @@ const {
   mockReplace,
   fetchProjectTree,
   fetchEndpoint,
+  fetchEndpointMockRules,
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
@@ -24,12 +25,14 @@ const {
   deleteEndpoint,
   deleteEnvironment,
   replaceEndpointParameters,
+  replaceEndpointMockRules,
   replaceEndpointResponses,
   createVersion
 } = vi.hoisted(() => ({
   mockReplace: vi.fn(),
   fetchProjectTree: vi.fn(),
   fetchEndpoint: vi.fn(),
+  fetchEndpointMockRules: vi.fn(),
   fetchEndpointParameters: vi.fn(),
   fetchEndpointResponses: vi.fn(),
   fetchEndpointVersions: vi.fn(),
@@ -49,6 +52,7 @@ const {
   deleteEndpoint: vi.fn(),
   deleteEnvironment: vi.fn(),
   replaceEndpointParameters: vi.fn(),
+  replaceEndpointMockRules: vi.fn(),
   replaceEndpointResponses: vi.fn(),
   createVersion: vi.fn()
 }));
@@ -62,6 +66,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@api-hub/api-sdk", () => ({
   fetchProjectTree,
   fetchEndpoint,
+  fetchEndpointMockRules,
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
@@ -81,6 +86,7 @@ vi.mock("@api-hub/api-sdk", () => ({
   deleteEndpoint,
   deleteEnvironment,
   replaceEndpointParameters,
+  replaceEndpointMockRules,
   replaceEndpointResponses,
   createVersion,
   isApiRequestError: () => false
@@ -145,6 +151,7 @@ describe("ProjectShell", () => {
 
     fetchEndpointParameters.mockResolvedValue({ data: [] });
     fetchEndpointResponses.mockResolvedValue({ data: [] });
+    fetchEndpointMockRules.mockResolvedValue({ data: [] });
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     fetchDebugHistory.mockResolvedValue({ data: [] });
     fetchEnvironments.mockResolvedValue({
@@ -193,6 +200,7 @@ describe("ProjectShell", () => {
     deleteEndpoint.mockResolvedValue({ data: null });
     deleteEnvironment.mockResolvedValue({ data: null });
     replaceEndpointParameters.mockResolvedValue({ data: null });
+    replaceEndpointMockRules.mockResolvedValue({ data: null });
     replaceEndpointResponses.mockResolvedValue({ data: null });
     createVersion.mockResolvedValue({
       data: {

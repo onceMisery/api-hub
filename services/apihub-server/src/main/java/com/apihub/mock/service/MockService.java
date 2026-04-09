@@ -5,6 +5,8 @@ import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.mock.model.MockDtos.MockConditionEntry;
+import com.apihub.mock.model.MockDtos.MockRuleDetail;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -32,13 +35,31 @@ public class MockService {
         this.endpointRepository = endpointRepository;
     }
 
-    public MockResponse resolve(Long projectId, String method, String path) {
+    public MockResponse resolve(Long projectId,
+                                String method,
+                                String path,
+                                Map<String, List<String>> queryParameters,
+                                Map<String, String> requestHeaders) {
         EndpointDetail endpoint = endpointRepository.listMockEndpoints(projectId, method).stream()
                 .filter(candidate -> matches(candidate.path(), path))
                 .min(Comparator
                         .comparingInt((EndpointDetail candidate) -> placeholderCount(candidate.path()))
                         .thenComparingInt(candidate -> -segmentCount(candidate.path())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mock endpoint not found"));
+
+        Optional<MockDocument> fromRule = endpointRepository.listMockRules(endpoint.id()).stream()
+                .filter(MockRuleDetail::enabled)
+                .sorted(Comparator.comparingInt(MockRuleDetail::priority).reversed().thenComparingLong(MockRuleDetail::id))
+                .filter(rule -> matchesConditions(rule, queryParameters, requestHeaders))
+                .map(this::mockDocumentFromRule)
+                .findFirst();
+        if (fromRule.isPresent()) {
+            MockDocument document = fromRule.get();
+            return new MockResponse(
+                    document.statusCode(),
+                    List.of(new DebugHeader("Content-Type", document.mediaType())),
+                    document.body());
+        }
 
         Optional<MockDocument> fromSnapshot = endpointRepository.findLatestVersion(endpoint.id())
                 .flatMap(this::mockDocumentFromVersion);
@@ -143,6 +164,35 @@ public class MockService {
                 .toList();
 
         return new MockDocument(first.httpStatusCode(), first.mediaType(), buildJsonBody(responseFields));
+    }
+
+    private MockDocument mockDocumentFromRule(MockRuleDetail rule) {
+        return new MockDocument(
+                rule.statusCode(),
+                rule.mediaType() == null || rule.mediaType().isBlank() ? "application/json" : rule.mediaType(),
+                rule.body() == null || rule.body().isBlank() ? "{}" : rule.body());
+    }
+
+    private boolean matchesConditions(MockRuleDetail rule,
+                                      Map<String, List<String>> queryParameters,
+                                      Map<String, String> requestHeaders) {
+        for (MockConditionEntry condition : rule.queryConditions()) {
+            List<String> requestValues = queryParameters.getOrDefault(condition.name(), List.of());
+            if (!requestValues.contains(condition.value())) {
+                return false;
+            }
+        }
+
+        Map<String, String> normalizedHeaders = new LinkedHashMap<>();
+        requestHeaders.forEach((name, value) -> normalizedHeaders.put(name.toLowerCase(Locale.ROOT), value));
+        for (MockConditionEntry condition : rule.headerConditions()) {
+            String requestValue = normalizedHeaders.get(condition.name().toLowerCase(Locale.ROOT));
+            if (!condition.value().equals(requestValue)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private String buildJsonBody(List<ResponseField> responseFields) {

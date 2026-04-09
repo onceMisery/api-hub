@@ -15,6 +15,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.BDDMockito.given;
@@ -58,7 +59,7 @@ class ProjectSecurityTest {
 
     @Test
     void shouldAllowPublicMockEndpointWithoutBearerToken() throws Exception {
-        given(mockService.resolve(1L, "GET", "/users/31"))
+        given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of()))
                 .willReturn(new com.apihub.mock.service.MockService.MockResponse(
                         200,
                         List.of(new DebugHeader("Content-Type", "application/json")),

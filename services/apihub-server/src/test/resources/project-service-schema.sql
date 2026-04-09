@@ -116,6 +116,21 @@ CREATE TABLE api_version (
   created_by BIGINT NOT NULL
 );
 
+CREATE TABLE mock_rule (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  endpoint_id BIGINT NOT NULL,
+  rule_name VARCHAR(128) NOT NULL,
+  priority INT NOT NULL DEFAULT 0,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  query_conditions_json CLOB NOT NULL,
+  header_conditions_json CLOB NOT NULL,
+  status_code INT NOT NULL DEFAULT 200,
+  media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
+  body_json CLOB NOT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL
+);
+
 CREATE TABLE debug_history (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,

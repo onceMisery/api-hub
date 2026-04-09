@@ -8,6 +8,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 @RestController
 public class MockController {
 
@@ -23,7 +29,12 @@ public class MockController {
     })
     public ResponseEntity<String> handleMock(@PathVariable Long projectId, HttpServletRequest request) {
         String requestPath = extractPath(projectId, request.getRequestURI());
-        MockService.MockResponse response = mockService.resolve(projectId, request.getMethod(), requestPath);
+        MockService.MockResponse response = mockService.resolve(
+                projectId,
+                request.getMethod(),
+                requestPath,
+                extractQueryParameters(request),
+                extractHeaders(request));
 
         HttpHeaders headers = new HttpHeaders();
         response.headers().forEach(header -> headers.add(header.name(), header.value()));
@@ -39,5 +50,21 @@ public class MockController {
         }
         String path = requestUri.startsWith(prefix) ? requestUri.substring(prefix.length()) : requestUri;
         return path.isBlank() ? "/" : path;
+    }
+
+    private Map<String, List<String>> extractQueryParameters(HttpServletRequest request) {
+        Map<String, List<String>> queryParameters = new LinkedHashMap<>();
+        request.getParameterMap().forEach((name, values) -> queryParameters.put(name, Arrays.asList(values)));
+        return queryParameters;
+    }
+
+    private Map<String, String> extractHeaders(HttpServletRequest request) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        Enumeration<String> names = request.getHeaderNames();
+        while (names.hasMoreElements()) {
+            String name = names.nextElement();
+            headers.put(name, request.getHeader(name));
+        }
+        return headers;
     }
 }
