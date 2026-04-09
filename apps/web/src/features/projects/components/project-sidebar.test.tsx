@@ -57,4 +57,62 @@ describe("ProjectSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete module 11" }));
     await waitFor(() => expect(onDeleteModule).toHaveBeenCalledWith(11));
   });
+
+  it("renames and deletes endpoint nodes", async () => {
+    const onCreateEndpoint = vi.fn().mockResolvedValue(undefined);
+    const onCreateGroup = vi.fn().mockResolvedValue(undefined);
+    const onCreateModule = vi.fn().mockResolvedValue(undefined);
+    const onDeleteEndpoint = vi.fn().mockResolvedValue(undefined);
+    const onDeleteGroup = vi.fn().mockResolvedValue(undefined);
+    const onDeleteModule = vi.fn().mockResolvedValue(undefined);
+    const onRenameEndpoint = vi.fn().mockResolvedValue(undefined);
+    const onRenameGroup = vi.fn().mockResolvedValue(undefined);
+    const onRenameModule = vi.fn().mockResolvedValue(undefined);
+    const onSelectEndpoint = vi.fn();
+
+    render(
+      <ProjectSidebar
+        modules={[
+          {
+            id: 11,
+            name: "Core",
+            groups: [
+              {
+                id: 21,
+                name: "Users",
+                endpoints: [{ id: 31, name: "Get User", method: "GET", path: "/users/{id}" }]
+              }
+            ]
+          }
+        ]}
+        onCreateEndpoint={onCreateEndpoint}
+        onCreateGroup={onCreateGroup}
+        onCreateModule={onCreateModule}
+        onDeleteEndpoint={onDeleteEndpoint}
+        onDeleteGroup={onDeleteGroup}
+        onDeleteModule={onDeleteModule}
+        onRenameEndpoint={onRenameEndpoint}
+        onRenameGroup={onRenameGroup}
+        onRenameModule={onRenameModule}
+        onSelectEndpoint={onSelectEndpoint}
+        selectedEndpointId={31}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Endpoint 31 name"), { target: { value: "Get User Detail" } });
+    fireEvent.change(screen.getByLabelText("Endpoint 31 path"), { target: { value: "/users/{userId}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename endpoint 31" }));
+
+    await waitFor(() =>
+      expect(onRenameEndpoint).toHaveBeenCalledWith(31, {
+        description: "",
+        method: "GET",
+        name: "Get User Detail",
+        path: "/users/{userId}"
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete endpoint 31" }));
+    await waitFor(() => expect(onDeleteEndpoint).toHaveBeenCalledWith(31));
+  });
 });

@@ -190,4 +190,97 @@ describe("ProjectShell", () => {
     expect(await screen.findByText("Create User")).toBeInTheDocument();
     await waitFor(() => expect(fetchEndpoint).toHaveBeenLastCalledWith(99));
   });
+
+  it("renames and deletes an endpoint from the tree", async () => {
+    fetchProjectTree
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: {
+          modules: [
+            {
+              id: 11,
+              name: "Core",
+              groups: [
+                {
+                  id: 21,
+                  name: "Users",
+                  endpoints: [{ id: 31, name: "Get User", method: "GET", path: "/users/{id}" }]
+                }
+              ]
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          modules: [
+            {
+              id: 11,
+              name: "Core",
+              groups: [
+                {
+                  id: 21,
+                  name: "Users",
+                  endpoints: [{ id: 31, name: "Get User Detail", method: "GET", path: "/users/{userId}" }]
+                }
+              ]
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          modules: [
+            {
+              id: 11,
+              name: "Core",
+              groups: [
+                {
+                  id: 21,
+                  name: "Users",
+                  endpoints: []
+                }
+              ]
+            }
+          ]
+        }
+      });
+
+    updateEndpoint.mockResolvedValueOnce({
+      data: {
+        id: 31,
+        groupId: 21,
+        name: "Get User Detail",
+        method: "GET",
+        path: "/users/{userId}",
+        description: "Endpoint detail"
+      }
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("Get User")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Endpoint 31 name"), { target: { value: "Get User Detail" } });
+    fireEvent.change(screen.getByLabelText("Endpoint 31 path"), { target: { value: "/users/{userId}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename endpoint 31" }));
+
+    await waitFor(() =>
+      expect(updateEndpoint).toHaveBeenCalledWith(31, {
+        description: "Endpoint detail",
+        method: "GET",
+        name: "Get User Detail",
+        path: "/users/{userId}"
+      })
+    );
+
+    await waitFor(() => expect(fetchProjectTree).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Get User Detail")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete endpoint 31" }));
+
+    await waitFor(() => expect(deleteEndpoint).toHaveBeenCalledWith(31));
+    await waitFor(() => expect(fetchProjectTree).toHaveBeenCalledTimes(3));
+    expect(screen.getByText("Pick an endpoint")).toBeInTheDocument();
+  });
 });

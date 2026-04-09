@@ -9,8 +9,10 @@ type ProjectSidebarProps = {
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
   onCreateModule: (payload: { name: string }) => Promise<void>;
+  onDeleteEndpoint: (endpointId: number) => Promise<void>;
   onDeleteGroup: (groupId: number) => Promise<void>;
   onDeleteModule: (moduleId: number) => Promise<void>;
+  onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
   onRenameModule: (moduleId: number, payload: { name: string }) => Promise<void>;
   onSelectEndpoint: (endpointId: number) => void;
@@ -21,8 +23,10 @@ export function ProjectSidebar({
   onCreateEndpoint,
   onCreateGroup,
   onCreateModule,
+  onDeleteEndpoint,
   onDeleteGroup,
   onDeleteModule,
+  onRenameEndpoint,
   onRenameGroup,
   onRenameModule,
   onSelectEndpoint,
@@ -71,8 +75,10 @@ export function ProjectSidebar({
             module={module}
             onCreateEndpoint={onCreateEndpoint}
             onCreateGroup={onCreateGroup}
+            onDeleteEndpoint={onDeleteEndpoint}
             onDeleteGroup={onDeleteGroup}
             onDeleteModule={onDeleteModule}
+            onRenameEndpoint={onRenameEndpoint}
             onRenameGroup={onRenameGroup}
             onRenameModule={onRenameModule}
             onSelectEndpoint={onSelectEndpoint}
@@ -88,8 +94,10 @@ function ModuleSection({
   module,
   onCreateEndpoint,
   onCreateGroup,
+  onDeleteEndpoint,
   onDeleteGroup,
   onDeleteModule,
+  onRenameEndpoint,
   onRenameGroup,
   onRenameModule,
   onSelectEndpoint,
@@ -98,8 +106,10 @@ function ModuleSection({
   module: ModuleTreeItem;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
+  onDeleteEndpoint: (endpointId: number) => Promise<void>;
   onDeleteGroup: (groupId: number) => Promise<void>;
   onDeleteModule: (moduleId: number) => Promise<void>;
+  onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
   onRenameModule: (moduleId: number, payload: { name: string }) => Promise<void>;
   onSelectEndpoint: (endpointId: number) => void;
@@ -182,7 +192,9 @@ function ModuleSection({
             key={group.id}
             group={group}
             onCreateEndpoint={onCreateEndpoint}
+            onDeleteEndpoint={onDeleteEndpoint}
             onDeleteGroup={onDeleteGroup}
+            onRenameEndpoint={onRenameEndpoint}
             onRenameGroup={onRenameGroup}
             onSelectEndpoint={onSelectEndpoint}
             selectedEndpointId={selectedEndpointId}
@@ -196,14 +208,18 @@ function ModuleSection({
 function GroupSection({
   group,
   onCreateEndpoint,
+  onDeleteEndpoint,
   onDeleteGroup,
+  onRenameEndpoint,
   onRenameGroup,
   onSelectEndpoint,
   selectedEndpointId
 }: {
   group: ModuleTreeItem["groups"][number];
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
+  onDeleteEndpoint: (endpointId: number) => Promise<void>;
   onDeleteGroup: (groupId: number) => Promise<void>;
+  onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
   onSelectEndpoint: (endpointId: number) => void;
   selectedEndpointId: number | null;
@@ -308,30 +324,124 @@ function GroupSection({
           const isActive = endpoint.id === selectedEndpointId;
 
           return (
-            <button
+            <EndpointNode
+              endpoint={endpoint}
+              isActive={isActive}
               key={endpoint.id}
-              className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                isActive
-                  ? "border-slate-900 bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.18)]"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-              }`}
-              onClick={() => onSelectEndpoint(endpoint.id)}
-              type="button"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="truncate text-sm font-medium">{endpoint.name}</span>
-                <span
-                  className={`rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
-                    isActive ? "bg-white/15 text-white" : "bg-slate-200 text-slate-700"
-                  }`}
-                >
-                  {endpoint.method}
-                </span>
-              </div>
-              <p className={`mt-2 truncate text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>{endpoint.path}</p>
-            </button>
+              onDeleteEndpoint={onDeleteEndpoint}
+              onRenameEndpoint={onRenameEndpoint}
+              onSelectEndpoint={onSelectEndpoint}
+            />
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function EndpointNode({
+  endpoint,
+  isActive,
+  onDeleteEndpoint,
+  onRenameEndpoint,
+  onSelectEndpoint
+}: {
+  endpoint: ModuleTreeItem["groups"][number]["endpoints"][number];
+  isActive: boolean;
+  onDeleteEndpoint: (endpointId: number) => Promise<void>;
+  onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
+  onSelectEndpoint: (endpointId: number) => void;
+}) {
+  const [endpointDraftName, setEndpointDraftName] = useState(endpoint.name);
+  const [endpointDraftPath, setEndpointDraftPath] = useState(endpoint.path);
+
+  return (
+    <div
+      className={`space-y-3 rounded-2xl border px-4 py-3 transition ${
+        isActive
+          ? "border-slate-900 bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.18)]"
+          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+      }`}
+    >
+      <button className="w-full text-left" onClick={() => onSelectEndpoint(endpoint.id)} type="button">
+        <div className="flex items-center justify-between gap-3">
+          <span className="truncate text-sm font-medium">{endpoint.name}</span>
+          <span
+            className={`rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+              isActive ? "bg-white/15 text-white" : "bg-slate-200 text-slate-700"
+            }`}
+          >
+            {endpoint.method}
+          </span>
+        </div>
+        <p className={`mt-2 truncate text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>{endpoint.path}</p>
+      </button>
+
+      <div className="grid gap-2">
+        <label className="space-y-2">
+          <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
+            Endpoint {endpoint.id} name
+          </span>
+          <input
+            aria-label={`Endpoint ${endpoint.id} name`}
+            className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+              isActive
+                ? "border-white/15 bg-white/10 text-white placeholder:text-slate-300/70 focus:border-white/30"
+                : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"
+            }`}
+            onChange={(event) => setEndpointDraftName(event.target.value)}
+            value={endpointDraftName}
+          />
+        </label>
+        <label className="space-y-2">
+          <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
+            Endpoint {endpoint.id} path
+          </span>
+          <input
+            aria-label={`Endpoint ${endpoint.id} path`}
+            className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${
+              isActive
+                ? "border-white/15 bg-white/10 text-white placeholder:text-slate-300/70 focus:border-white/30"
+                : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"
+            }`}
+            onChange={(event) => setEndpointDraftPath(event.target.value)}
+            value={endpointDraftPath}
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button
+          aria-label={`Rename endpoint ${endpoint.id}`}
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+            isActive
+              ? "border-white/15 bg-white/10 text-white hover:bg-white/15"
+              : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"
+          }`}
+          onClick={() =>
+            void onRenameEndpoint(endpoint.id, {
+              description: "",
+              method: endpoint.method,
+              name: endpointDraftName.trim() || endpoint.name,
+              path: endpointDraftPath.trim() || endpoint.path
+            })
+          }
+          type="button"
+        >
+          Rename endpoint
+        </button>
+        <button
+          aria-label={`Delete endpoint ${endpoint.id}`}
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+            isActive
+              ? "border-rose-300/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
+              : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+          }`}
+          onClick={() => void onDeleteEndpoint(endpoint.id)}
+          type="button"
+        >
+          Delete endpoint
+        </button>
       </div>
     </div>
   );

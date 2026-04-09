@@ -158,8 +158,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onCreateEndpoint={handleCreateEndpoint}
             onCreateGroup={handleCreateGroup}
             onCreateModule={handleCreateModule}
+            onDeleteEndpoint={handleDeleteEndpointFromTree}
             onDeleteGroup={handleDeleteGroup}
             onDeleteModule={handleDeleteModule}
+            onRenameEndpoint={handleRenameEndpoint}
             onRenameGroup={handleRenameGroup}
             onRenameModule={handleRenameModule}
             onSelectEndpoint={setSelectedEndpointId}
@@ -333,6 +335,25 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  async function handleRenameEndpoint(endpointId: number, payload: UpdateEndpointPayload) {
+    setError(null);
+
+    try {
+      const description = endpointId === selectedEndpointId ? endpoint?.description ?? payload.description : payload.description;
+      await updateEndpoint(endpointId, {
+        ...payload,
+        description: description ?? ""
+      });
+      await reloadTree(endpointId);
+    } catch (updateError) {
+      if (handleUnauthorized(updateError)) {
+        return;
+      }
+
+      setError(updateError instanceof Error ? updateError.message : "Failed to rename endpoint");
+    }
+  }
+
   async function handleDeleteEndpoint() {
     if (!selectedEndpointId) {
       return;
@@ -350,6 +371,26 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete endpoint");
       throw deleteError;
+    }
+  }
+
+  async function handleDeleteEndpointFromTree(endpointId: number) {
+    setError(null);
+
+    try {
+      await deleteEndpoint(endpointId);
+      if (endpointId === selectedEndpointId) {
+        await reloadTree();
+        return;
+      }
+
+      await reloadTree(selectedEndpointId);
+    } catch (deleteError) {
+      if (handleUnauthorized(deleteError)) {
+        return;
+      }
+
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete endpoint");
     }
   }
 
