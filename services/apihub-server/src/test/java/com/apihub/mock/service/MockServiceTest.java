@@ -2,19 +2,17 @@ package com.apihub.mock.service;
 
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.doc.model.EndpointDetail;
-import com.apihub.doc.model.ResponseDetail;
-import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
-import com.apihub.mock.model.MockDtos.MockConditionEntry;
-import com.apihub.mock.model.MockDtos.MockRuleDetail;
+import com.apihub.mock.model.MockDtos.MockReleaseDetail;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,23 +27,28 @@ class MockServiceTest {
     @Mock
     private EndpointRepository endpointRepository;
 
-    @InjectMocks
     private MockService mockService;
 
+    @BeforeEach
+    void setUp() {
+        mockService = new MockService(endpointRepository, new MockRuntimeResolver());
+    }
+
     @Test
-    void shouldMatchTemplatePathAndRenderLatestSnapshotResponse() {
+    void shouldMatchTemplatePathAndRenderLatestReleasedResponse() {
         given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of(
                 new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{id}", "Load user", true)));
-        given(endpointRepository.findLatestVersion(31L)).willReturn(Optional.of(
-                new VersionDetail(
-                        9L,
+        given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.of(
+                new MockReleaseDetail(
+                        5L,
                         31L,
-                        "v2",
-                        "seed",
-                        "{\"endpoint\":{\"path\":\"/users/{id}\"},\"responses\":[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"}]}"
+                        1,
+                        """
+                        [{"httpStatusCode":200,"mediaType":"application/json","name":"userId","dataType":"string","required":true,"description":"","exampleValue":"u_1001"}]
+                        """,
+                        "[]",
+                        Instant.parse("2026-04-09T12:00:00Z")
                 )));
-
-        given(endpointRepository.listMockRules(31L)).willReturn(List.of());
 
         MockService.MockResponse response = mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of());
 
@@ -55,15 +58,21 @@ class MockServiceTest {
     }
 
     @Test
-    void shouldFallbackToResponseRowsWhenNoSnapshotExists() {
+    void shouldFallbackToPublishedDefaultResponseWhenNoRuleMatched() {
         given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of(
                 new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{id}", "Load user", true)));
-        given(endpointRepository.findLatestVersion(31L)).willReturn(Optional.empty());
-        given(endpointRepository.listMockRules(31L)).willReturn(List.of());
-        given(endpointRepository.listResponses(31L)).willReturn(List.of(
-                new ResponseDetail(1L, 200, "application/json", "enabled", "boolean", true, "", "", 0),
-                new ResponseDetail(2L, 200, "application/json", "count", "integer", true, "", "", 1)
-        ));
+        given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.of(
+                new MockReleaseDetail(
+                        5L,
+                        31L,
+                        1,
+                        """
+                        [{"httpStatusCode":200,"mediaType":"application/json","name":"enabled","dataType":"boolean","required":true,"description":"","exampleValue":""},
+                         {"httpStatusCode":200,"mediaType":"application/json","name":"count","dataType":"integer","required":true,"description":"","exampleValue":""}]
+                        """,
+                        "[]",
+                        Instant.parse("2026-04-09T12:00:00Z")
+                )));
 
         MockService.MockResponse response = mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of());
 
@@ -72,21 +81,21 @@ class MockServiceTest {
     }
 
     @Test
-    void shouldPreferMatchingRuleOverSnapshotFallback() {
+    void shouldPreferMatchingReleasedRuleOverDefaultResponse() {
         given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of(
                 new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{id}", "Load user", true)));
-        given(endpointRepository.listMockRules(31L)).willReturn(List.of(
-                new MockRuleDetail(
-                        7L,
+        given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.of(
+                new MockReleaseDetail(
+                        5L,
                         31L,
-                        "unauthorized",
-                        100,
-                        true,
-                        List.of(new MockConditionEntry("mode", "strict")),
-                        List.of(new MockConditionEntry("x-scenario", "unauthorized")),
-                        401,
-                        "application/json",
-                        "{\"error\":\"token expired\"}"
+                        1,
+                        """
+                        [{"httpStatusCode":200,"mediaType":"application/json","name":"userId","dataType":"string","required":true,"description":"","exampleValue":"u_1001"}]
+                        """,
+                        """
+                        [{"ruleName":"unauthorized","priority":100,"enabled":true,"queryConditions":[{"name":"mode","value":"strict"}],"headerConditions":[{"name":"x-scenario","value":"unauthorized"}],"statusCode":401,"mediaType":"application/json","body":"{\\"error\\":\\"token expired\\"}"}]
+                        """,
+                        Instant.parse("2026-04-09T12:00:00Z")
                 )));
 
         MockService.MockResponse response = mockService.resolve(
@@ -106,6 +115,18 @@ class MockServiceTest {
         given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of());
 
         assertThatThrownBy(() -> mockService.resolve(1L, "GET", "/missing", Map.of(), Map.of()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void shouldRejectRuntimeRequestsWhenNoMockReleaseExists() {
+        given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{id}", "Load user", true)));
+        given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);

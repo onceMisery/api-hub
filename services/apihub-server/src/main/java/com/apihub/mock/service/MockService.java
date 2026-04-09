@@ -2,37 +2,41 @@ package com.apihub.mock.service;
 
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.doc.model.EndpointDetail;
-import com.apihub.doc.model.ResponseDetail;
-import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
-import com.apihub.mock.model.MockDtos.MockRuleDetail;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.apihub.mock.model.MockDtos.MockReleaseDetail;
+import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
+import com.apihub.mock.model.MockDtos.MockSimulationRequest;
+import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
+import com.apihub.mock.model.MockDtos.MockSimulationResult;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class MockService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
+    private static final TypeReference<List<MockRuleUpsertItem>> MOCK_RULE_UPSERT_LIST = new TypeReference<>() {
+    };
+    private static final TypeReference<List<MockSimulationResponseItem>> MOCK_RESPONSE_ITEM_LIST = new TypeReference<>() {
+    };
 
     private final EndpointRepository endpointRepository;
+    private final MockRuntimeResolver mockRuntimeResolver;
 
-    public MockService(EndpointRepository endpointRepository) {
+    public MockService(EndpointRepository endpointRepository, MockRuntimeResolver mockRuntimeResolver) {
         this.endpointRepository = endpointRepository;
+        this.mockRuntimeResolver = mockRuntimeResolver;
     }
 
     public MockResponse resolve(Long projectId,
@@ -47,24 +51,15 @@ public class MockService {
                         .thenComparingInt(candidate -> -segmentCount(candidate.path())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mock endpoint not found"));
 
-        Optional<MockDocument> fromRule = endpointRepository.listMockRules(endpoint.id()).stream()
-                .filter(MockRuleDetail::enabled)
-                .sorted(Comparator.comparingInt(MockRuleDetail::priority).reversed().thenComparingLong(MockRuleDetail::id))
-                .filter(rule -> matchesConditions(rule, queryParameters, requestHeaders))
-                .map(this::mockDocumentFromRule)
-                .findFirst();
-        if (fromRule.isPresent()) {
-            MockDocument document = fromRule.get();
-            return new MockResponse(
-                    document.statusCode(),
-                    List.of(new DebugHeader("Content-Type", document.mediaType())),
-                    document.body());
-        }
+        MockReleaseDetail release = endpointRepository.findLatestMockRelease(endpoint.id())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mock release not published"));
 
-        Optional<MockDocument> fromSnapshot = endpointRepository.findLatestVersion(endpoint.id())
-                .flatMap(this::mockDocumentFromVersion);
-
-        MockDocument document = fromSnapshot.orElseGet(() -> mockDocumentFromResponses(endpoint.id()));
+        MockSimulationResult document = mockRuntimeResolver.resolveDraft(new MockSimulationRequest(
+                readMockRules(release.rulesSnapshotJson()),
+                readResponses(release.responseSnapshotJson()),
+                toQueryConditionEntries(queryParameters),
+                toHeaderConditionEntries(requestHeaders)
+        ));
         return new MockResponse(
                 document.statusCode(),
                 List.of(new DebugHeader("Content-Type", document.mediaType())),
@@ -101,156 +96,44 @@ public class MockService {
         return normalized;
     }
 
-    private Optional<MockDocument> mockDocumentFromVersion(VersionDetail version) {
-        if (version.snapshotJson() == null || version.snapshotJson().isBlank()) {
-            return Optional.empty();
-        }
-
+    private List<MockRuleUpsertItem> readMockRules(String snapshotJson) {
         try {
-            JsonNode root = OBJECT_MAPPER.readTree(version.snapshotJson());
-            JsonNode responsesNode = root.path("responses");
-            if (!responsesNode.isArray() || responsesNode.isEmpty()) {
-                return Optional.empty();
+            if (snapshotJson == null || snapshotJson.isBlank()) {
+                return List.of();
             }
-
-            List<ResponseField> responseFields = new ArrayList<>();
-            int statusCode = 200;
-            String mediaType = "application/json";
-            Integer selectedStatus = null;
-            String selectedMediaType = null;
-
-            for (JsonNode responseNode : responsesNode) {
-                int currentStatus = responseNode.path("httpStatusCode").asInt(200);
-                String currentMediaType = responseNode.path("mediaType").asText("application/json");
-                if (selectedStatus == null) {
-                    selectedStatus = currentStatus;
-                    selectedMediaType = currentMediaType;
-                    statusCode = currentStatus;
-                    mediaType = currentMediaType;
-                }
-
-                if (selectedStatus != currentStatus || !selectedMediaType.equals(currentMediaType)) {
-                    continue;
-                }
-
-                responseFields.add(new ResponseField(
-                        responseNode.path("name").asText(""),
-                        responseNode.path("dataType").asText("string"),
-                        responseNode.path("exampleValue").isMissingNode() ? null : responseNode.path("exampleValue").asText(null)));
-            }
-
-            return responseFields.isEmpty()
-                    ? Optional.empty()
-                    : Optional.of(new MockDocument(statusCode, mediaType, buildJsonBody(responseFields)));
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Failed to parse mock snapshot", exception);
+            return OBJECT_MAPPER.readValue(snapshotJson, MOCK_RULE_UPSERT_LIST);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to parse released mock rules", exception);
         }
     }
 
-    private MockDocument mockDocumentFromResponses(Long endpointId) {
-        List<ResponseDetail> responses = endpointRepository.listResponses(endpointId);
-        if (responses.isEmpty()) {
-            return new MockDocument(200, "application/json", "{}");
-        }
-
-        ResponseDetail first = responses.get(0);
-        List<ResponseField> responseFields = responses.stream()
-                .filter(response -> response.httpStatusCode() == first.httpStatusCode())
-                .filter(response -> response.mediaType().equals(first.mediaType()))
-                .map(response -> new ResponseField(
-                        response.name() == null ? "" : response.name(),
-                        response.dataType(),
-                        response.exampleValue()))
-                .toList();
-
-        return new MockDocument(first.httpStatusCode(), first.mediaType(), buildJsonBody(responseFields));
-    }
-
-    private MockDocument mockDocumentFromRule(MockRuleDetail rule) {
-        return new MockDocument(
-                rule.statusCode(),
-                rule.mediaType() == null || rule.mediaType().isBlank() ? "application/json" : rule.mediaType(),
-                rule.body() == null || rule.body().isBlank() ? "{}" : rule.body());
-    }
-
-    private boolean matchesConditions(MockRuleDetail rule,
-                                      Map<String, List<String>> queryParameters,
-                                      Map<String, String> requestHeaders) {
-        for (MockConditionEntry condition : rule.queryConditions()) {
-            List<String> requestValues = queryParameters.getOrDefault(condition.name(), List.of());
-            if (!requestValues.contains(condition.value())) {
-                return false;
+    private List<MockSimulationResponseItem> readResponses(String snapshotJson) {
+        try {
+            if (snapshotJson == null || snapshotJson.isBlank()) {
+                return List.of();
             }
+            return OBJECT_MAPPER.readValue(snapshotJson, MOCK_RESPONSE_ITEM_LIST);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to parse released mock responses", exception);
         }
+    }
 
+    private List<MockConditionEntry> toQueryConditionEntries(Map<String, List<String>> queryParameters) {
+        List<MockConditionEntry> entries = new java.util.ArrayList<>();
+        queryParameters.forEach((name, values) -> {
+            for (String value : values) {
+                entries.add(new MockConditionEntry(name, value));
+            }
+        });
+        return entries;
+    }
+
+    private List<MockConditionEntry> toHeaderConditionEntries(Map<String, String> requestHeaders) {
         Map<String, String> normalizedHeaders = new LinkedHashMap<>();
-        requestHeaders.forEach((name, value) -> normalizedHeaders.put(name.toLowerCase(Locale.ROOT), value));
-        for (MockConditionEntry condition : rule.headerConditions()) {
-            String requestValue = normalizedHeaders.get(condition.name().toLowerCase(Locale.ROOT));
-            if (!condition.value().equals(requestValue)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private String buildJsonBody(List<ResponseField> responseFields) {
-        try {
-            if (responseFields.size() == 1 && responseFields.get(0).name().isBlank()) {
-                return OBJECT_MAPPER.writeValueAsString(defaultValue(responseFields.get(0)));
-            }
-
-            Map<String, Object> payload = new LinkedHashMap<>();
-            for (ResponseField field : responseFields) {
-                if (field.name().isBlank()) {
-                    continue;
-                }
-                payload.put(field.name(), defaultValue(field));
-            }
-            return OBJECT_MAPPER.writeValueAsString(payload);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Failed to render mock body", exception);
-        }
-    }
-
-    private Object defaultValue(ResponseField field) {
-        if (field.exampleValue() != null && !field.exampleValue().isBlank()) {
-            return parseExampleValue(field.dataType(), field.exampleValue());
-        }
-
-        return defaultValueByType(field.dataType());
-    }
-
-    private Object defaultValueByType(String dataType) {
-        return switch (dataType.toLowerCase()) {
-            case "integer", "int", "long" -> 0;
-            case "number", "float", "double", "decimal" -> 0;
-            case "boolean" -> true;
-            case "array" -> List.of();
-            case "object" -> Map.of();
-            default -> "";
-        };
-    }
-
-    private Object parseExampleValue(String dataType, String exampleValue) {
-        try {
-            return switch (dataType.toLowerCase()) {
-                case "integer", "int", "long" -> Integer.parseInt(exampleValue);
-                case "number", "float", "double", "decimal" -> Double.parseDouble(exampleValue);
-                case "boolean" -> Boolean.parseBoolean(exampleValue);
-                case "array", "object" -> OBJECT_MAPPER.readValue(exampleValue, Object.class);
-                default -> exampleValue;
-            };
-        } catch (Exception ignored) {
-            return defaultValueByType(dataType);
-        }
-    }
-
-    private record ResponseField(String name, String dataType, String exampleValue) {
-    }
-
-    private record MockDocument(int statusCode, String mediaType, String body) {
+        requestHeaders.forEach((name, value) -> normalizedHeaders.put(name.toLowerCase(java.util.Locale.ROOT), value));
+        return normalizedHeaders.entrySet().stream()
+                .map(entry -> new MockConditionEntry(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     public record MockResponse(int statusCode, List<DebugHeader> headers, String body) {

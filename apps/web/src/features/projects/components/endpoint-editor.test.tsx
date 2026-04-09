@@ -247,7 +247,17 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("200 application/json userId")).toBeInTheDocument();
   });
 
-  it("shows a live mock preview from response examples and fallback defaults", async () => {
+  it("runs a draft mock simulation and renders the resolved result", async () => {
+    const onSimulateMock = vi.fn().mockResolvedValue({
+      source: "rule",
+      matchedRuleName: "Unauthorized",
+      matchedRulePriority: 100,
+      explanations: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
+      statusCode: 401,
+      mediaType: "application/json",
+      body: "{\"error\":\"token expired\"}"
+    });
+
     render(
       <EndpointEditor
         endpoint={{
@@ -284,78 +294,77 @@ describe("EndpointEditor", () => {
             sortOrder: 1
           }
         ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        onSimulateMock={onSimulateMock}
         versions={[]}
       />
     );
 
-    expect(screen.getByText("Mock Preview")).toBeInTheDocument();
-    expect(screen.getByText("200")).toBeInTheDocument();
-    expect(screen.getByText("application/json")).toBeInTheDocument();
-    const previewBody = screen.getByText("Preview Body").parentElement?.querySelector("pre");
-    expect(previewBody).toHaveTextContent('"userId": "u_1001"');
-    expect(previewBody).toHaveTextContent('"count": 0');
+    fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Simulator header samples"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run mock simulation" }));
 
-    fireEvent.change(screen.getByLabelText("Response 1 example"), { target: { value: "u_2002" } });
-
-    await waitFor(() => {
-      expect(previewBody).toHaveTextContent('"userId": "u_2002"');
-    });
-  });
-
-  it("switches mock preview between response status groups", async () => {
-    render(
-      <EndpointEditor
-        endpoint={{
-          id: 7,
-          groupId: 3,
-          name: "Get User",
-          method: "GET",
-          path: "/users/{id}",
-          description: "Load a single user",
-          mockEnabled: true
-        }}
-        projectId={1}
-        responses={[
+    await waitFor(() =>
+      expect(onSimulateMock).toHaveBeenCalledWith({
+        draftRules: [
           {
-            id: 1,
-            httpStatusCode: 200,
+            body: "{\"error\":\"token expired\"}",
+            enabled: true,
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
             mediaType: "application/json",
-            name: "userId",
+            priority: 100,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            ruleName: "Unauthorized",
+            statusCode: 401
+          }
+        ],
+        draftResponses: [
+          {
             dataType: "string",
-            required: true,
             description: "User identifier",
             exampleValue: "u_1001",
-            sortOrder: 0
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            required: true
           },
           {
-            id: 2,
-            httpStatusCode: 400,
+            dataType: "integer",
+            description: "Count",
+            exampleValue: "",
+            httpStatusCode: 200,
             mediaType: "application/json",
-            name: "error",
-            dataType: "string",
-            required: true,
-            description: "Error message",
-            exampleValue: "bad request",
-            sortOrder: 0
+            name: "count",
+            required: true
           }
-        ]}
-        versions={[]}
-      />
+        ],
+        headerSamples: [{ name: "x-scenario", value: "unauthorized" }],
+        querySamples: [{ name: "mode", value: "strict" }]
+      })
     );
 
-    const previewBody = screen.getByText("Preview Body").parentElement?.querySelector("pre");
-    expect(previewBody).toHaveTextContent('"userId": "u_1001"');
-
-    const previewStatus = screen.getByLabelText("Preview status");
-    fireEvent.change(previewStatus, { target: { value: "400:application/json" } });
-
-    await waitFor(() => {
-      expect(previewStatus).toHaveValue("400:application/json");
-      expect(previewBody).toHaveTextContent('"error": "bad request"');
-    });
+    expect(await screen.findByText("Unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("Matched header x-scenario=unauthorized")).toBeInTheDocument();
+    const simulationBody = screen.getByText("Simulation Body").parentElement?.querySelector("pre");
+    expect(simulationBody).toHaveTextContent('"error":"token expired"');
   });
 
-  it("switches mock preview between current draft and latest saved version", async () => {
+  it("shows published runtime status and triggers mock publish", async () => {
+    const onPublishMockRelease = vi.fn().mockResolvedValue(undefined);
+
     render(
       <EndpointEditor
         endpoint={{
@@ -368,59 +377,48 @@ describe("EndpointEditor", () => {
           mockEnabled: true
         }}
         projectId={1}
-        responses={[
+        mockReleases={[
           {
-            id: 1,
-            httpStatusCode: 200,
-            mediaType: "application/json",
-            name: "userId",
-            dataType: "string",
-            required: true,
-            description: "User identifier",
-            exampleValue: "draft-user",
-            sortOrder: 0
-          }
-        ]}
-        versions={[
-          {
-            id: 2,
+            id: 21,
             endpointId: 7,
-            version: "v2",
-            changeSummary: "Saved snapshot",
-            snapshotJson: JSON.stringify({
-              endpoint: {
-                name: "Get User",
-                method: "GET",
-                path: "/users/{id}",
-                description: "Load a single user"
-              },
-              parameters: [],
-              responses: [
-                {
-                  httpStatusCode: 400,
-                  mediaType: "application/json",
-                  name: "error",
-                  dataType: "string",
-                  required: true,
-                  description: "Error message",
-                  exampleValue: "saved-error"
-                }
-              ]
-            })
+            releaseNo: 3,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-09T12:20:00Z"
           }
         ]}
+        onPublishMockRelease={onPublishMockRelease}
+        versions={[]}
       />
     );
 
-    const previewBody = screen.getByText("Preview Body").parentElement?.querySelector("pre");
-    expect(previewBody).toHaveTextContent('"userId": "draft-user"');
+    expect(screen.getByText("Published Runtime")).toBeInTheDocument();
+    expect(screen.getAllByText("Release #3").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("/mock/1/users/{id}").length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText("Preview source"), { target: { value: "latest-version" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish mock" }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Preview source")).toHaveValue("latest-version");
-      expect(previewBody).toHaveTextContent('"error": "saved-error"');
-    });
+    await waitFor(() => expect(onPublishMockRelease).toHaveBeenCalled());
+  });
+
+  it("shows unpublished runtime state when no release exists", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("No published release yet.")).toBeInTheDocument();
   });
 
   it("shows mock rule match summary and formatted rule response preview", () => {
@@ -464,70 +462,4 @@ describe("EndpointEditor", () => {
     expect(previewBody).toHaveTextContent('"error": "token expired"');
   });
 
-  it("shows mock preview source details when a rule overrides the selected preview group", async () => {
-    render(
-      <EndpointEditor
-        endpoint={{
-          id: 7,
-          groupId: 3,
-          name: "Get User",
-          method: "GET",
-          path: "/users/{id}",
-          description: "Load a single user",
-          mockEnabled: true
-        }}
-        projectId={1}
-        responses={[
-          {
-            id: 1,
-            httpStatusCode: 200,
-            mediaType: "application/json",
-            name: "userId",
-            dataType: "string",
-            required: true,
-            description: "User identifier",
-            exampleValue: "u_1001",
-            sortOrder: 0
-          },
-          {
-            id: 2,
-            httpStatusCode: 401,
-            mediaType: "application/json",
-            name: "error",
-            dataType: "string",
-            required: true,
-            description: "Unauthorized",
-            exampleValue: "unauthorized",
-            sortOrder: 0
-          }
-        ]}
-        mockRules={[
-          {
-            id: 11,
-            endpointId: 7,
-            ruleName: "Unauthorized",
-            priority: 100,
-            enabled: true,
-            queryConditions: [{ name: "mode", value: "strict" }],
-            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
-            statusCode: 401,
-            mediaType: "application/json",
-            body: "{\"error\":\"token expired\"}"
-          }
-        ]}
-        versions={[]}
-      />
-    );
-
-    fireEvent.change(screen.getByLabelText("Preview status"), { target: { value: "401:application/json" } });
-
-    await waitFor(() => {
-      expect(screen.getByText("Preview source details")).toBeInTheDocument();
-      expect(screen.getByText("Conditional rule override")).toBeInTheDocument();
-      expect(screen.getByText("Rule: Unauthorized")).toBeInTheDocument();
-      expect(screen.getByText("Priority 100")).toBeInTheDocument();
-      expect(screen.getAllByText("query mode=strict").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("header x-scenario=unauthorized").length).toBeGreaterThan(0);
-    });
-  });
 });

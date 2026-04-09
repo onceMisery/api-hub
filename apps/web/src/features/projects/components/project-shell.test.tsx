@@ -6,67 +6,7 @@ const {
   fetchProjectTree,
   fetchEndpoint,
   fetchEndpointMockRules,
-  fetchEndpointParameters,
-  fetchEndpointResponses,
-  fetchEndpointVersions,
-  fetchDebugHistory,
-  fetchEnvironments,
-  executeDebug,
-  createModule,
-  createEnvironment,
-  updateModule,
-  updateEnvironment,
-  deleteModule,
-  createGroup,
-  updateGroup,
-  deleteGroup,
-  createEndpoint,
-  updateEndpoint,
-  deleteEndpoint,
-  deleteEnvironment,
-  replaceEndpointParameters,
-  replaceEndpointMockRules,
-  replaceEndpointResponses,
-  createVersion
-} = vi.hoisted(() => ({
-  mockReplace: vi.fn(),
-  fetchProjectTree: vi.fn(),
-  fetchEndpoint: vi.fn(),
-  fetchEndpointMockRules: vi.fn(),
-  fetchEndpointParameters: vi.fn(),
-  fetchEndpointResponses: vi.fn(),
-  fetchEndpointVersions: vi.fn(),
-  fetchDebugHistory: vi.fn(),
-  fetchEnvironments: vi.fn(),
-  executeDebug: vi.fn(),
-  createModule: vi.fn(),
-  createEnvironment: vi.fn(),
-  updateModule: vi.fn(),
-  updateEnvironment: vi.fn(),
-  deleteModule: vi.fn(),
-  createGroup: vi.fn(),
-  updateGroup: vi.fn(),
-  deleteGroup: vi.fn(),
-  createEndpoint: vi.fn(),
-  updateEndpoint: vi.fn(),
-  deleteEndpoint: vi.fn(),
-  deleteEnvironment: vi.fn(),
-  replaceEndpointParameters: vi.fn(),
-  replaceEndpointMockRules: vi.fn(),
-  replaceEndpointResponses: vi.fn(),
-  createVersion: vi.fn()
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: mockReplace
-  })
-}));
-
-vi.mock("@api-hub/api-sdk", () => ({
-  fetchProjectTree,
-  fetchEndpoint,
-  fetchEndpointMockRules,
+  fetchEndpointMockReleases,
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
@@ -89,6 +29,75 @@ vi.mock("@api-hub/api-sdk", () => ({
   replaceEndpointMockRules,
   replaceEndpointResponses,
   createVersion,
+  publishEndpointMockRelease,
+  simulateEndpointMock
+} = vi.hoisted(() => ({
+  mockReplace: vi.fn(),
+  fetchProjectTree: vi.fn(),
+  fetchEndpoint: vi.fn(),
+  fetchEndpointMockRules: vi.fn(),
+  fetchEndpointMockReleases: vi.fn(),
+  fetchEndpointParameters: vi.fn(),
+  fetchEndpointResponses: vi.fn(),
+  fetchEndpointVersions: vi.fn(),
+  fetchDebugHistory: vi.fn(),
+  fetchEnvironments: vi.fn(),
+  executeDebug: vi.fn(),
+  createModule: vi.fn(),
+  createEnvironment: vi.fn(),
+  updateModule: vi.fn(),
+  updateEnvironment: vi.fn(),
+  deleteModule: vi.fn(),
+  createGroup: vi.fn(),
+  updateGroup: vi.fn(),
+  deleteGroup: vi.fn(),
+  createEndpoint: vi.fn(),
+  updateEndpoint: vi.fn(),
+  deleteEndpoint: vi.fn(),
+  deleteEnvironment: vi.fn(),
+  replaceEndpointParameters: vi.fn(),
+  replaceEndpointMockRules: vi.fn(),
+  replaceEndpointResponses: vi.fn(),
+  createVersion: vi.fn(),
+  publishEndpointMockRelease: vi.fn(),
+  simulateEndpointMock: vi.fn()
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: mockReplace
+  })
+}));
+
+vi.mock("@api-hub/api-sdk", () => ({
+  fetchProjectTree,
+  fetchEndpoint,
+  fetchEndpointMockRules,
+  fetchEndpointMockReleases,
+  fetchEndpointParameters,
+  fetchEndpointResponses,
+  fetchEndpointVersions,
+  fetchDebugHistory,
+  fetchEnvironments,
+  executeDebug,
+  createModule,
+  createEnvironment,
+  updateModule,
+  updateEnvironment,
+  deleteModule,
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  createEndpoint,
+  updateEndpoint,
+  deleteEndpoint,
+  deleteEnvironment,
+  replaceEndpointParameters,
+  replaceEndpointMockRules,
+  replaceEndpointResponses,
+  createVersion,
+  publishEndpointMockRelease,
+  simulateEndpointMock,
   isApiRequestError: () => false
 }));
 
@@ -152,6 +161,7 @@ describe("ProjectShell", () => {
     fetchEndpointParameters.mockResolvedValue({ data: [] });
     fetchEndpointResponses.mockResolvedValue({ data: [] });
     fetchEndpointMockRules.mockResolvedValue({ data: [] });
+    fetchEndpointMockReleases.mockResolvedValue({ data: [] });
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     fetchDebugHistory.mockResolvedValue({ data: [] });
     fetchEnvironments.mockResolvedValue({
@@ -202,6 +212,27 @@ describe("ProjectShell", () => {
     replaceEndpointParameters.mockResolvedValue({ data: null });
     replaceEndpointMockRules.mockResolvedValue({ data: null });
     replaceEndpointResponses.mockResolvedValue({ data: null });
+    publishEndpointMockRelease.mockResolvedValue({
+      data: {
+        id: 8,
+        endpointId: 31,
+        releaseNo: 3,
+        responseSnapshotJson: "[]",
+        rulesSnapshotJson: "[]",
+        createdAt: "2026-04-09T12:12:00Z"
+      }
+    });
+    simulateEndpointMock.mockResolvedValue({
+      data: {
+        source: "default-response",
+        matchedRuleName: null,
+        matchedRulePriority: null,
+        explanations: ["No rule matched; fallback to draft default response"],
+        statusCode: 200,
+        mediaType: "application/json",
+        body: "{\"ok\":true}"
+      }
+    });
     createVersion.mockResolvedValue({
       data: {
         id: 2,
@@ -551,5 +582,120 @@ describe("ProjectShell", () => {
       })
     );
     expect(await screen.findByText("{\"rerun\":true}")).toBeInTheDocument();
+  });
+
+  it("loads mock releases and wires publish plus simulator actions", async () => {
+    fetchEndpointResponses.mockResolvedValueOnce({
+      data: [
+        {
+          id: 1,
+          httpStatusCode: 200,
+          mediaType: "application/json",
+          name: "userId",
+          dataType: "string",
+          required: true,
+          description: "User identifier",
+          exampleValue: "u_1001",
+          sortOrder: 0
+        }
+      ]
+    });
+    fetchEndpointMockRules.mockResolvedValueOnce({
+      data: [
+        {
+          id: 11,
+          endpointId: 31,
+          ruleName: "Unauthorized",
+          priority: 100,
+          enabled: true,
+          queryConditions: [{ name: "mode", value: "strict" }],
+          headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+          statusCode: 401,
+          mediaType: "application/json",
+          body: "{\"error\":\"token expired\"}"
+        }
+      ]
+    });
+    fetchEndpointMockReleases
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 7,
+            endpointId: 31,
+            releaseNo: 2,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-09T12:10:00Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 8,
+            endpointId: 31,
+            releaseNo: 3,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-09T12:12:00Z"
+          }
+        ]
+      });
+    simulateEndpointMock.mockResolvedValueOnce({
+      data: {
+        source: "rule",
+        matchedRuleName: "Unauthorized",
+        matchedRulePriority: 100,
+        explanations: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
+        statusCode: 401,
+        mediaType: "application/json",
+        body: "{\"error\":\"token expired\"}"
+      }
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect((await screen.findAllByText("Release #2")).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish mock" }));
+
+    await waitFor(() => expect(publishEndpointMockRelease).toHaveBeenCalledWith(31));
+    expect((await screen.findAllByText("Release #3")).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Simulator header samples"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run mock simulation" }));
+
+    await waitFor(() =>
+      expect(simulateEndpointMock).toHaveBeenCalledWith(31, {
+        draftRules: [
+          {
+            body: "{\"error\":\"token expired\"}",
+            enabled: true,
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            mediaType: "application/json",
+            priority: 100,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            ruleName: "Unauthorized",
+            statusCode: 401
+          }
+        ],
+        draftResponses: [
+          {
+            dataType: "string",
+            description: "User identifier",
+            exampleValue: "u_1001",
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            required: true
+          }
+        ],
+        headerSamples: [{ name: "x-scenario", value: "unauthorized" }],
+        querySamples: [{ name: "mode", value: "strict" }]
+      })
+    );
+
+    expect(await screen.findByText("Matched header x-scenario=unauthorized")).toBeInTheDocument();
   });
 });

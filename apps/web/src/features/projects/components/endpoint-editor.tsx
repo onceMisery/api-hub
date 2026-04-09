@@ -1,8 +1,11 @@
 import type {
   EndpointDetail,
   MockConditionEntry,
+  MockReleaseDetail,
   MockRuleDetail,
   MockRuleUpsertItem,
+  MockSimulationPayload,
+  MockSimulationResult,
   ParameterDetail,
   ParameterUpsertItem,
   ResponseDetail,
@@ -17,11 +20,14 @@ type EndpointEditorProps = {
   projectId: number;
   isLoading?: boolean;
   onDelete?: () => Promise<void>;
+  onPublishMockRelease?: () => Promise<void>;
   onSave?: (payload: UpdateEndpointPayload) => Promise<void>;
   onSaveMockRules?: (payload: MockRuleUpsertItem[]) => Promise<void>;
   onSaveParameters?: (payload: ParameterUpsertItem[]) => Promise<void>;
   onSaveResponses?: (payload: ResponseUpsertItem[]) => Promise<void>;
+  onSimulateMock?: (payload: MockSimulationPayload) => Promise<MockSimulationResult>;
   onSaveVersion?: (payload: { version: string; changeSummary: string }) => Promise<void>;
+  mockReleases?: MockReleaseDetail[];
   mockRules?: MockRuleDetail[];
   parameters?: ParameterDetail[];
   responses?: ResponseDetail[];
@@ -61,6 +67,7 @@ type MockRuleDraft = {
 const EMPTY_PARAMETERS: ParameterDetail[] = [];
 const EMPTY_RESPONSES: ResponseDetail[] = [];
 const EMPTY_MOCK_RULES: MockRuleDetail[] = [];
+const EMPTY_MOCK_RELEASES: MockReleaseDetail[] = [];
 type SnapshotShape = {
   endpoint: {
     name: string;
@@ -79,11 +86,14 @@ export function EndpointEditor(props: EndpointEditorProps) {
     projectId,
     isLoading = false,
     onDelete,
+    onPublishMockRelease,
     onSave,
     onSaveMockRules,
     onSaveParameters,
     onSaveResponses,
+    onSimulateMock,
     onSaveVersion,
+    mockReleases = EMPTY_MOCK_RELEASES,
     mockRules = EMPTY_MOCK_RULES,
     parameters = EMPTY_PARAMETERS,
     responses = EMPTY_RESPONSES,
@@ -101,13 +111,18 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [mockRuleRows, setMockRuleRows] = useState<MockRuleDraft[]>([]);
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
   const [compareVersionId, setCompareVersionId] = useState("");
-  const [previewSelection, setPreviewSelection] = useState("");
-  const [previewSource, setPreviewSource] = useState<PreviewSource>("draft");
+  const [simulationQueryText, setSimulationQueryText] = useState("");
+  const [simulationHeaderText, setSimulationHeaderText] = useState("");
+  const [simulationResult, setSimulationResult] = useState<MockSimulationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [mockRuleMessage, setMockRuleMessage] = useState<string | null>(null);
   const [parameterMessage, setParameterMessage] = useState<string | null>(null);
   const [responseMessage, setResponseMessage] = useState<string | null>(null);
+  const [simulationMessage, setSimulationMessage] = useState<string | null>(null);
   const [versionMessage, setVersionMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -124,12 +139,15 @@ export function EndpointEditor(props: EndpointEditorProps) {
     });
     setVersionForm({ changeSummary: "", version: "" });
     setCompareVersionId("");
-    setPreviewSelection("");
-    setPreviewSource("draft");
+    setSimulationQueryText("");
+    setSimulationHeaderText("");
+    setSimulationResult(null);
+    setPublishMessage(null);
     setSaveMessage(null);
     setMockRuleMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
+    setSimulationMessage(null);
     setVersionMessage(null);
   }, [endpoint]);
 
@@ -205,10 +223,6 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => versions.find((version) => String(version.id) === compareVersionId) ?? null,
     [compareVersionId, versions]
   );
-  const latestSavedSnapshot = useMemo(
-    () => (versions.length > 0 ? normalizeSnapshot(versions[versions.length - 1].snapshotJson) : emptySnapshot()),
-    [versions]
-  );
   const diffItems = useMemo(() => {
     if (!compareVersion) {
       return [];
@@ -216,20 +230,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
-  const activePreviewRows = useMemo(
-    () => (previewSource === "latest-version" ? latestSavedSnapshot.responses : responseRows),
-    [latestSavedSnapshot.responses, previewSource, responseRows]
-  );
-  const previewOptions = useMemo(() => buildPreviewOptions(activePreviewRows), [activePreviewRows]);
-  const selectedPreviewKey = previewSelection || previewOptions[0]?.key || "";
-  const mockPreview = useMemo(
-    () => buildMockPreview(activePreviewRows, selectedPreviewKey),
-    [activePreviewRows, selectedPreviewKey]
-  );
-  const previewDetails = useMemo(
-    () => buildPreviewDetails(previewSource, mockRuleRows, selectedPreviewKey, mockPreview),
-    [mockPreview, mockRuleRows, previewSource, selectedPreviewKey]
-  );
+  const latestRelease = mockReleases[0] ?? null;
 
   if (isLoading) {
     return (
@@ -680,66 +681,113 @@ export function EndpointEditor(props: EndpointEditorProps) {
         </div>
       </EditorPanel>
 
-      <EditorPanel title="Mock Preview">
+      <EditorPanel title="Mock Simulator">
         <div className="space-y-4">
-          {versions.length > 0 ? (
-            <Field label="Preview source">
-              <select
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => {
-                  setPreviewSource(event.target.value as PreviewSource);
-                  setPreviewSelection("");
-                }}
-                value={previewSource}
-              >
-                <option value="draft">Current draft</option>
-                <option value="latest-version">Latest saved version</option>
-              </select>
-            </Field>
-          ) : null}
+          <p className="text-sm text-slate-500">
+            Send query and header samples to the backend resolver. This only simulates exact `query/header` matches against the current draft.
+          </p>
 
-          {previewOptions.length > 1 ? (
-            <Field label="Preview status">
-              <select
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setPreviewSelection(event.target.value)}
-                value={selectedPreviewKey}
-              >
-                {previewOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Simulator query samples">
+              <textarea
+                aria-label="Simulator query samples"
+                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => setSimulationQueryText(event.target.value)}
+                placeholder="mode=strict"
+                value={simulationQueryText}
+              />
             </Field>
-          ) : null}
-
-          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview source details</p>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{previewDetails.badge}</span>
-              {previewDetails.priorityLabel ? (
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
-                  {previewDetails.priorityLabel}
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-3 space-y-2 text-sm text-slate-600">
-              {previewDetails.lines.map((line, index) => (
-                <p key={`${line}-${index}`}>{line}</p>
-              ))}
-            </div>
+            <Field label="Simulator header samples">
+              <textarea
+                aria-label="Simulator header samples"
+                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => setSimulationHeaderText(event.target.value)}
+                placeholder="x-scenario=unauthorized"
+                value={simulationHeaderText}
+              />
+            </Field>
           </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={!onSimulateMock || isSimulating}
+              onClick={() => void handleRunSimulation()}
+              type="button"
+            >
+              {isSimulating ? "Running..." : "Run mock simulation"}
+            </button>
+            {simulationMessage ? <p className="text-sm text-emerald-600">{simulationMessage}</p> : null}
+          </div>
+
+          {simulationResult ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <PreviewMetric label="Source" value={simulationResult.source} />
+                <PreviewMetric label="Status" value={String(simulationResult.statusCode)} />
+                <PreviewMetric label="Content-Type" value={simulationResult.mediaType} />
+              </div>
+
+              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation details</p>
+                  {simulationResult.matchedRuleName ? (
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
+                      {simulationResult.matchedRuleName}
+                    </span>
+                  ) : null}
+                  {simulationResult.matchedRulePriority !== null ? (
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
+                      Priority {simulationResult.matchedRulePriority}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-3 space-y-2 text-sm text-slate-600">
+                  {simulationResult.explanations.map((line, index) => (
+                    <p key={`${line}-${index}`}>{line}</p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation Body</p>
+                <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{simulationResult.body}</pre>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </EditorPanel>
+
+      <EditorPanel title="Published Runtime">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Runtime requests to `{buildMockUrl(projectId, formState.path)}` only read the latest published mock release.
+          </p>
 
           <div className="grid gap-4 md:grid-cols-3">
             <PreviewMetric label="Mock URL" value={buildMockUrl(projectId, formState.path)} mono />
-            <PreviewMetric label="Status" value={String(mockPreview.statusCode)} />
-            <PreviewMetric label="Content-Type" value={mockPreview.mediaType} />
+            <PreviewMetric label="Latest Release" value={latestRelease ? `Release #${latestRelease.releaseNo}` : "Not published"} />
+            <PreviewMetric label="Created At" value={latestRelease?.createdAt ?? "N/A"} mono />
           </div>
 
-          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview Body</p>
-            <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{mockPreview.body}</pre>
+          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+            {latestRelease ? (
+              <p>Release #{latestRelease.releaseNo}</p>
+            ) : (
+              <p>No published release yet.</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={!onPublishMockRelease || isPublishing}
+              onClick={() => void handlePublishMock()}
+              type="button"
+            >
+              {isPublishing ? "Publishing..." : "Publish mock"}
+            </button>
+            {publishMessage ? <p className="text-sm text-emerald-600">{publishMessage}</p> : null}
           </div>
         </div>
       </EditorPanel>
@@ -888,19 +936,41 @@ export function EndpointEditor(props: EndpointEditorProps) {
       return;
     }
 
-    await onSaveMockRules(
-      mockRuleRows.map((rule) => ({
-        body: rule.body,
-        enabled: rule.enabled,
-        headerConditions: parseConditions(rule.headerConditionsText),
-        mediaType: rule.mediaType,
-        priority: rule.priority,
-        queryConditions: parseConditions(rule.queryConditionsText),
-        ruleName: rule.ruleName,
-        statusCode: rule.statusCode
-      }))
-    );
+    await onSaveMockRules(buildSimulationPayload().draftRules);
     setMockRuleMessage("Saved");
+  }
+
+  async function handleRunSimulation() {
+    if (!onSimulateMock) {
+      return;
+    }
+
+    setIsSimulating(true);
+    setSimulationMessage(null);
+
+    try {
+      const result = await onSimulateMock(buildSimulationPayload());
+      setSimulationResult(result);
+      setSimulationMessage("Simulation complete");
+    } finally {
+      setIsSimulating(false);
+    }
+  }
+
+  async function handlePublishMock() {
+    if (!onPublishMockRelease) {
+      return;
+    }
+
+    setIsPublishing(true);
+    setPublishMessage(null);
+
+    try {
+      await onPublishMockRelease();
+      setPublishMessage("Published");
+    } finally {
+      setIsPublishing(false);
+    }
   }
 
   async function handleSaveVersion() {
@@ -929,6 +999,32 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
   function updateMockRuleRow<K extends keyof MockRuleDraft>(index: number, field: K, value: MockRuleDraft[K]) {
     setMockRuleRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
+  }
+
+  function buildSimulationPayload(): MockSimulationPayload {
+    return {
+      draftRules: mockRuleRows.map((rule) => ({
+        body: rule.body,
+        enabled: rule.enabled,
+        headerConditions: parseConditions(rule.headerConditionsText),
+        mediaType: rule.mediaType,
+        priority: rule.priority,
+        queryConditions: parseConditions(rule.queryConditionsText),
+        ruleName: rule.ruleName,
+        statusCode: rule.statusCode
+      })),
+      draftResponses: responseRows.map((response) => ({
+        dataType: response.dataType,
+        description: response.description,
+        exampleValue: response.exampleValue,
+        httpStatusCode: response.httpStatusCode,
+        mediaType: response.mediaType,
+        name: response.name,
+        required: response.required
+      })),
+      headerSamples: parseConditions(simulationHeaderText),
+      querySamples: parseConditions(simulationQueryText)
+    };
   }
 }
 

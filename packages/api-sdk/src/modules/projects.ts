@@ -206,6 +206,42 @@ export type MockRuleUpsertItem = {
   body: string;
 };
 
+export type MockReleaseDetail = {
+  id: number;
+  endpointId: number;
+  releaseNo: number;
+  responseSnapshotJson: string;
+  rulesSnapshotJson: string;
+  createdAt: string;
+};
+
+export type MockSimulationResponseItem = {
+  httpStatusCode: number;
+  mediaType: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  description: string;
+  exampleValue: string;
+};
+
+export type MockSimulationPayload = {
+  draftRules: MockRuleUpsertItem[];
+  draftResponses: MockSimulationResponseItem[];
+  querySamples: MockConditionEntry[];
+  headerSamples: MockConditionEntry[];
+};
+
+export type MockSimulationResult = {
+  source: string;
+  matchedRuleName: string | null;
+  matchedRulePriority: number | null;
+  explanations: string[];
+  statusCode: number;
+  mediaType: string;
+  body: string;
+};
+
 export type CreateVersionPayload = {
   version: string;
   changeSummary: string;
@@ -379,6 +415,23 @@ export function fetchEndpointMockRules(endpointId: number) {
 export function replaceEndpointMockRules(endpointId: number, payload: MockRuleUpsertItem[]) {
   return apiFetch<null>(`/api/v1/endpoints/${endpointId}/mock-rules`, {
     method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchEndpointMockReleases(endpointId: number) {
+  return apiFetch<MockReleaseDetail[]>(`/api/v1/endpoints/${endpointId}/mock-releases`);
+}
+
+export function publishEndpointMockRelease(endpointId: number) {
+  return apiFetch<MockReleaseDetail>(`/api/v1/endpoints/${endpointId}/mock-releases`, {
+    method: "POST"
+  });
+}
+
+export function simulateEndpointMock(endpointId: number, payload: MockSimulationPayload) {
+  return apiFetch<MockSimulationResult>(`/api/v1/endpoints/${endpointId}/mock-simulations`, {
+    method: "POST",
     body: JSON.stringify(payload)
   });
 }

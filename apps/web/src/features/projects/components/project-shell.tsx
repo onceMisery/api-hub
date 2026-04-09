@@ -13,6 +13,7 @@ import {
   deleteModule,
   fetchEndpoint,
   fetchEndpointMockRules,
+  fetchEndpointMockReleases,
   fetchEnvironments,
   fetchDebugHistory,
   fetchEndpointParameters,
@@ -23,6 +24,8 @@ import {
   replaceEndpointParameters,
   replaceEndpointMockRules,
   replaceEndpointResponses,
+  publishEndpointMockRelease,
+  simulateEndpointMock,
   updateEndpoint,
   updateEnvironment,
   updateGroup,
@@ -34,6 +37,9 @@ import {
   type EndpointDetail,
   type ModuleTreeItem,
   type MockRuleDetail,
+  type MockReleaseDetail,
+  type MockSimulationPayload,
+  type MockSimulationResult,
   type MockRuleUpsertItem,
   type ParameterDetail,
   type ParameterUpsertItem,
@@ -73,6 +79,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [parameters, setParameters] = useState<ParameterDetail[]>([]);
   const [responses, setResponses] = useState<ResponseDetail[]>([]);
   const [mockRules, setMockRules] = useState<MockRuleDetail[]>([]);
+  const [mockReleases, setMockReleases] = useState<MockReleaseDetail[]>([]);
   const [versions, setVersions] = useState<VersionDetail[]>([]);
   const [isLoadingTree, setIsLoadingTree] = useState(true);
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
@@ -95,6 +102,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setParameters([]);
       setResponses([]);
       setMockRules([]);
+      setMockReleases([]);
       setVersions([]);
       return;
     }
@@ -107,11 +115,12 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setError(null);
 
       try {
-        const [endpointResponse, parameterResponse, responseResponse, mockRuleResponse, versionsResponse] = await Promise.all([
+        const [endpointResponse, parameterResponse, responseResponse, mockRuleResponse, mockReleaseResponse, versionsResponse] = await Promise.all([
           fetchEndpoint(endpointId),
           fetchEndpointParameters(endpointId),
           fetchEndpointResponses(endpointId),
           fetchEndpointMockRules(endpointId),
+          fetchEndpointMockReleases(endpointId),
           fetchEndpointVersions(endpointId)
         ]);
 
@@ -123,6 +132,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         setParameters(parameterResponse.data);
         setResponses(responseResponse.data);
         setMockRules(mockRuleResponse.data);
+        setMockReleases(mockReleaseResponse.data);
         setVersions(versionsResponse.data);
       } catch (loadError) {
         if (!isMounted) {
@@ -306,11 +316,14 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             endpoint={endpoint}
             isLoading={isLoadingEndpoint}
             onDelete={handleDeleteEndpoint}
+            onPublishMockRelease={handlePublishMockRelease}
             onSave={handleSaveEndpoint}
             onSaveMockRules={handleSaveMockRules}
             onSaveParameters={handleSaveParameters}
             onSaveResponses={handleSaveResponses}
+            onSimulateMock={handleSimulateMock}
             onSaveVersion={handleSaveVersion}
+            mockReleases={mockReleases}
             mockRules={mockRules}
             parameters={parameters}
             projectId={projectId}
@@ -657,6 +670,47 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
       setError(saveError instanceof Error ? saveError.message : "Failed to save mock rules");
       throw saveError;
+    }
+  }
+
+  async function handlePublishMockRelease() {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await publishEndpointMockRelease(selectedEndpointId);
+      const response = await fetchEndpointMockReleases(selectedEndpointId);
+      setMockReleases(response.data);
+    } catch (publishError) {
+      if (handleUnauthorized(publishError)) {
+        return;
+      }
+
+      setError(publishError instanceof Error ? publishError.message : "Failed to publish mock release");
+      throw publishError;
+    }
+  }
+
+  async function handleSimulateMock(payload: MockSimulationPayload): Promise<MockSimulationResult> {
+    if (!selectedEndpointId) {
+      throw new Error("No endpoint selected");
+    }
+
+    setError(null);
+
+    try {
+      const response = await simulateEndpointMock(selectedEndpointId, payload);
+      return response.data;
+    } catch (simulationError) {
+      if (handleUnauthorized(simulationError)) {
+        throw simulationError;
+      }
+
+      setError(simulationError instanceof Error ? simulationError.message : "Failed to simulate mock");
+      throw simulationError;
     }
   }
 

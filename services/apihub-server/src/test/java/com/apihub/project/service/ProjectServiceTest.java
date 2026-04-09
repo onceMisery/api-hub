@@ -5,8 +5,14 @@ import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
+import com.apihub.mock.model.MockDtos.MockConditionEntry;
+import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
+import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
+import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
+import com.apihub.mock.model.MockDtos.MockSimulationResult;
+import com.apihub.mock.service.MockRuntimeResolver;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
@@ -30,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.datasource.username=sa",
         "spring.datasource.password="
 })
-@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class})
+@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class})
 @Sql(scripts = "/project-service-schema.sql")
 @Sql(scripts = "/project-service-data.sql")
 class ProjectServiceTest {
@@ -160,5 +166,83 @@ class ProjectServiceTest {
 
         projectService.deleteEnvironment(environment.id());
         assertThat(projectService.listEnvironments(project.id())).isEmpty();
+    }
+
+    @Test
+    void shouldPublishAndListEndpointMockReleases() {
+        var project = projectService.createProject(new CreateProjectRequest("Mock Publish", "mock-publish", "mock publish"));
+        var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
+        var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
+        var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
+                "Get User",
+                "GET",
+                "/users/{id}",
+                "load user",
+                true));
+
+        projectService.replaceResponses(endpoint.id(), java.util.List.of(
+                new ResponseUpsertItem(200, "application/json", "userId", "string", true, "", "u_1001")));
+        projectService.replaceMockRules(endpoint.id(), java.util.List.of(
+                new MockRuleUpsertItem(
+                        "Unauthorized",
+                        100,
+                        true,
+                        java.util.List.of(new MockConditionEntry("mode", "strict")),
+                        java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        401,
+                        "application/json",
+                        "{\"error\":\"token expired\"}")));
+
+        var firstRelease = projectService.publishMockRelease(endpoint.id());
+        var secondRelease = projectService.publishMockRelease(endpoint.id());
+        var releases = projectService.listMockReleases(endpoint.id());
+
+        assertThat(firstRelease.releaseNo()).isEqualTo(1);
+        assertThat(secondRelease.releaseNo()).isEqualTo(2);
+        assertThat(releases).extracting("releaseNo").containsExactly(2, 1);
+        assertThat(releases.get(0).responseSnapshotJson()).contains("\"userId\"");
+        assertThat(releases.get(0).rulesSnapshotJson()).contains("\"Unauthorized\"");
+    }
+
+    @Test
+    void shouldSimulateEndpointMockDraftThroughResolver() {
+        var project = projectService.createProject(new CreateProjectRequest("Mock Simulate", "mock-simulate", "mock simulate"));
+        var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
+        var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
+        var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
+                "Get User",
+                "GET",
+                "/users/{id}",
+                "load user",
+                true));
+
+        MockSimulationResult result = projectService.simulateMock(endpoint.id(), new MockSimulationRequest(
+                java.util.List.of(new MockRuleUpsertItem(
+                        "Unauthorized",
+                        100,
+                        true,
+                        java.util.List.of(new MockConditionEntry("mode", "strict")),
+                        java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        401,
+                        "application/json",
+                        "{\"error\":\"token expired\"}"
+                )),
+                java.util.List.of(new MockSimulationResponseItem(
+                        200,
+                        "application/json",
+                        "userId",
+                        "string",
+                        true,
+                        "",
+                        "u_1001"
+                )),
+                java.util.List.of(new MockConditionEntry("mode", "strict")),
+                java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized"))
+        ));
+
+        assertThat(result.source()).isEqualTo("rule");
+        assertThat(result.matchedRuleName()).isEqualTo("Unauthorized");
+        assertThat(result.statusCode()).isEqualTo(401);
+        assertThat(result.body()).isEqualTo("{\"error\":\"token expired\"}");
     }
 }

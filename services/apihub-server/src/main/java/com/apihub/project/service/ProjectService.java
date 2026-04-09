@@ -10,8 +10,13 @@ import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.mock.model.MockDtos.MockReleaseDetail;
+import com.apihub.mock.model.MockDtos.MockSimulationRequest;
+import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
+import com.apihub.mock.model.MockDtos.MockSimulationResult;
 import com.apihub.mock.model.MockDtos.MockRuleDetail;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
+import com.apihub.mock.service.MockRuntimeResolver;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
@@ -29,6 +34,8 @@ import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
 import com.apihub.project.repository.ProjectRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,12 +47,18 @@ import java.util.List;
 @Transactional
 public class ProjectService {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
+    private final MockRuntimeResolver mockRuntimeResolver;
 
-    public ProjectService(ProjectRepository projectRepository, EndpointRepository endpointRepository) {
+    public ProjectService(ProjectRepository projectRepository,
+                          EndpointRepository endpointRepository,
+                          MockRuntimeResolver mockRuntimeResolver) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
+        this.mockRuntimeResolver = mockRuntimeResolver;
     }
 
     @Transactional(readOnly = true)
@@ -219,6 +232,46 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    public List<MockReleaseDetail> listMockReleases(Long endpointId) {
+        requireEndpoint(endpointId);
+        return endpointRepository.listMockReleases(endpointId);
+    }
+
+    public MockReleaseDetail publishMockRelease(Long endpointId) {
+        requireEndpoint(endpointId);
+
+        String responseSnapshotJson = writeJson(endpointRepository.listResponses(endpointId).stream()
+                .map(response -> new MockSimulationResponseItem(
+                        response.httpStatusCode(),
+                        response.mediaType(),
+                        response.name() == null ? "" : response.name(),
+                        response.dataType(),
+                        response.required(),
+                        response.description() == null ? "" : response.description(),
+                        response.exampleValue() == null ? "" : response.exampleValue()))
+                .toList());
+
+        String rulesSnapshotJson = writeJson(endpointRepository.listMockRules(endpointId).stream()
+                .map(rule -> new MockRuleUpsertItem(
+                        rule.ruleName(),
+                        rule.priority(),
+                        rule.enabled(),
+                        rule.queryConditions(),
+                        rule.headerConditions(),
+                        rule.statusCode(),
+                        rule.mediaType(),
+                        rule.body()))
+                .toList());
+
+        return endpointRepository.createMockRelease(endpointId, responseSnapshotJson, rulesSnapshotJson);
+    }
+
+    public MockSimulationResult simulateMock(Long endpointId, MockSimulationRequest request) {
+        requireEndpoint(endpointId);
+        return mockRuntimeResolver.resolveDraft(request);
+    }
+
+    @Transactional(readOnly = true)
     public List<VersionDetail> listVersions(Long endpointId) {
         requireEndpoint(endpointId);
         return endpointRepository.listVersions(endpointId);
@@ -252,5 +305,13 @@ public class ProjectService {
     private EnvironmentDetail requireEnvironment(Long environmentId) {
         return projectRepository.findEnvironment(environmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize mock release snapshot", exception);
+        }
     }
 }
