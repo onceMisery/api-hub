@@ -54,6 +54,7 @@ type SnapshotShape = {
   parameters: ParameterDraft[];
   responses: ResponseDraft[];
 };
+type PreviewSource = "draft" | "latest-version";
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
@@ -81,6 +82,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
   const [compareVersionId, setCompareVersionId] = useState("");
   const [previewSelection, setPreviewSelection] = useState("");
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("draft");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [parameterMessage, setParameterMessage] = useState<string | null>(null);
@@ -102,6 +104,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setVersionForm({ changeSummary: "", version: "" });
     setCompareVersionId("");
     setPreviewSelection("");
+    setPreviewSource("draft");
     setSaveMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
@@ -165,6 +168,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => versions.find((version) => String(version.id) === compareVersionId) ?? null,
     [compareVersionId, versions]
   );
+  const latestSavedSnapshot = useMemo(
+    () => (versions.length > 0 ? normalizeSnapshot(versions[versions.length - 1].snapshotJson) : emptySnapshot()),
+    [versions]
+  );
   const diffItems = useMemo(() => {
     if (!compareVersion) {
       return [];
@@ -172,11 +179,15 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
-  const previewOptions = useMemo(() => buildPreviewOptions(responseRows), [responseRows]);
+  const activePreviewRows = useMemo(
+    () => (previewSource === "latest-version" ? latestSavedSnapshot.responses : responseRows),
+    [latestSavedSnapshot.responses, previewSource, responseRows]
+  );
+  const previewOptions = useMemo(() => buildPreviewOptions(activePreviewRows), [activePreviewRows]);
   const selectedPreviewKey = previewSelection || previewOptions[0]?.key || "";
   const mockPreview = useMemo(
-    () => buildMockPreview(responseRows, selectedPreviewKey),
-    [responseRows, selectedPreviewKey]
+    () => buildMockPreview(activePreviewRows, selectedPreviewKey),
+    [activePreviewRows, selectedPreviewKey]
   );
 
   if (isLoading) {
@@ -492,6 +503,22 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
       <EditorPanel title="Mock Preview">
         <div className="space-y-4">
+          {versions.length > 0 ? (
+            <Field label="Preview source">
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => {
+                  setPreviewSource(event.target.value as PreviewSource);
+                  setPreviewSelection("");
+                }}
+                value={previewSource}
+              >
+                <option value="draft">Current draft</option>
+                <option value="latest-version">Latest saved version</option>
+              </select>
+            </Field>
+          ) : null}
+
           {previewOptions.length > 1 ? (
             <Field label="Preview status">
               <select

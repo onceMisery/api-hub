@@ -329,4 +329,72 @@ describe("EndpointEditor", () => {
       expect(previewBody).toHaveTextContent('"error": "bad request"');
     });
   });
+
+  it("switches mock preview between current draft and latest saved version", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "draft-user",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 2,
+            endpointId: 7,
+            version: "v2",
+            changeSummary: "Saved snapshot",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User",
+                method: "GET",
+                path: "/users/{id}",
+                description: "Load a single user"
+              },
+              parameters: [],
+              responses: [
+                {
+                  httpStatusCode: 400,
+                  mediaType: "application/json",
+                  name: "error",
+                  dataType: "string",
+                  required: true,
+                  description: "Error message",
+                  exampleValue: "saved-error"
+                }
+              ]
+            })
+          }
+        ]}
+      />
+    );
+
+    const previewBody = screen.getByText("Preview Body").parentElement?.querySelector("pre");
+    expect(previewBody).toHaveTextContent('"userId": "draft-user"');
+
+    fireEvent.change(screen.getByLabelText("Preview source"), { target: { value: "latest-version" } });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Preview source")).toHaveValue("latest-version");
+      expect(previewBody).toHaveTextContent('"error": "saved-error"');
+    });
+  });
 });
