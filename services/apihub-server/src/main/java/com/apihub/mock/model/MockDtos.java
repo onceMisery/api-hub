@@ -46,4 +46,34 @@ public final class MockDtos {
             Instant createdAt
     ) {
     }
+
+    public record MockSimulationResponseItem(
+            int httpStatusCode,
+            String mediaType,
+            String name,
+            String dataType,
+            boolean required,
+            String description,
+            String exampleValue
+    ) {
+    }
+
+    public record MockSimulationRequest(
+            List<MockRuleUpsertItem> draftRules,
+            List<MockSimulationResponseItem> draftResponses,
+            List<MockConditionEntry> querySamples,
+            List<MockConditionEntry> headerSamples
+    ) {
+    }
+
+    public record MockSimulationResult(
+            String source,
+            String matchedRuleName,
+            Integer matchedRulePriority,
+            List<String> explanations,
+            int statusCode,
+            String mediaType,
+            String body
+    ) {
+    }
 }
