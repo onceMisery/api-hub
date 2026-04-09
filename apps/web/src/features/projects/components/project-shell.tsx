@@ -60,6 +60,12 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
   const [endpoint, setEndpoint] = useState<EndpointDetail | null>(null);
   const [debugHistory, setDebugHistory] = useState<DebugHistoryItem[]>([]);
+  const [replayDraft, setReplayDraft] = useState<{
+    historyId: number;
+    queryString: string;
+    headersText: string;
+    body: string;
+  } | null>(null);
   const [parameters, setParameters] = useState<ParameterDetail[]>([]);
   const [responses, setResponses] = useState<ResponseDetail[]>([]);
   const [versions, setVersions] = useState<VersionDetail[]>([]);
@@ -80,6 +86,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     if (!selectedEndpointId) {
       setEndpoint(null);
       setDebugHistory([]);
+      setReplayDraft(null);
       setParameters([]);
       setResponses([]);
       setVersions([]);
@@ -283,6 +290,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             history={debugHistory}
             isLoadingHistory={isLoadingHistory}
             onExecute={handleExecuteDebug}
+            onReplayHistory={handleReplayHistory}
+            replayDraft={replayDraft}
           />
           <EndpointEditor
             endpoint={endpoint}
@@ -676,6 +685,16 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  function handleReplayHistory(historyItem: DebugHistoryItem) {
+    setSelectedEnvironmentId(historyItem.environmentId);
+    setReplayDraft({
+      body: historyItem.requestBody ?? "",
+      headersText: formatHeaderText(historyItem.requestHeaders),
+      historyId: historyItem.id,
+      queryString: extractQueryString(historyItem.finalUrl)
+    });
+  }
+
   function handleUnauthorized(loadError: unknown) {
     if (isApiRequestError(loadError) && loadError.status === 401) {
       router.replace("/login");
@@ -684,6 +703,20 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
     return false;
   }
+}
+
+function extractQueryString(finalUrl: string) {
+  try {
+    const url = new URL(finalUrl);
+    return url.search.replace(/^\?/, "");
+  } catch {
+    const questionMarkIndex = finalUrl.indexOf("?");
+    return questionMarkIndex === -1 ? "" : finalUrl.slice(questionMarkIndex + 1);
+  }
+}
+
+function formatHeaderText(headers: { name: string; value: string }[]) {
+  return headers.map((header) => `${header.name}: ${header.value}`.trimEnd()).join("\n");
 }
 
 function findFirstEndpointId(modules: ModuleTreeItem[]) {

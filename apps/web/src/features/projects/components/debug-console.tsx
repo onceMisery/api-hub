@@ -8,10 +8,17 @@ type DebugConsoleProps = {
   environment: EnvironmentDetail | null;
   history: DebugHistoryItem[];
   isLoadingHistory: boolean;
+  onReplayHistory: (historyItem: DebugHistoryItem) => void;
+  replayDraft: {
+    historyId: number;
+    queryString: string;
+    headersText: string;
+    body: string;
+  } | null;
   onExecute: (payload: ExecuteDebugPayload) => Promise<DebugExecutionResult>;
 };
 
-export function DebugConsole({ endpoint, environment, history, isLoadingHistory, onExecute }: DebugConsoleProps) {
+export function DebugConsole({ endpoint, environment, history, isLoadingHistory, onExecute, onReplayHistory, replayDraft }: DebugConsoleProps) {
   const [queryString, setQueryString] = useState("");
   const [headersText, setHeadersText] = useState("");
   const [body, setBody] = useState("");
@@ -23,7 +30,21 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
     setError(null);
     setResult(null);
     setHeadersText(formatHeaderEntries(environment?.defaultHeaders ?? []));
+    setQueryString("");
+    setBody("");
   }, [endpoint?.id, environment?.id]);
+
+  useEffect(() => {
+    if (!replayDraft) {
+      return;
+    }
+
+    setQueryString(replayDraft.queryString);
+    setHeadersText(replayDraft.headersText);
+    setBody(replayDraft.body);
+    setResult(null);
+    setError(null);
+  }, [replayDraft]);
 
   const previewUrl = useMemo(() => buildPreviewUrl(environment?.baseUrl, endpoint?.path, queryString), [environment?.baseUrl, endpoint?.path, queryString]);
   const canExecute = Boolean(endpoint && environment);
@@ -168,10 +189,20 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
           ) : (
             history.map((item) => (
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3" key={item.id}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{item.statusCode}</span>
-                  <span className="text-xs text-slate-500">{item.durationMs} ms</span>
-                  <span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{item.statusCode}</span>
+                    <span className="text-xs text-slate-500">{item.durationMs} ms</span>
+                    <span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</span>
+                  </div>
+                  <button
+                    aria-label={`Replay history ${item.id}`}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-white"
+                    onClick={() => onReplayHistory(item)}
+                    type="button"
+                  >
+                    Replay
+                  </button>
                 </div>
                 <p className="mt-2 font-mono text-xs text-slate-600">{item.finalUrl}</p>
               </div>

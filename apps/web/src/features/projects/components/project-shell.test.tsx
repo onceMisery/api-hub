@@ -413,4 +413,45 @@ describe("ProjectShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete environment 41" }));
     await waitFor(() => expect(deleteEnvironment).toHaveBeenCalledWith(41));
   });
+
+  it("replays debug history and switches to the history environment", async () => {
+    fetchEnvironments.mockResolvedValue({
+      data: [
+        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [] },
+        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [] }
+      ]
+    });
+    fetchDebugHistory.mockResolvedValue({
+      data: [
+        {
+          createdAt: "2026-04-09T12:10:00Z",
+          durationMs: 35,
+          endpointId: 31,
+          environmentId: 42,
+          finalUrl: "https://staging.dev/users/{id}?cached=true",
+          id: 101,
+          method: "GET",
+          projectId: 1,
+          requestBody: "{\"user\":\"31\"}",
+          requestHeaders: [{ name: "Authorization", value: "Bearer history-token" }],
+          responseBody: "{\"cached\":true}",
+          responseHeaders: [{ name: "content-type", value: "application/json" }],
+          statusCode: 200
+        }
+      ]
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("https://staging.dev/users/{id}?cached=true")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay history 101" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Use environment 42" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Query string")).toHaveValue("cached=true");
+      expect(screen.getByLabelText("Headers")).toHaveValue("Authorization: Bearer history-token");
+      expect(screen.getByLabelText("Body")).toHaveValue("{\"user\":\"31\"}");
+    });
+  });
 });

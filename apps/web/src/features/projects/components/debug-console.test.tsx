@@ -14,6 +14,8 @@ describe("DebugConsole", () => {
       statusCode: 200
     });
 
+    const onReplayHistory = vi.fn();
+
     render(
       <DebugConsole
         history={[
@@ -45,6 +47,8 @@ describe("DebugConsole", () => {
         }}
         isLoadingHistory={false}
         onExecute={onExecute}
+        onReplayHistory={onReplayHistory}
+        replayDraft={null}
       />
     );
 
@@ -69,5 +73,76 @@ describe("DebugConsole", () => {
     expect(screen.getByText("{\"ok\":true}")).toBeInTheDocument();
     expect(screen.getByText("Recent history")).toBeInTheDocument();
     expect(screen.getByText("https://local.dev/api/users/31?cached=true")).toBeInTheDocument();
+  });
+
+  it("should replay a history item back into the request form", async () => {
+    const historyItem = {
+      createdAt: "2026-04-09T12:10:00Z",
+      durationMs: 35,
+      endpointId: 31,
+      environmentId: 42,
+      finalUrl: "https://staging.dev/api/users/31?cached=true&include=profile",
+      id: 101,
+      method: "GET",
+      projectId: 1,
+      requestBody: "{\"user\":\"31\"}",
+      requestHeaders: [
+        { name: "Authorization", value: "Bearer history-token" },
+        { name: "X-App", value: "ApiHub" }
+      ],
+      responseBody: "{\"cached\":true}",
+      responseHeaders: [{ name: "content-type", value: "application/json" }],
+      statusCode: 200
+    };
+    const onReplayHistory = vi.fn();
+
+    function ReplayHarness() {
+      const [environmentId, setEnvironmentId] = React.useState(41);
+      const [replayDraft, setReplayDraft] = React.useState<{
+        historyId: number;
+        queryString: string;
+        headersText: string;
+        body: string;
+      } | null>(null);
+
+      return (
+        <DebugConsole
+          history={[historyItem]}
+          endpoint={{ description: "Load user", groupId: 21, id: 31, method: "GET", name: "Get User", path: "/users/31" }}
+          environment={{
+            baseUrl: environmentId === 42 ? "https://staging.dev/api" : "https://local.dev/api",
+            defaultHeaders: [{ name: "X-App", value: "ApiHub" }],
+            id: environmentId,
+            isDefault: environmentId === 41,
+            name: environmentId === 42 ? "Staging" : "Local",
+            projectId: 1,
+            variables: []
+          }}
+          isLoadingHistory={false}
+          onExecute={vi.fn()}
+          onReplayHistory={(item) => {
+            onReplayHistory(item);
+            setEnvironmentId(item.environmentId);
+            setReplayDraft({
+              body: item.requestBody ?? "",
+              headersText: item.requestHeaders.map((header) => `${header.name}: ${header.value}`.trimEnd()).join("\n"),
+              historyId: item.id,
+              queryString: new URL(item.finalUrl).search.replace(/^\?/, "")
+            });
+          }}
+          replayDraft={replayDraft}
+        />
+      );
+    }
+
+    render(<ReplayHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay history 101" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Query string")).toHaveValue("cached=true&include=profile"));
+    expect(screen.getByLabelText("Headers")).toHaveValue("Authorization: Bearer history-token\nX-App: ApiHub");
+    expect(screen.getByLabelText("Body")).toHaveValue("{\"user\":\"31\"}");
+    expect(screen.getByText("https://staging.dev/api")).toBeInTheDocument();
+    expect(onReplayHistory).toHaveBeenCalledWith(historyItem);
   });
 });
