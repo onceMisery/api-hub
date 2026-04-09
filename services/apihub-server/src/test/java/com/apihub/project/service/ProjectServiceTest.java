@@ -70,14 +70,16 @@ class ProjectServiceTest {
                 "Get User",
                 "GET",
                 "/users/{id}",
-                "load user"));
+                "load user",
+                true));
         var renamedModule = projectService.updateModule(module.id(), new UpdateModuleRequest("Core Services"));
         var renamedGroup = projectService.updateGroup(group.id(), new UpdateGroupRequest("User Management"));
         var updatedEndpoint = projectService.updateEndpoint(endpoint.id(), new UpdateEndpointRequest(
                 "Get User Detail",
                 "GET",
                 "/users/{id}",
-                "load detailed user"));
+                "load detailed user",
+                false));
         var parameter = new ParameterUpsertItem(
                 "path",
                 "id",
@@ -144,7 +146,8 @@ class ProjectServiceTest {
                 "Delete Me",
                 "DELETE",
                 "/legacy",
-                "remove soon"));
+                "remove soon",
+                false));
 
         projectService.deleteEndpoint(endpoint.id());
         assertThat(projectService.listEndpoints(group.id())).isEmpty();

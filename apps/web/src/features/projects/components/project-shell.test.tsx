@@ -138,7 +138,8 @@ describe("ProjectShell", () => {
         name: endpointId === 99 ? "Create User" : "Get User",
         method: endpointId === 99 ? "POST" : "GET",
         path: endpointId === 99 ? "/users" : "/users/{id}",
-        description: "Endpoint detail"
+        description: "Endpoint detail",
+        mockEnabled: false
       }
     }));
 
@@ -174,7 +175,8 @@ describe("ProjectShell", () => {
         name: "Create User",
         method: "POST",
         path: "/users",
-        description: "Create user endpoint"
+        description: "Create user endpoint",
+        mockEnabled: false
       }
     });
     updateEndpoint.mockResolvedValue({
@@ -184,7 +186,8 @@ describe("ProjectShell", () => {
         name: "Get User",
         method: "GET",
         path: "/users/{id}",
-        description: "Updated"
+        description: "Updated",
+        mockEnabled: false
       }
     });
     deleteEndpoint.mockResolvedValue({ data: null });
@@ -216,6 +219,7 @@ describe("ProjectShell", () => {
       expect(createEndpoint).toHaveBeenCalledWith(21, {
         description: "",
         method: "POST",
+        mockEnabled: false,
         name: "Create User",
         path: "/users"
       })
@@ -288,7 +292,8 @@ describe("ProjectShell", () => {
         name: "Get User Detail",
         method: "GET",
         path: "/users/{userId}",
-        description: "Endpoint detail"
+        description: "Endpoint detail",
+        mockEnabled: false
       }
     });
 
@@ -304,6 +309,7 @@ describe("ProjectShell", () => {
       expect(updateEndpoint).toHaveBeenCalledWith(31, {
         description: "Endpoint detail",
         method: "GET",
+        mockEnabled: false,
         name: "Get User Detail",
         path: "/users/{userId}"
       })
@@ -356,7 +362,8 @@ describe("ProjectShell", () => {
         name: endpointId === 32 ? "Billing Overview" : "Get User",
         method: "GET",
         path: endpointId === 32 ? "/billing/overview" : "/users/{id}",
-        description: "Endpoint detail"
+        description: "Endpoint detail",
+        mockEnabled: false
       }
     }));
 

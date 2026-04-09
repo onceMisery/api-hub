@@ -303,6 +303,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onSaveResponses={handleSaveResponses}
             onSaveVersion={handleSaveVersion}
             parameters={parameters}
+            projectId={projectId}
             responses={responses}
             versions={versions}
           />
@@ -494,7 +495,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     setError(null);
 
     try {
-      const response = await createEndpoint(groupId, payload);
+      const response = await createEndpoint(groupId, { ...payload, mockEnabled: false });
       await reloadTree(response.data.id);
     } catch (creationError) {
       if (handleUnauthorized(creationError)) {
@@ -533,7 +534,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       const description = endpointId === selectedEndpointId ? endpoint?.description ?? payload.description : payload.description;
       await updateEndpoint(endpointId, {
         ...payload,
-        description: description ?? ""
+        description: description ?? "",
+        ...(endpointId === selectedEndpointId && endpoint ? { mockEnabled: endpoint.mockEnabled } : {})
       });
       await reloadTree(endpointId);
     } catch (updateError) {

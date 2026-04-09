@@ -66,7 +66,7 @@ class DebugServiceTest {
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
-                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{{userId}}", "Load user")));
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{{userId}}", "Load user", false)));
         given(debugHttpExecutor.execute(any())).willReturn(new DebugHttpResult(
                 200,
                 List.of(new DebugHeader("Content-Type", "application/json")),
@@ -125,7 +125,7 @@ class DebugServiceTest {
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
-                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user")));
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
         given(debugHttpExecutor.execute(any())).willReturn(new DebugHttpResult(
                 200,
                 List.of(new DebugHeader("Content-Type", "application/json")),
@@ -148,7 +148,7 @@ class DebugServiceTest {
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
-                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user")));
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
 
         assertThatThrownBy(() -> debugService.execute(new ExecuteDebugRequest(
                 41L,

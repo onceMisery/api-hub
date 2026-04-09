@@ -122,6 +122,7 @@ CREATE TABLE api_endpoint (
   route_key VARCHAR(640) NOT NULL,
   http_method VARCHAR(16) NOT NULL,
   path VARCHAR(512) NOT NULL,
+  mock_enabled TINYINT(1) NOT NULL DEFAULT 0,
   status VARCHAR(16) NOT NULL DEFAULT 'draft',
   sort_order INT NOT NULL DEFAULT 0,
   created_by BIGINT NOT NULL,

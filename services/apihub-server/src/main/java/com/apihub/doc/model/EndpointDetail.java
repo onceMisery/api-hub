@@ -6,6 +6,7 @@ public record EndpointDetail(
         String name,
         String method,
         String path,
-        String description
+        String description,
+        boolean mockEnabled
 ) {
 }

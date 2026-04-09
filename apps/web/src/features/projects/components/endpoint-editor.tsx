@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 
 type EndpointEditorProps = {
   endpoint: EndpointDetail | null;
+  projectId: number;
   isLoading?: boolean;
   onDelete?: () => Promise<void>;
   onSave?: (payload: UpdateEndpointPayload) => Promise<void>;
@@ -56,8 +57,9 @@ type SnapshotShape = {
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
-    endpoint,
-    isLoading = false,
+  endpoint,
+  projectId,
+  isLoading = false,
     onDelete,
     onSave,
     onSaveParameters,
@@ -70,6 +72,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [formState, setFormState] = useState<UpdateEndpointPayload>({
     description: "",
     method: "GET",
+    mockEnabled: false,
     name: "",
     path: ""
   });
@@ -91,6 +94,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setFormState({
       description: endpoint.description ?? "",
       method: endpoint.method,
+      mockEnabled: endpoint.mockEnabled,
       name: endpoint.name,
       path: endpoint.path
     });
@@ -239,6 +243,23 @@ export function EndpointEditor(props: EndpointEditorProps) {
               value={formState.description}
             />
           </Field>
+
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+            <Field label="Mock URL">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-700">
+                {buildMockUrl(projectId, formState.path)}
+              </div>
+            </Field>
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+              <input
+                aria-label="Enable mock"
+                checked={formState.mockEnabled}
+                onChange={(event) => updateField("mockEnabled", event.target.checked)}
+                type="checkbox"
+              />
+              Enable mock
+            </label>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -646,6 +667,11 @@ function createResponseDraft(): ResponseDraft {
     name: "",
     required: false
   };
+}
+
+function buildMockUrl(projectId: number, path: string) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `/mock/${projectId}${normalizedPath}`;
 }
 
 function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {

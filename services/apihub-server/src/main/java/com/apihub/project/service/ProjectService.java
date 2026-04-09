@@ -174,7 +174,8 @@ public class ProjectService {
                 request.name() != null ? request.name() : current.name(),
                 request.method() != null ? request.method() : current.method(),
                 request.path() != null ? request.path() : current.path(),
-                request.description() != null ? request.description() : current.description()));
+                request.description() != null ? request.description() : current.description(),
+                request.mockEnabled() != null ? request.mockEnabled() : current.mockEnabled()));
     }
 
     public void deleteEndpoint(Long endpointId) {

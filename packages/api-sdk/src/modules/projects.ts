@@ -37,6 +37,7 @@ export type EndpointDetail = {
   method: string;
   path: string;
   description: string | null;
+  mockEnabled: boolean;
 };
 
 export type VersionDetail = {
@@ -91,6 +92,7 @@ export type CreateEndpointPayload = {
   method: string;
   path: string;
   description: string;
+  mockEnabled: boolean;
 };
 
 export type UpdateEndpointPayload = {
@@ -98,6 +100,7 @@ export type UpdateEndpointPayload = {
   method: string;
   path: string;
   description: string;
+  mockEnabled?: boolean;
 };
 
 export type UpdateModulePayload = {

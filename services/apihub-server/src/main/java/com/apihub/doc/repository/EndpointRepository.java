@@ -17,6 +17,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,7 +32,8 @@ public class EndpointRepository {
             rs.getString("name"),
             rs.getString("http_method"),
             rs.getString("path"),
-            rs.getString("description"));
+            rs.getString("description"),
+            rs.getBoolean("mock_enabled"));
 
     private static final RowMapper<VersionDetail> VERSION_ROW_MAPPER = (rs, rowNum) -> new VersionDetail(
             rs.getLong("id"),
@@ -69,7 +71,7 @@ public class EndpointRepository {
 
     public List<EndpointDetail> listEndpoints(Long groupId) {
         return jdbcTemplate.query("""
-                select id, group_id, name, http_method, path, description
+                select id, group_id, name, http_method, path, description, mock_enabled
                 from api_endpoint
                 where group_id = ?
                 order by sort_order, id
@@ -89,11 +91,12 @@ public class EndpointRepository {
                         route_key,
                         http_method,
                         path,
+                        mock_enabled,
                         status,
                         sort_order,
                         created_by,
                         updated_by
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, groupReference.projectId());
             statement.setLong(2, groupReference.moduleId());
@@ -103,9 +106,10 @@ public class EndpointRepository {
             statement.setString(6, routeKey(request.method(), request.path()));
             statement.setString(7, request.method());
             statement.setString(8, request.path());
-            statement.setInt(9, nextEndpointSortOrder(groupReference.id()));
-            statement.setLong(10, DEFAULT_USER_ID);
+            statement.setBoolean(9, Boolean.TRUE.equals(request.mockEnabled()));
+            statement.setInt(10, nextEndpointSortOrder(groupReference.id()));
             statement.setLong(11, DEFAULT_USER_ID);
+            statement.setLong(12, DEFAULT_USER_ID);
             return statement;
         }, keyHolder);
         return findEndpoint(requireGeneratedId(keyHolder)).orElseThrow();
@@ -113,7 +117,7 @@ public class EndpointRepository {
 
     public Optional<EndpointDetail> findEndpoint(Long endpointId) {
         return jdbcTemplate.query("""
-                select id, group_id, name, http_method, path, description
+                select id, group_id, name, http_method, path, description, mock_enabled
                 from api_endpoint
                 where id = ?
                 """, ENDPOINT_ROW_MAPPER, endpointId).stream().findFirst();
@@ -133,7 +137,7 @@ public class EndpointRepository {
     public EndpointDetail updateEndpoint(Long endpointId, UpdateEndpointRequest request) {
         jdbcTemplate.update("""
                 update api_endpoint
-                set name = ?, description = ?, route_key = ?, http_method = ?, path = ?, updated_by = ?
+                set name = ?, description = ?, route_key = ?, http_method = ?, path = ?, mock_enabled = ?, updated_by = ?
                 where id = ?
                 """,
                 request.name(),
@@ -141,6 +145,7 @@ public class EndpointRepository {
                 routeKey(request.method(), request.path()),
                 request.method(),
                 request.path(),
+                Boolean.TRUE.equals(request.mockEnabled()),
                 DEFAULT_USER_ID,
                 endpointId);
         return findEndpoint(endpointId).orElseThrow();
@@ -188,6 +193,15 @@ public class EndpointRepository {
                     item.exampleValue(),
                     i);
         }
+    }
+
+    public List<EndpointDetail> listMockEndpoints(Long projectId, String method) {
+        return jdbcTemplate.query("""
+                select id, group_id, name, http_method, path, description, mock_enabled
+                from api_endpoint
+                where project_id = ? and http_method = ? and mock_enabled = true
+                order by path, id
+                """, ENDPOINT_ROW_MAPPER, projectId, method.toUpperCase());
     }
 
     public List<ResponseDetail> listResponses(Long endpointId) {
@@ -261,6 +275,11 @@ public class EndpointRepository {
             return statement;
         }, keyHolder);
         return findVersion(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
+    public Optional<VersionDetail> findLatestVersion(Long endpointId) {
+        return listVersions(endpointId).stream()
+                .max(Comparator.comparingLong(VersionDetail::id));
     }
 
     public Optional<VersionDetail> findVersion(Long versionId) {

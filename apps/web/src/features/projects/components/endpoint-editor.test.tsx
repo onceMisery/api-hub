@@ -13,8 +13,10 @@ describe("EndpointEditor", () => {
           name: "Get User",
           method: "GET",
           path: "/users/{id}",
-          description: "Load a single user"
+          description: "Load a single user",
+          mockEnabled: true
         }}
+        projectId={1}
         versions={[
           {
             id: 1,
@@ -29,6 +31,7 @@ describe("EndpointEditor", () => {
 
     expect(screen.getByDisplayValue("Get User")).toBeInTheDocument();
     expect(screen.getByDisplayValue("/users/{id}")).toBeInTheDocument();
+    expect(screen.getByText("/mock/1/users/{id}")).toBeInTheDocument();
     expect(screen.getByText("Request Parameters")).toBeInTheDocument();
     expect(screen.getByText("Versions")).toBeInTheDocument();
     expect(screen.getByText("Initial release")).toBeInTheDocument();
@@ -45,8 +48,10 @@ describe("EndpointEditor", () => {
           name: "Get User",
           method: "GET",
           path: "/users/{id}",
-          description: "Load a single user"
+          description: "Load a single user",
+          mockEnabled: false
         }}
+        projectId={1}
         onSave={onSave}
         versions={[]}
       />
@@ -54,12 +59,14 @@ describe("EndpointEditor", () => {
 
     fireEvent.change(screen.getByLabelText("Endpoint name"), { target: { value: "Get User Detail" } });
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Load detailed user profile" } });
+    fireEvent.click(screen.getByLabelText("Enable mock"));
     fireEvent.click(screen.getByRole("button", { name: "Save endpoint" }));
 
     await waitFor(() =>
       expect(onSave).toHaveBeenCalledWith({
         description: "Load detailed user profile",
         method: "GET",
+        mockEnabled: true,
         name: "Get User Detail",
         path: "/users/{id}"
       })
@@ -80,8 +87,10 @@ describe("EndpointEditor", () => {
           name: "Get User",
           method: "GET",
           path: "/users/{id}",
-          description: "Load a single user"
+          description: "Load a single user",
+          mockEnabled: false
         }}
+        projectId={1}
         onDelete={onDelete}
         onSaveParameters={onSaveParameters}
         onSaveResponses={onSaveResponses}
@@ -153,8 +162,10 @@ describe("EndpointEditor", () => {
           name: "Get User",
           method: "GET",
           path: "/users/{id}",
-          description: "Load a single user"
+          description: "Load a single user",
+          mockEnabled: false
         }}
+        projectId={1}
         parameters={[
           {
             id: 1,
