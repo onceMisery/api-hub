@@ -143,4 +143,71 @@ describe("EndpointEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete endpoint" }));
     await waitFor(() => expect(onDelete).toHaveBeenCalled());
   });
+
+  it("shows a basic diff against a selected version snapshot", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user"
+        }}
+        parameters={[
+          {
+            id: 1,
+            sectionType: "query",
+            name: "id",
+            dataType: "string",
+            required: true,
+            description: "User id",
+            exampleValue: "1001",
+            sortOrder: 0
+          }
+        ]}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "1001",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User",
+                method: "GET",
+                path: "/users",
+                description: "Load a user"
+              },
+              parameters: [],
+              responses: []
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Compare against version"), { target: { value: "1" } });
+
+    expect(await screen.findByText("Changed endpoint path")).toBeInTheDocument();
+    expect(screen.getByText("/users -> /users/{id}")).toBeInTheDocument();
+    expect(screen.getByText("Added request parameter")).toBeInTheDocument();
+    expect(screen.getByText("query.id")).toBeInTheDocument();
+    expect(screen.getByText("Added response field")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId")).toBeInTheDocument();
+  });
 });

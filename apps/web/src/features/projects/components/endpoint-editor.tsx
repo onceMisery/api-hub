@@ -43,6 +43,16 @@ type ResponseDraft = {
 
 const EMPTY_PARAMETERS: ParameterDetail[] = [];
 const EMPTY_RESPONSES: ResponseDetail[] = [];
+type SnapshotShape = {
+  endpoint: {
+    name: string;
+    method: string;
+    path: string;
+    description: string;
+  };
+  parameters: ParameterDraft[];
+  responses: ResponseDraft[];
+};
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
@@ -66,6 +76,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [parameterRows, setParameterRows] = useState<ParameterDraft[]>([]);
   const [responseRows, setResponseRows] = useState<ResponseDraft[]>([]);
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
+  const [compareVersionId, setCompareVersionId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [parameterMessage, setParameterMessage] = useState<string | null>(null);
@@ -84,6 +95,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
       path: endpoint.path
     });
     setVersionForm({ changeSummary: "", version: "" });
+    setCompareVersionId("");
     setSaveMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
@@ -130,6 +142,30 @@ export function EndpointEditor(props: EndpointEditorProps) {
       ),
     [formState, parameterRows, responseRows]
   );
+  const currentSnapshot = useMemo<SnapshotShape>(
+    () => ({
+      endpoint: {
+        description: formState.description,
+        method: formState.method,
+        name: formState.name,
+        path: formState.path
+      },
+      parameters: parameterRows,
+      responses: responseRows
+    }),
+    [formState, parameterRows, responseRows]
+  );
+  const compareVersion = useMemo(
+    () => versions.find((version) => String(version.id) === compareVersionId) ?? null,
+    [compareVersionId, versions]
+  );
+  const diffItems = useMemo(() => {
+    if (!compareVersion) {
+      return [];
+    }
+
+    return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
+  }, [compareVersion, currentSnapshot]);
 
   if (isLoading) {
     return (
@@ -427,6 +463,49 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
       <EditorPanel title="Versions">
         <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+            <Field label="Compare against version">
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => setCompareVersionId(event.target.value)}
+                value={compareVersionId}
+              >
+                <option value="">Current draft only</option>
+                {versions.map((version) => (
+                  <option key={version.id} value={String(version.id)}>
+                    {version.version}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Version Diff</p>
+                {compareVersion ? (
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{compareVersion.version}</span>
+                ) : null}
+              </div>
+
+              {compareVersion ? (
+                diffItems.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {diffItems.map((item, index) => (
+                      <div key={`${item.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                        <p className="mt-1 text-sm text-slate-500">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">No visible changes between the selected version and the current draft.</p>
+                )
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">Choose a historical snapshot to compare against the current draft.</p>
+              )}
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Version label">
               <input
@@ -567,6 +646,121 @@ function createResponseDraft(): ResponseDraft {
     name: "",
     required: false
   };
+}
+
+function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {
+  if (!snapshotJson) {
+    return emptySnapshot();
+  }
+
+  try {
+    const parsed = JSON.parse(snapshotJson) as Partial<SnapshotShape> & {
+      path?: string;
+      method?: string;
+      name?: string;
+      description?: string;
+    };
+
+    const endpointSource = parsed.endpoint ?? parsed;
+
+    return {
+      endpoint: {
+        description: typeof endpointSource.description === "string" ? endpointSource.description : "",
+        method: typeof endpointSource.method === "string" ? endpointSource.method : "GET",
+        name: typeof endpointSource.name === "string" ? endpointSource.name : "",
+        path: typeof endpointSource.path === "string" ? endpointSource.path : ""
+      },
+      parameters: Array.isArray(parsed.parameters) ? parsed.parameters.map(normalizeParameterDraft) : [],
+      responses: Array.isArray(parsed.responses) ? parsed.responses.map(normalizeResponseDraft) : []
+    };
+  } catch {
+    return emptySnapshot();
+  }
+}
+
+function normalizeParameterDraft(parameter: Partial<ParameterDraft>): ParameterDraft {
+  return {
+    dataType: typeof parameter.dataType === "string" ? parameter.dataType : "string",
+    description: typeof parameter.description === "string" ? parameter.description : "",
+    exampleValue: typeof parameter.exampleValue === "string" ? parameter.exampleValue : "",
+    name: typeof parameter.name === "string" ? parameter.name : "",
+    required: Boolean(parameter.required),
+    sectionType: typeof parameter.sectionType === "string" ? parameter.sectionType : "query"
+  };
+}
+
+function normalizeResponseDraft(response: Partial<ResponseDraft>): ResponseDraft {
+  return {
+    dataType: typeof response.dataType === "string" ? response.dataType : "string",
+    description: typeof response.description === "string" ? response.description : "",
+    exampleValue: typeof response.exampleValue === "string" ? response.exampleValue : "",
+    httpStatusCode: typeof response.httpStatusCode === "number" ? response.httpStatusCode : 200,
+    mediaType: typeof response.mediaType === "string" ? response.mediaType : "application/json",
+    name: typeof response.name === "string" ? response.name : "",
+    required: Boolean(response.required)
+  };
+}
+
+function emptySnapshot(): SnapshotShape {
+  return {
+    endpoint: {
+      description: "",
+      method: "GET",
+      name: "",
+      path: ""
+    },
+    parameters: [],
+    responses: []
+  };
+}
+
+function buildSnapshotDiff(previous: SnapshotShape, current: SnapshotShape) {
+  const items: Array<{ title: string; detail: string }> = [];
+
+  if (previous.endpoint.path !== current.endpoint.path) {
+    items.push({
+      title: "Changed endpoint path",
+      detail: `${previous.endpoint.path || "(empty)"} -> ${current.endpoint.path || "(empty)"}`
+    });
+  }
+
+  if (previous.endpoint.method !== current.endpoint.method) {
+    items.push({
+      title: "Changed endpoint method",
+      detail: `${previous.endpoint.method || "(empty)"} -> ${current.endpoint.method || "(empty)"}`
+    });
+  }
+
+  if (previous.endpoint.description !== current.endpoint.description) {
+    items.push({
+      title: "Changed endpoint description",
+      detail: `${previous.endpoint.description || "(empty)"} -> ${current.endpoint.description || "(empty)"}`
+    });
+  }
+
+  const previousParameters = new Set(previous.parameters.map((parameter) => `${parameter.sectionType}.${parameter.name}`));
+  for (const parameter of current.parameters) {
+    const parameterKey = `${parameter.sectionType}.${parameter.name}`;
+    if (!previousParameters.has(parameterKey)) {
+      items.push({
+        title: "Added request parameter",
+        detail: parameterKey
+      });
+    }
+  }
+
+  const previousResponses = new Set(previous.responses.map((response) => `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim()));
+  for (const response of current.responses) {
+    const responseKey = `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim();
+    if (!previousResponses.has(responseKey)) {
+      items.push({
+        title: "Added response field",
+        detail: responseKey
+      });
+    }
+  }
+
+  return items;
 }
 
 function EditorPanel({ children, title }: { children: ReactNode; title: string }) {
