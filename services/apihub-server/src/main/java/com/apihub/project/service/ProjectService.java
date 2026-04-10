@@ -5,6 +5,7 @@ import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
+import com.apihub.debug.service.DebugTargetRuleValidator;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
@@ -21,6 +22,7 @@ import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.EndpointTreeItem;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
@@ -52,13 +54,16 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
     private final MockRuntimeResolver mockRuntimeResolver;
+    private final DebugTargetRuleValidator debugTargetRuleValidator;
 
     public ProjectService(ProjectRepository projectRepository,
                           EndpointRepository endpointRepository,
-                          MockRuntimeResolver mockRuntimeResolver) {
+                          MockRuntimeResolver mockRuntimeResolver,
+                          DebugTargetRuleValidator debugTargetRuleValidator) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.mockRuntimeResolver = mockRuntimeResolver;
+        this.debugTargetRuleValidator = debugTargetRuleValidator;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +72,7 @@ public class ProjectService {
     }
 
     public ProjectDetail createProject(CreateProjectRequest request) {
+        debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
         return projectRepository.createProject(request);
     }
 
@@ -77,11 +83,15 @@ public class ProjectService {
 
     public ProjectDetail updateProject(Long projectId, UpdateProjectRequest request) {
         ProjectDetail current = requireProject(projectId);
+        List<DebugTargetRuleEntry> debugAllowedHosts = request.debugAllowedHosts() != null
+                ? request.debugAllowedHosts()
+                : current.debugAllowedHosts();
+        debugTargetRuleValidator.validateRules(debugAllowedHosts);
         return projectRepository.updateProject(
                 projectId,
                 request.name() != null ? request.name() : current.name(),
                 request.description() != null ? request.description() : current.description(),
-                request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
+                debugAllowedHosts);
     }
 
     @Transactional(readOnly = true)
@@ -156,11 +166,15 @@ public class ProjectService {
 
     public EnvironmentDetail createEnvironment(Long projectId, CreateEnvironmentRequest request) {
         requireProject(projectId);
+        debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
+        debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode());
         return projectRepository.createEnvironment(projectId, request);
     }
 
     public EnvironmentDetail updateEnvironment(Long environmentId, UpdateEnvironmentRequest request) {
-        requireEnvironment(environmentId);
+        EnvironmentDetail current = requireEnvironment(environmentId);
+        debugTargetRuleValidator.validateRules(request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
+        debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode() != null ? request.debugHostMode() : current.debugHostMode());
         return projectRepository.updateEnvironment(environmentId, request);
     }
 

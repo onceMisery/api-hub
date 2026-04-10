@@ -13,6 +13,7 @@ import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
+import com.apihub.debug.service.DebugTargetRuleValidator;
 import com.apihub.mock.service.MockRuntimeResolver;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
@@ -24,12 +25,15 @@ import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
 import com.apihub.project.repository.ProjectRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @JdbcTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:project-service;MODE=MySQL;DB_CLOSE_DELAY=-1",
@@ -37,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.datasource.username=sa",
         "spring.datasource.password="
 })
-@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class})
+@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class, DebugTargetRuleValidator.class})
 @Sql(scripts = "/project-service-schema.sql")
 @Sql(scripts = "/project-service-data.sql")
 class ProjectServiceTest {
@@ -76,6 +80,36 @@ class ProjectServiceTest {
         assertThat(environment.debugHostMode()).isEqualTo("append");
         assertThat(environment.debugAllowedHosts())
                 .containsExactly(new DebugTargetRuleEntry("10.10.1.8", true));
+    }
+
+    @Test
+    void shouldRejectInvalidDebugRulePattern() {
+        assertThatThrownBy(() -> projectService.updateProject(1L, new UpdateProjectRequest(
+                "Default Project",
+                "Seed project",
+                java.util.List.of(new DebugTargetRuleEntry("https://bad.example.com/path", false)))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void shouldRejectInvalidEnvironmentDebugMode() {
+        assertThatThrownBy(() -> projectService.updateEnvironment(1L, new UpdateEnvironmentRequest(
+                "Local",
+                "https://local.dev",
+                true,
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                "none",
+                "",
+                "",
+                "merge-all",
+                java.util.List.of())))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
