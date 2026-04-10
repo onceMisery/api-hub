@@ -79,6 +79,12 @@ type SnapshotShape = {
   responses: ResponseDraft[];
 };
 type PreviewSource = "draft" | "latest-version";
+type MockRuntimeSummary = {
+  responseFieldCount: number;
+  responseGroupCount: number;
+  totalRuleCount: number;
+  enabledRuleCount: number;
+};
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
@@ -231,6 +237,15 @@ export function EndpointEditor(props: EndpointEditorProps) {
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
   const latestRelease = mockReleases[0] ?? null;
+  const publishedRuntimeSummary = useMemo(() => summarizeMockRelease(latestRelease), [latestRelease]);
+  const draftRuntimeSummary = useMemo(
+    () => summarizeDraftRuntime(responseRows, mockRuleRows),
+    [responseRows, mockRuleRows]
+  );
+  const runtimeDiffItems = useMemo(
+    () => buildRuntimeDiffItems(publishedRuntimeSummary, draftRuntimeSummary, latestRelease !== null),
+    [draftRuntimeSummary, latestRelease, publishedRuntimeSummary]
+  );
 
   if (isLoading) {
     return (
@@ -770,11 +785,33 @@ export function EndpointEditor(props: EndpointEditorProps) {
             <PreviewMetric label="Created At" value={latestRelease?.createdAt ?? "N/A"} mono />
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <PreviewMetric label="Published response fields" value={formatMockResponseSummary(publishedRuntimeSummary)} />
+            <PreviewMetric label="Published rules" value={formatMockRuleSummary(publishedRuntimeSummary)} />
+            <PreviewMetric label="Draft response fields" value={formatMockResponseSummary(draftRuntimeSummary)} />
+            <PreviewMetric label="Draft rules" value={formatMockRuleSummary(draftRuntimeSummary)} />
+          </div>
+
           <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
             {latestRelease ? (
-              <p>Release #{latestRelease.releaseNo}</p>
+              <div className="space-y-3">
+                <p>Release #{latestRelease.releaseNo} is the only snapshot served by runtime.</p>
+                {runtimeDiffItems.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-medium text-slate-900">Draft has unpublished mock changes.</p>
+                    {runtimeDiffItems.map((item) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p>Draft mock rules and responses currently match the published runtime snapshot.</p>
+                )}
+              </div>
             ) : (
-              <p>No published release yet.</p>
+              <div className="space-y-2">
+                <p>No published release yet.</p>
+                <p>Draft simulation can preview changes here, but runtime will not serve them until you publish.</p>
+              </div>
             )}
           </div>
 
@@ -1391,6 +1428,119 @@ function buildSnapshotDiff(previous: SnapshotShape, current: SnapshotShape) {
   }
 
   return items;
+}
+
+function summarizeMockRelease(release: MockReleaseDetail | null): MockRuntimeSummary {
+  if (!release) {
+    return emptyMockRuntimeSummary();
+  }
+
+  const responses = readReleaseResponses(release.responseSnapshotJson);
+  const rules = readReleaseRules(release.rulesSnapshotJson);
+
+  return summarizeMockRuntime(responses, rules);
+}
+
+function summarizeDraftRuntime(responseRows: ResponseDraft[], mockRuleRows: MockRuleDraft[]): MockRuntimeSummary {
+  return summarizeMockRuntime(responseRows, mockRuleRows);
+}
+
+function summarizeMockRuntime(
+  responses: Array<Pick<ResponseDraft, "httpStatusCode" | "mediaType">>,
+  rules: Array<Pick<MockRuleDraft, "enabled">>
+): MockRuntimeSummary {
+  const responseGroups = new Set(
+    responses.map((response) => `${response.httpStatusCode}:${response.mediaType || "application/json"}`)
+  );
+
+  return {
+    enabledRuleCount: rules.filter((rule) => rule.enabled).length,
+    responseFieldCount: responses.length,
+    responseGroupCount: responseGroups.size,
+    totalRuleCount: rules.length
+  };
+}
+
+function readReleaseResponses(snapshotJson: string): ResponseDraft[] {
+  try {
+    const parsed = JSON.parse(snapshotJson) as Partial<ResponseDraft>[];
+    return Array.isArray(parsed) ? parsed.map(normalizeResponseDraft) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readReleaseRules(snapshotJson: string): MockRuleDraft[] {
+  try {
+    const parsed = JSON.parse(snapshotJson) as Partial<MockRuleDraft>[];
+    return Array.isArray(parsed) ? parsed.map(normalizeMockRuleDraft) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMockRuleDraft(rule: Partial<MockRuleDraft>): MockRuleDraft {
+  return {
+    body: typeof rule.body === "string" ? rule.body : "{}",
+    enabled: rule.enabled !== false,
+    headerConditionsText: typeof rule.headerConditionsText === "string" ? rule.headerConditionsText : "",
+    mediaType: typeof rule.mediaType === "string" ? rule.mediaType : "application/json",
+    priority: typeof rule.priority === "number" ? rule.priority : 100,
+    queryConditionsText: typeof rule.queryConditionsText === "string" ? rule.queryConditionsText : "",
+    ruleName: typeof rule.ruleName === "string" ? rule.ruleName : "",
+    statusCode: typeof rule.statusCode === "number" ? rule.statusCode : 200
+  };
+}
+
+function buildRuntimeDiffItems(
+  published: MockRuntimeSummary,
+  draft: MockRuntimeSummary,
+  hasPublishedRelease: boolean
+) {
+  if (!hasPublishedRelease) {
+    return [];
+  }
+
+  const items: string[] = [];
+
+  if (published.responseFieldCount !== draft.responseFieldCount) {
+    items.push(`Draft response fields changed from ${published.responseFieldCount} to ${draft.responseFieldCount}.`);
+  }
+
+  if (published.responseGroupCount !== draft.responseGroupCount) {
+    items.push(`Draft response groups changed from ${published.responseGroupCount} to ${draft.responseGroupCount}.`);
+  }
+
+  if (published.enabledRuleCount !== draft.enabledRuleCount) {
+    items.push(`Draft enabled rules changed from ${published.enabledRuleCount} to ${draft.enabledRuleCount}.`);
+  }
+
+  if (published.totalRuleCount !== draft.totalRuleCount) {
+    items.push(`Draft total rules changed from ${published.totalRuleCount} to ${draft.totalRuleCount}.`);
+  }
+
+  return items;
+}
+
+function formatMockResponseSummary(summary: MockRuntimeSummary) {
+  return `${summary.responseFieldCount} ${pluralize(summary.responseFieldCount, "field")} across ${summary.responseGroupCount} status ${pluralize(summary.responseGroupCount, "group")}`;
+}
+
+function formatMockRuleSummary(summary: MockRuntimeSummary) {
+  return `${summary.enabledRuleCount} enabled of ${summary.totalRuleCount} total`;
+}
+
+function pluralize(value: number, noun: string) {
+  return value === 1 ? noun : `${noun}s`;
+}
+
+function emptyMockRuntimeSummary(): MockRuntimeSummary {
+  return {
+    enabledRuleCount: 0,
+    responseFieldCount: 0,
+    responseGroupCount: 0,
+    totalRuleCount: 0
+  };
 }
 
 function EditorPanel({ children, title }: { children: ReactNode; title: string }) {

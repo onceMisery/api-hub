@@ -401,6 +401,85 @@ describe("EndpointEditor", () => {
     await waitFor(() => expect(onPublishMockRelease).toHaveBeenCalled());
   });
 
+  it("shows published runtime snapshot summary and draft drift details", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          },
+          {
+            id: 2,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "role",
+            dataType: "string",
+            required: true,
+            description: "Role",
+            exampleValue: "admin",
+            sortOrder: 1
+          }
+        ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        mockReleases={[
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"}]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-09T12:20:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Draft has unpublished mock changes.")).toBeInTheDocument();
+    expect(screen.getByText("Published response fields")).toBeInTheDocument();
+    expect(screen.getByText("1 field across 1 status group")).toBeInTheDocument();
+    expect(screen.getByText("Published rules")).toBeInTheDocument();
+    expect(screen.getByText("0 enabled of 0 total")).toBeInTheDocument();
+    expect(screen.getByText("Draft response fields")).toBeInTheDocument();
+    expect(screen.getByText("2 fields across 1 status group")).toBeInTheDocument();
+    expect(screen.getByText("Draft rules")).toBeInTheDocument();
+    expect(screen.getByText("1 enabled of 1 total")).toBeInTheDocument();
+    expect(screen.getByText("Draft response fields changed from 1 to 2.")).toBeInTheDocument();
+    expect(screen.getByText("Draft enabled rules changed from 0 to 1.")).toBeInTheDocument();
+  });
+
   it("shows unpublished runtime state when no release exists", () => {
     render(
       <EndpointEditor
