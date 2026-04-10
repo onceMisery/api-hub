@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  clearDebugHistory,
   createEndpoint,
   executeDebug,
   createEnvironment,
@@ -75,6 +76,17 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
   const [endpoint, setEndpoint] = useState<EndpointDetail | null>(null);
   const [debugHistory, setDebugHistory] = useState<DebugHistoryItem[]>([]);
+  const [historyFilters, setHistoryFilters] = useState<{
+    environmentId: number | null;
+    statusCode: number | null;
+    createdFrom: string;
+    createdTo: string;
+  }>({
+    environmentId: null,
+    statusCode: null,
+    createdFrom: "",
+    createdTo: ""
+  });
   const [replayDraft, setReplayDraft] = useState<{
     historyId: number;
     queryString: string;
@@ -176,7 +188,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     let isMounted = true;
     setIsLoadingHistory(true);
 
-    void fetchDebugHistory(projectId, selectedEndpointId, 10)
+    void fetchDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters))
       .then((response) => {
         if (isMounted) {
           setDebugHistory(response.data);
@@ -202,7 +214,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     return () => {
       isMounted = false;
     };
-  }, [projectId, selectedEndpointId]);
+  }, [historyFilters, projectId, selectedEndpointId]);
 
   const treeStats = useMemo(() => {
     const groupCount = modules.reduce((count, module) => count + module.groups.length, 0);
@@ -316,8 +328,12 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           <DebugConsole
             endpoint={endpoint}
             environment={selectedEnvironment}
+            environmentOptions={environments}
             history={debugHistory}
+            historyFilters={historyFilters}
             isLoadingHistory={isLoadingHistory}
+            onChangeHistoryFilters={setHistoryFilters}
+            onClearHistory={handleClearHistory}
             onExecute={handleExecuteDebug}
             onReplayHistory={handleReplayHistory}
             onRunHistory={handleRunHistory}
@@ -808,7 +824,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       const response = await executeDebug(payload);
       if (selectedEndpointId) {
-        const historyResponse = await fetchDebugHistory(projectId, selectedEndpointId, 10);
+        const historyResponse = await fetchDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters));
         setDebugHistory(historyResponse.data);
       }
       return response.data;
@@ -850,6 +866,26 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     });
   }
 
+  async function handleClearHistory() {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await clearDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters, false));
+      const historyResponse = await fetchDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters));
+      setDebugHistory(historyResponse.data);
+    } catch (clearError) {
+      if (handleUnauthorized(clearError)) {
+        return;
+      }
+
+      setError(clearError instanceof Error ? clearError.message : "Failed to clear debug history");
+    }
+  }
+
   function handleUnauthorized(loadError: unknown) {
     if (isApiRequestError(loadError) && loadError.status === 401) {
       router.replace("/login");
@@ -872,6 +908,35 @@ function extractQueryString(finalUrl: string) {
 
 function formatHeaderText(headers: { name: string; value: string }[]) {
   return headers.map((header) => `${header.name}: ${header.value}`.trimEnd()).join("\n");
+}
+
+function buildDebugHistoryFilters(
+  endpointId: number,
+  filters: {
+    environmentId: number | null;
+    statusCode: number | null;
+    createdFrom: string;
+    createdTo: string;
+  },
+  includeLimit = true
+) {
+  return {
+    endpointId,
+    environmentId: filters.environmentId ?? undefined,
+    statusCode: filters.statusCode ?? undefined,
+    createdFrom: toInstantString(filters.createdFrom),
+    createdTo: toInstantString(filters.createdTo),
+    ...(includeLimit ? { limit: 10 } : {})
+  };
+}
+
+function toInstantString(value: string) {
+  if (!value.trim()) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
 function findFirstEndpointId(modules: ModuleTreeItem[]) {

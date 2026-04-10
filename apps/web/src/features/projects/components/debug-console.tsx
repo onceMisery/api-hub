@@ -3,11 +3,22 @@
 import type { DebugExecutionResult, DebugHistoryItem, EndpointDetail, EnvironmentDetail, ExecuteDebugPayload } from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
 
+type DebugHistoryFiltersState = {
+  environmentId: number | null;
+  statusCode: number | null;
+  createdFrom: string;
+  createdTo: string;
+};
+
 type DebugConsoleProps = {
   endpoint: EndpointDetail | null;
   environment: EnvironmentDetail | null;
+  environmentOptions: EnvironmentDetail[];
   history: DebugHistoryItem[];
+  historyFilters: DebugHistoryFiltersState;
   isLoadingHistory: boolean;
+  onChangeHistoryFilters: (filters: DebugHistoryFiltersState) => void;
+  onClearHistory: () => Promise<void>;
   onReplayHistory: (historyItem: DebugHistoryItem) => void;
   onRunHistory: (historyItem: DebugHistoryItem) => Promise<DebugExecutionResult>;
   replayDraft: {
@@ -19,7 +30,20 @@ type DebugConsoleProps = {
   onExecute: (payload: ExecuteDebugPayload) => Promise<DebugExecutionResult>;
 };
 
-export function DebugConsole({ endpoint, environment, history, isLoadingHistory, onExecute, onReplayHistory, onRunHistory, replayDraft }: DebugConsoleProps) {
+export function DebugConsole({
+  endpoint,
+  environment,
+  environmentOptions,
+  history,
+  historyFilters,
+  isLoadingHistory,
+  onChangeHistoryFilters,
+  onClearHistory,
+  onExecute,
+  onReplayHistory,
+  onRunHistory,
+  replayDraft
+}: DebugConsoleProps) {
   const [queryString, setQueryString] = useState("");
   const [headersText, setHeadersText] = useState("");
   const [body, setBody] = useState("");
@@ -206,6 +230,70 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
 
       <div className="mt-5 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recent history</p>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto]">
+          <select
+            aria-label="Debug history environment filter"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) =>
+              onChangeHistoryFilters({
+                ...historyFilters,
+                environmentId: event.target.value ? Number(event.target.value) : null
+              })
+            }
+            value={historyFilters.environmentId ?? ""}
+          >
+            <option value="">All environments</option>
+            {environmentOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Debug history status filter"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) =>
+              onChangeHistoryFilters({
+                ...historyFilters,
+                statusCode: event.target.value ? Number(event.target.value) : null
+              })
+            }
+            placeholder="Status code"
+            type="number"
+            value={historyFilters.statusCode ?? ""}
+          />
+          <input
+            aria-label="Debug history created from filter"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) =>
+              onChangeHistoryFilters({
+                ...historyFilters,
+                createdFrom: event.target.value
+              })
+            }
+            type="datetime-local"
+            value={historyFilters.createdFrom}
+          />
+          <input
+            aria-label="Debug history created to filter"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) =>
+              onChangeHistoryFilters({
+                ...historyFilters,
+                createdTo: event.target.value
+              })
+            }
+            type="datetime-local"
+            value={historyFilters.createdTo}
+          />
+          <button
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            onClick={() => void onClearHistory()}
+            type="button"
+          >
+            Clear debug history
+          </button>
+        </div>
         <div className="mt-3 space-y-3">
           {isLoadingHistory ? (
             <p className="text-sm text-slate-500">Loading history...</p>

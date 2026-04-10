@@ -13,6 +13,7 @@ const {
   fetchEndpointResponses,
   fetchEndpointVersions,
   fetchDebugHistory,
+  clearDebugHistory,
   fetchEnvironments,
   executeDebug,
   createModule,
@@ -45,6 +46,7 @@ const {
   fetchEndpointResponses: vi.fn(),
   fetchEndpointVersions: vi.fn(),
   fetchDebugHistory: vi.fn(),
+  clearDebugHistory: vi.fn(),
   fetchEnvironments: vi.fn(),
   executeDebug: vi.fn(),
   createModule: vi.fn(),
@@ -84,6 +86,7 @@ vi.mock("@api-hub/api-sdk", () => ({
   fetchEndpointResponses,
   fetchEndpointVersions,
   fetchDebugHistory,
+  clearDebugHistory,
   fetchEnvironments,
   executeDebug,
   createModule,
@@ -193,6 +196,7 @@ describe("ProjectShell", () => {
     fetchEndpointMockReleases.mockResolvedValue({ data: [] });
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     fetchDebugHistory.mockResolvedValue({ data: [] });
+    clearDebugHistory.mockResolvedValue({ data: { deletedCount: 1 } });
     fetchEnvironments.mockResolvedValue({
       data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "", debugHostMode: "inherit", debugAllowedHosts: [] }]
     });
@@ -478,7 +482,7 @@ describe("ProjectShell", () => {
   it("loads and manages project environments", async () => {
     render(<ProjectShell projectId={1} />);
 
-    expect(await screen.findByText("Local")).toBeInTheDocument();
+    expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("New environment name"), { target: { value: "Staging" } });
     fireEvent.change(screen.getByLabelText("New environment base URL"), { target: { value: "https://staging.dev" } });
@@ -544,6 +548,61 @@ describe("ProjectShell", () => {
     );
   });
 
+  it("refetches and clears debug history with active filters", async () => {
+    fetchDebugHistory
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 101,
+            projectId: 1,
+            environmentId: 41,
+            endpointId: 31,
+            method: "GET",
+            finalUrl: "https://local.dev/users/{id}",
+            requestHeaders: [],
+            requestBody: "",
+            statusCode: 200,
+            responseHeaders: [],
+            responseBody: "{\"ok\":true}",
+            durationMs: 22,
+            createdAt: "2026-04-10T12:00:00Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] });
+    clearDebugHistory.mockResolvedValueOnce({ data: { deletedCount: 1 } });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect((await screen.findAllByText("https://local.dev/users/{id}")).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("Debug history environment filter"), { target: { value: "41" } });
+
+    await waitFor(() =>
+      expect(fetchDebugHistory).toHaveBeenLastCalledWith(1, {
+        endpointId: 31,
+        environmentId: 41,
+        statusCode: undefined,
+        createdFrom: undefined,
+        createdTo: undefined,
+        limit: 10
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear debug history" }));
+
+    await waitFor(() =>
+      expect(clearDebugHistory).toHaveBeenCalledWith(1, {
+        endpointId: 31,
+        environmentId: 41,
+        statusCode: undefined,
+        createdFrom: undefined,
+        createdTo: undefined
+      })
+    );
+  });
+
   it("replays debug history and switches to the history environment", async () => {
     fetchEnvironments.mockResolvedValue({
       data: [
@@ -587,7 +646,7 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
-    expect(await screen.findByText("https://staging.dev/users/{id}?cached=true")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Replay history 101" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Replay history 101" }));
 
@@ -686,7 +745,7 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
-    expect(await screen.findByText("https://staging.dev/users/{id}?cached=true")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Run history 101" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Run history 101" }));
 
