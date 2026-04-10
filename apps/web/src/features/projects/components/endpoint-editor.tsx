@@ -1384,50 +1384,128 @@ function emptySnapshot(): SnapshotShape {
 function buildSnapshotDiff(previous: SnapshotShape, current: SnapshotShape) {
   const items: Array<{ title: string; detail: string }> = [];
 
-  if (previous.endpoint.path !== current.endpoint.path) {
-    items.push({
-      title: "Changed endpoint path",
-      detail: `${previous.endpoint.path || "(empty)"} -> ${current.endpoint.path || "(empty)"}`
-    });
-  }
+  pushEndpointFieldDiff(items, "name", "Changed endpoint name", previous.endpoint.name, current.endpoint.name);
+  pushEndpointFieldDiff(items, "path", "Changed endpoint path", previous.endpoint.path, current.endpoint.path);
+  pushEndpointFieldDiff(items, "method", "Changed endpoint method", previous.endpoint.method, current.endpoint.method);
+  pushEndpointFieldDiff(
+    items,
+    "description",
+    "Changed endpoint description",
+    previous.endpoint.description,
+    current.endpoint.description
+  );
 
-  if (previous.endpoint.method !== current.endpoint.method) {
-    items.push({
-      title: "Changed endpoint method",
-      detail: `${previous.endpoint.method || "(empty)"} -> ${current.endpoint.method || "(empty)"}`
-    });
-  }
+  const previousParameters = new Map(previous.parameters.map((parameter) => [buildParameterKey(parameter), parameter]));
+  const currentParameters = new Map(current.parameters.map((parameter) => [buildParameterKey(parameter), parameter]));
 
-  if (previous.endpoint.description !== current.endpoint.description) {
-    items.push({
-      title: "Changed endpoint description",
-      detail: `${previous.endpoint.description || "(empty)"} -> ${current.endpoint.description || "(empty)"}`
-    });
-  }
-
-  const previousParameters = new Set(previous.parameters.map((parameter) => `${parameter.sectionType}.${parameter.name}`));
-  for (const parameter of current.parameters) {
-    const parameterKey = `${parameter.sectionType}.${parameter.name}`;
+  for (const [parameterKey, parameter] of currentParameters) {
     if (!previousParameters.has(parameterKey)) {
       items.push({
         title: "Added request parameter",
         detail: parameterKey
       });
+      continue;
+    }
+
+    const previousParameter = previousParameters.get(parameterKey);
+    if (!previousParameter) {
+      continue;
+    }
+
+    pushFieldChange(items, "Changed request parameter type", parameterKey, previousParameter.dataType, parameter.dataType);
+    pushFieldChange(items, "Changed request parameter required flag", parameterKey, String(previousParameter.required), String(parameter.required));
+    pushFieldChange(items, "Changed request parameter description", parameterKey, previousParameter.description, parameter.description);
+    pushFieldChange(items, "Changed request parameter example", parameterKey, previousParameter.exampleValue, parameter.exampleValue);
+  }
+
+  for (const [parameterKey] of previousParameters) {
+    if (!currentParameters.has(parameterKey)) {
+      items.push({
+        title: "Removed request parameter",
+        detail: parameterKey
+      });
     }
   }
 
-  const previousResponses = new Set(previous.responses.map((response) => `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim()));
-  for (const response of current.responses) {
-    const responseKey = `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim();
+  const previousResponses = new Map(previous.responses.map((response) => [buildResponseKey(response), response]));
+  const currentResponses = new Map(current.responses.map((response) => [buildResponseKey(response), response]));
+
+  for (const [responseKey, response] of currentResponses) {
     if (!previousResponses.has(responseKey)) {
       items.push({
         title: "Added response field",
+        detail: responseKey
+      });
+      continue;
+    }
+
+    const previousResponse = previousResponses.get(responseKey);
+    if (!previousResponse) {
+      continue;
+    }
+
+    pushFieldChange(items, "Changed response field type", responseKey, previousResponse.dataType, response.dataType);
+    pushFieldChange(items, "Changed response field required flag", responseKey, String(previousResponse.required), String(response.required));
+    pushFieldChange(items, "Changed response field description", responseKey, previousResponse.description, response.description);
+    pushFieldChange(items, "Changed response field example", responseKey, previousResponse.exampleValue, response.exampleValue);
+  }
+
+  for (const [responseKey] of previousResponses) {
+    if (!currentResponses.has(responseKey)) {
+      items.push({
+        title: "Removed response field",
         detail: responseKey
       });
     }
   }
 
   return items;
+}
+
+function pushEndpointFieldDiff(
+  items: Array<{ title: string; detail: string }>,
+  _field: string,
+  title: string,
+  previousValue: string,
+  currentValue: string
+) {
+  if (previousValue === currentValue) {
+    return;
+  }
+
+  items.push({
+    title,
+    detail: `${displayDiffValue(previousValue)} -> ${displayDiffValue(currentValue)}`
+  });
+}
+
+function buildParameterKey(parameter: ParameterDraft) {
+  return `${parameter.sectionType}.${parameter.name}`;
+}
+
+function buildResponseKey(response: ResponseDraft) {
+  return `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim();
+}
+
+function pushFieldChange(
+  items: Array<{ title: string; detail: string }>,
+  title: string,
+  fieldKey: string,
+  previousValue: string,
+  currentValue: string
+) {
+  if (previousValue === currentValue) {
+    return;
+  }
+
+  items.push({
+    title,
+    detail: `${fieldKey}: ${displayDiffValue(previousValue)} -> ${displayDiffValue(currentValue)}`
+  });
+}
+
+function displayDiffValue(value: string) {
+  return value.trim() ? value : "(empty)";
 }
 
 function summarizeMockRelease(release: MockReleaseDetail | null): MockRuntimeSummary {

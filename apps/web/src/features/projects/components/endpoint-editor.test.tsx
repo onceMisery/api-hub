@@ -247,6 +247,87 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("200 application/json userId")).toBeInTheDocument();
   });
 
+  it("shows structural diff items for removed and changed fields", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User Detail",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user with profile",
+          mockEnabled: false
+        }}
+        projectId={1}
+        parameters={[]}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "uuid",
+            required: true,
+            description: "Current user identifier",
+            exampleValue: "u_2002",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User",
+                method: "GET",
+                path: "/users/{id}",
+                description: "Load a single user"
+              },
+              parameters: [
+                {
+                  sectionType: "query",
+                  name: "expand",
+                  dataType: "string",
+                  required: false,
+                  description: "Expand relations",
+                  exampleValue: "team"
+                }
+              ],
+              responses: [
+                {
+                  httpStatusCode: 200,
+                  mediaType: "application/json",
+                  name: "userId",
+                  dataType: "string",
+                  required: true,
+                  description: "User identifier",
+                  exampleValue: "u_1001"
+                }
+              ]
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Compare against version"), { target: { value: "1" } });
+
+    expect(await screen.findByText("Changed endpoint name")).toBeInTheDocument();
+    expect(screen.getByText("Get User -> Get User Detail")).toBeInTheDocument();
+    expect(screen.getByText("Removed request parameter")).toBeInTheDocument();
+    expect(screen.getByText("query.expand")).toBeInTheDocument();
+    expect(screen.getByText("Changed response field type")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId: string -> uuid")).toBeInTheDocument();
+    expect(screen.getByText("Changed response field description")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId: User identifier -> Current user identifier")).toBeInTheDocument();
+    expect(screen.getByText("Changed response field example")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId: u_1001 -> u_2002")).toBeInTheDocument();
+  });
+
   it("runs a draft mock simulation and renders the resolved result", async () => {
     const onSimulateMock = vi.fn().mockResolvedValue({
       source: "rule",
