@@ -73,6 +73,9 @@ public class DebugTargetMatcher {
             return "";
         }
         String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("[") && normalized.endsWith("]") && normalized.length() > 2) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
         while (normalized.endsWith(".")) {
             normalized = normalized.substring(0, normalized.length() - 1);
         }

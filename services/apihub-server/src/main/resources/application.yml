@@ -6,3 +6,17 @@ spring:
     url: ${APIHUB_DB_URL:jdbc:mysql://localhost:3306/apihub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
     username: ${APIHUB_DB_USERNAME:root}
     password: ${APIHUB_DB_PASSWORD:root}
+
+apihub:
+  debug:
+    security:
+      connect-timeout-ms: 5000
+      read-timeout-ms: 10000
+      max-response-body-bytes: 262144
+      global-allowlist:
+        - pattern: "local.dev"
+          allow-private: false
+        - pattern: "localhost"
+          allow-private: true
+        - pattern: "127.0.0.1"
+          allow-private: true

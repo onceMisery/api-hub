@@ -1,19 +1,21 @@
 package com.apihub.debug.service;
 
+import com.apihub.debug.config.DebugSecurityProperties;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.debug.model.DebugDtos.DebugHistoryItem;
 import com.apihub.debug.model.DebugDtos.ExecuteDebugRequest;
 import com.apihub.debug.model.DebugDtos.ExecuteDebugResponse;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.repository.ProjectRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -27,7 +29,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,11 +52,29 @@ class DebugServiceTest {
     @Mock
     private DebugHistoryRepository debugHistoryRepository;
 
-    @InjectMocks
     private DebugService debugService;
+
+    @BeforeEach
+    void setUp() {
+        DebugSecurityProperties debugSecurityProperties = new DebugSecurityProperties();
+        debugSecurityProperties.setGlobalAllowlist(List.of(
+                new DebugSecurityProperties.AllowRule("local.dev", false),
+                new DebugSecurityProperties.AllowRule("localhost", true),
+                new DebugSecurityProperties.AllowRule("127.0.0.1", true)));
+        debugService = new DebugService(
+                projectRepository,
+                endpointRepository,
+                debugHttpExecutor,
+                debugHistoryRepository,
+                new DebugTargetPolicyResolver(),
+                new DebugTargetMatcher(),
+                debugSecurityProperties);
+    }
 
     @Test
     void shouldBuildRequestFromEnvironmentAndEndpoint() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
         given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
                 new EnvironmentDetail(
                         41L,
@@ -111,6 +136,8 @@ class DebugServiceTest {
 
     @Test
     void shouldInjectBearerAuthWhenRequestDoesNotOverrideAuthorization() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
         given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
                 new EnvironmentDetail(
                         41L,
@@ -147,6 +174,8 @@ class DebugServiceTest {
 
     @Test
     void shouldRejectUnsupportedBaseUrlScheme() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
         given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
                 new EnvironmentDetail(41L, 1L, "Local", "ftp://local.dev/api", true, List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
@@ -163,6 +192,44 @@ class DebugServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void shouldBlockHostOutsideAllowlist() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "https://blocked.example.com", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+
+        assertThatThrownBy(() -> debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), "")))
+                .isInstanceOf(DebugSecurityException.class)
+                .extracting(error -> ((DebugSecurityException) error).getErrorCode())
+                .isEqualTo("DEBUG_TARGET_NOT_ALLOWED");
+
+        verify(debugHistoryRepository, never()).saveHistory(anyLong(), anyLong(), anyLong(), anyString(), anyString(), anyList(), anyString(), anyInt(), anyList(), anyString(), anyLong());
+    }
+
+    @Test
+    void shouldRequireExplicitPrivateAllowance() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of(new DebugTargetRuleEntry("10.10.1.8", false)))));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "http://10.10.1.8", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+
+        assertThatThrownBy(() -> debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), "")))
+                .isInstanceOf(DebugSecurityException.class)
+                .extracting(error -> ((DebugSecurityException) error).getErrorCode())
+                .isEqualTo("DEBUG_PRIVATE_TARGET_NOT_ALLOWED");
     }
 
     @Test

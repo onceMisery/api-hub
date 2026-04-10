@@ -1,13 +1,16 @@
 package com.apihub.debug.service;
 
+import com.apihub.debug.config.DebugSecurityProperties;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.debug.model.DebugDtos.DebugHistoryItem;
 import com.apihub.debug.model.DebugDtos.ExecuteDebugRequest;
 import com.apihub.debug.model.DebugDtos.ExecuteDebugResponse;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
+import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.repository.ProjectRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,15 +34,24 @@ public class DebugService {
     private final EndpointRepository endpointRepository;
     private final DebugHttpExecutor debugHttpExecutor;
     private final DebugHistoryRepository debugHistoryRepository;
+    private final DebugTargetPolicyResolver debugTargetPolicyResolver;
+    private final DebugTargetMatcher debugTargetMatcher;
+    private final DebugSecurityProperties debugSecurityProperties;
 
     public DebugService(ProjectRepository projectRepository,
                         EndpointRepository endpointRepository,
                         DebugHttpExecutor debugHttpExecutor,
-                        DebugHistoryRepository debugHistoryRepository) {
+                        DebugHistoryRepository debugHistoryRepository,
+                        DebugTargetPolicyResolver debugTargetPolicyResolver,
+                        DebugTargetMatcher debugTargetMatcher,
+                        DebugSecurityProperties debugSecurityProperties) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.debugHttpExecutor = debugHttpExecutor;
         this.debugHistoryRepository = debugHistoryRepository;
+        this.debugTargetPolicyResolver = debugTargetPolicyResolver;
+        this.debugTargetMatcher = debugTargetMatcher;
+        this.debugSecurityProperties = debugSecurityProperties;
     }
 
     public ExecuteDebugResponse execute(ExecuteDebugRequest request) {
@@ -50,6 +62,8 @@ public class DebugService {
         if (!environment.projectId().equals(endpointReference.projectId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Endpoint and environment do not belong to the same project");
         }
+        ProjectDetail project = projectRepository.findProject(environment.projectId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
         EndpointDetail endpoint = endpointRepository.findEndpoint(request.endpointId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
@@ -61,6 +75,7 @@ public class DebugService {
                 substituteVariables(environment.baseUrl(), variables),
                 substituteVariables(endpoint.path(), variables),
                 mergeQueryString(environment.defaultQuery(), request.queryString(), variables));
+        enforceTargetPolicy(project, environment, targetUri);
         List<DebugHeader> headers = mergeHeaders(environment.defaultHeaders(), request.headers(), environment, variables);
         String requestBody = substituteVariables(request.body(), variables);
 
@@ -117,11 +132,41 @@ public class DebugService {
             normalizedQuery = normalizedQuery.substring(1);
         }
 
-        return UriComponentsBuilder.fromUriString(baseUrl)
+        URI targetUri = UriComponentsBuilder.fromUriString(baseUrl)
                 .path(normalizedPath)
                 .replaceQuery(normalizedQuery.isBlank() ? null : normalizedQuery)
                 .build(true)
                 .toUri();
+        if (targetUri.getHost() == null || targetUri.getHost().isBlank()) {
+            throw DebugSecurityException.badRequest("DEBUG_TARGET_URL_INVALID", "Target URL host is invalid");
+        }
+        return targetUri;
+    }
+
+    private void enforceTargetPolicy(ProjectDetail project, EnvironmentDetail environment, URI targetUri) {
+        List<DebugTargetRuleEntry> globalRules = debugSecurityProperties.getGlobalAllowlist().stream()
+                .map(rule -> new DebugTargetRuleEntry(rule.getPattern(), rule.isAllowPrivate()))
+                .toList();
+        List<DebugTargetRuleEntry> effectiveRules = debugTargetPolicyResolver.resolveEffectiveRules(
+                globalRules,
+                project.debugAllowedHosts(),
+                environment.debugHostMode(),
+                environment.debugAllowedHosts());
+        DebugTargetMatcher.MatchResult matchResult = debugTargetMatcher.match(targetUri.getHost(), effectiveRules);
+        if (!matchResult.matched()) {
+            throw DebugSecurityException.forbidden(
+                    "DEBUG_TARGET_NOT_ALLOWED",
+                    "目标主机 " + targetUri.getHost() + " 未在调试白名单中",
+                    targetUri.getHost(),
+                    List.of());
+        }
+        if (matchResult.privateTarget() && !matchResult.allowPrivate()) {
+            throw DebugSecurityException.forbidden(
+                    "DEBUG_PRIVATE_TARGET_NOT_ALLOWED",
+                    "目标主机 " + targetUri.getHost() + " 命中私网限制，需显式允许私网访问",
+                    targetUri.getHost(),
+                    matchResult.matchedPatterns());
+        }
     }
 
     private List<DebugHeader> mergeHeaders(List<EnvironmentEntry> defaultHeaders,

@@ -1,11 +1,14 @@
 package com.apihub.debug.service;
 
+import com.apihub.debug.config.DebugSecurityProperties;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -18,22 +21,25 @@ import java.util.Map;
 public class JdkDebugHttpExecutor implements DebugHttpExecutor {
 
     private final HttpClient httpClient;
+    private final DebugSecurityProperties debugSecurityProperties;
 
-    public JdkDebugHttpExecutor() {
+    public JdkDebugHttpExecutor(DebugSecurityProperties debugSecurityProperties) {
         this(HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
+                .connectTimeout(Duration.ofMillis(debugSecurityProperties.getConnectTimeoutMs()))
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .build());
+                .build(),
+                debugSecurityProperties);
     }
 
-    JdkDebugHttpExecutor(HttpClient httpClient) {
+    JdkDebugHttpExecutor(HttpClient httpClient, DebugSecurityProperties debugSecurityProperties) {
         this.httpClient = httpClient;
+        this.debugSecurityProperties = debugSecurityProperties;
     }
 
     @Override
     public DebugHttpResult execute(DebugHttpRequest request) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri())
-                .timeout(Duration.ofSeconds(10));
+                .timeout(Duration.ofMillis(debugSecurityProperties.getReadTimeoutMs()));
 
         for (DebugHeader header : request.headers()) {
             builder.header(header.name(), header.value());
@@ -47,13 +53,13 @@ public class JdkDebugHttpExecutor implements DebugHttpExecutor {
         long startedAt = System.nanoTime();
 
         try {
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
             long durationMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
 
             return new DebugHttpResult(
                     response.statusCode(),
                     mapHeaders(response.headers().map()),
-                    response.body(),
+                    readResponseBody(response.body()),
                     durationMs);
         } catch (IOException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Debug request failed", exception);
@@ -67,5 +73,21 @@ public class JdkDebugHttpExecutor implements DebugHttpExecutor {
         return headers.entrySet().stream()
                 .flatMap(entry -> entry.getValue().stream().map(value -> new DebugHeader(entry.getKey(), value)))
                 .toList();
+    }
+
+    private String readResponseBody(InputStream bodyStream) throws IOException {
+        int maxBytes = debugSecurityProperties.getMaxResponseBodyBytes();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int totalBytes = 0;
+        int bytesRead;
+        while ((bytesRead = bodyStream.read(buffer)) != -1) {
+            totalBytes += bytesRead;
+            if (totalBytes > maxBytes) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Debug response exceeded configured size limit");
+            }
+            outputStream.write(buffer, 0, bytesRead);
+        }
+        return outputStream.toString(StandardCharsets.UTF_8);
     }
 }

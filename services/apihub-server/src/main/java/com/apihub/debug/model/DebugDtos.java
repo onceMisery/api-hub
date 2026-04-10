@@ -30,6 +30,13 @@ public final class DebugDtos {
     ) {
     }
 
+    public record DebugExecutionErrorDetail(
+            String errorCode,
+            String host,
+            List<String> matchedPatterns
+    ) {
+    }
+
     public record DebugHistoryItem(
             Long id,
             Long projectId,
