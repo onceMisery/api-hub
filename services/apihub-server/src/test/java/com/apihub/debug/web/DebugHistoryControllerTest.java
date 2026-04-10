@@ -13,10 +13,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,7 +38,7 @@ class DebugHistoryControllerTest {
 
     @Test
     void shouldReturnProjectDebugHistory() throws Exception {
-        given(debugService.listHistory(1L, 31L, 5)).willReturn(List.of(
+        given(debugService.listHistory(1L, 31L, null, null, null, null, 5)).willReturn(List.of(
                 new DebugHistoryItem(
                         101L,
                         1L,
@@ -59,5 +61,39 @@ class DebugHistoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].statusCode").value(200))
                 .andExpect(jsonPath("$.data[0].finalUrl").value("https://local.dev/api/users/31"));
+    }
+
+    @Test
+    void shouldReturnFilteredProjectDebugHistory() throws Exception {
+        Instant from = Instant.parse("2026-04-09T00:00:00Z");
+        Instant to = Instant.parse("2026-04-10T00:00:00Z");
+        given(debugService.listHistory(1L, 31L, 41L, 500, from, to, 5)).willReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/projects/1/debug-history")
+                        .with(user("tester"))
+                        .param("endpointId", "31")
+                        .param("environmentId", "41")
+                        .param("statusCode", "500")
+                        .param("createdFrom", "2026-04-09T00:00:00Z")
+                        .param("createdTo", "2026-04-10T00:00:00Z")
+                        .param("limit", "5"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldDeleteFilteredProjectDebugHistory() throws Exception {
+        Instant from = Instant.parse("2026-04-09T00:00:00Z");
+        Instant to = Instant.parse("2026-04-10T00:00:00Z");
+        given(debugService.clearHistory(1L, 31L, 41L, 500, from, to)).willReturn(3);
+
+        mockMvc.perform(delete("/api/v1/projects/1/debug-history")
+                        .with(user("tester"))
+                        .param("endpointId", "31")
+                        .param("environmentId", "41")
+                        .param("statusCode", "500")
+                        .param("createdFrom", "2026-04-09T00:00:00Z")
+                        .param("createdTo", "2026-04-10T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deletedCount").value(3));
     }
 }

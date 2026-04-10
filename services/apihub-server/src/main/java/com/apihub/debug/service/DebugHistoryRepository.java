@@ -10,9 +10,11 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Repository
@@ -72,27 +74,26 @@ public class DebugHistoryRepository {
         }, keyHolder);
     }
 
-    public List<DebugHistoryItem> listHistory(Long projectId, Long endpointId, int limit) {
-        String sql = endpointId == null
-                ? """
-                select id, project_id, environment_id, endpoint_id, http_method, final_url,
-                       request_headers_json, request_body, response_status_code, response_headers_json,
-                       response_body, duration_ms, created_at
-                from debug_history
-                where project_id = ?
-                order by created_at desc, id desc
-                limit ?
+    public List<DebugHistoryItem> listHistory(Long projectId,
+                                              Long endpointId,
+                                              Long environmentId,
+                                              Integer statusCode,
+                                              Instant createdFrom,
+                                              Instant createdTo,
+                                              int limit) {
+        HistoryQuery query = buildHistoryQuery(
                 """
-                : """
                 select id, project_id, environment_id, endpoint_id, http_method, final_url,
                        request_headers_json, request_body, response_status_code, response_headers_json,
                        response_body, duration_ms, created_at
-                from debug_history
-                where project_id = ? and endpoint_id = ?
-                order by created_at desc, id desc
-                limit ?
-                """;
-
+                """,
+                projectId,
+                endpointId,
+                environmentId,
+                statusCode,
+                createdFrom,
+                createdTo,
+                limit);
         RowMapper<DebugHistoryItem> rowMapper = (rs, rowNum) -> new DebugHistoryItem(
                 rs.getLong("id"),
                 rs.getLong("project_id"),
@@ -108,10 +109,65 @@ public class DebugHistoryRepository {
                 rs.getLong("duration_ms"),
                 rs.getTimestamp("created_at").toInstant());
 
-        if (endpointId == null) {
-            return jdbcTemplate.query(sql, rowMapper, projectId, limit);
+        return jdbcTemplate.query(query.sql(), rowMapper, query.args().toArray());
+    }
+
+    public int deleteHistory(Long projectId,
+                             Long endpointId,
+                             Long environmentId,
+                             Integer statusCode,
+                             Instant createdFrom,
+                             Instant createdTo) {
+        HistoryQuery query = buildHistoryQuery(
+                "delete",
+                projectId,
+                endpointId,
+                environmentId,
+                statusCode,
+                createdFrom,
+                createdTo,
+                null);
+        return jdbcTemplate.update(query.sql(), query.args().toArray());
+    }
+
+    private HistoryQuery buildHistoryQuery(String selectClause,
+                                           Long projectId,
+                                           Long endpointId,
+                                           Long environmentId,
+                                           Integer statusCode,
+                                           Instant createdFrom,
+                                           Instant createdTo,
+                                           Integer limit) {
+        StringBuilder sql = new StringBuilder(selectClause).append(" from debug_history where project_id = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(projectId);
+
+        if (endpointId != null) {
+            sql.append(" and endpoint_id = ?");
+            args.add(endpointId);
         }
-        return jdbcTemplate.query(sql, rowMapper, projectId, endpointId, limit);
+        if (environmentId != null) {
+            sql.append(" and environment_id = ?");
+            args.add(environmentId);
+        }
+        if (statusCode != null) {
+            sql.append(" and response_status_code = ?");
+            args.add(statusCode);
+        }
+        if (createdFrom != null) {
+            sql.append(" and created_at >= ?");
+            args.add(Timestamp.from(createdFrom));
+        }
+        if (createdTo != null) {
+            sql.append(" and created_at <= ?");
+            args.add(Timestamp.from(createdTo));
+        }
+        if (limit != null) {
+            sql.append(" order by created_at desc, id desc limit ?");
+            args.add(limit);
+        }
+
+        return new HistoryQuery(sql.toString(), args);
     }
 
     private String toJson(List<DebugHeader> headers) {
@@ -133,5 +189,8 @@ public class DebugHistoryRepository {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to parse debug history headers", exception);
         }
+    }
+
+    private record HistoryQuery(String sql, List<Object> args) {
     }
 }

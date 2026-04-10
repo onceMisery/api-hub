@@ -236,7 +236,7 @@ class DebugServiceTest {
     void shouldReturnProjectDebugHistory() {
         Instant createdAt = Instant.parse("2026-04-09T04:12:30Z");
         given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
-        given(debugHistoryRepository.listHistory(1L, 31L, 10)).willReturn(List.of(
+        given(debugHistoryRepository.listHistory(1L, 31L, null, null, null, null, 10)).willReturn(List.of(
                 new DebugHistoryItem(
                         101L,
                         1L,
@@ -252,10 +252,35 @@ class DebugServiceTest {
                         35L,
                         createdAt)));
 
-        List<DebugHistoryItem> history = debugService.listHistory(1L, 31L, 10);
+        List<DebugHistoryItem> history = debugService.listHistory(1L, 31L, null, null, null, null, 10);
 
         assertThat(history).hasSize(1);
         assertThat(history.getFirst().id()).isEqualTo(101L);
-        verify(debugHistoryRepository).listHistory(1L, 31L, 10);
+        verify(debugHistoryRepository).listHistory(1L, 31L, null, null, null, null, 10);
+    }
+
+    @Test
+    void shouldFilterProjectDebugHistoryByEnvironmentStatusAndTimeRange() {
+        Instant from = Instant.parse("2026-04-09T00:00:00Z");
+        Instant to = Instant.parse("2026-04-10T00:00:00Z");
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(debugHistoryRepository.listHistory(1L, 31L, 41L, 500, from, to, 20)).willReturn(List.of());
+
+        debugService.listHistory(1L, 31L, 41L, 500, from, to, 20);
+
+        verify(debugHistoryRepository).listHistory(1L, 31L, 41L, 500, from, to, 20);
+    }
+
+    @Test
+    void shouldClearProjectDebugHistoryByCurrentFilters() {
+        Instant from = Instant.parse("2026-04-09T00:00:00Z");
+        Instant to = Instant.parse("2026-04-10T00:00:00Z");
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(debugHistoryRepository.deleteHistory(1L, 31L, 41L, 500, from, to)).willReturn(3);
+
+        int deletedCount = debugService.clearHistory(1L, 31L, 41L, 500, from, to);
+
+        assertThat(deletedCount).isEqualTo(3);
+        verify(debugHistoryRepository).deleteHistory(1L, 31L, 41L, 500, from, to);
     }
 }

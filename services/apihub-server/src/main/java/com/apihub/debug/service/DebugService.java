@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,10 +108,34 @@ public class DebugService {
                 result.durationMs());
     }
 
-    public List<DebugHistoryItem> listHistory(Long projectId, Long endpointId, int limit) {
+    public List<DebugHistoryItem> listHistory(Long projectId,
+                                              Long endpointId,
+                                              Long environmentId,
+                                              Integer statusCode,
+                                              Instant createdFrom,
+                                              Instant createdTo,
+                                              int limit) {
         projectRepository.findProject(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
-        return debugHistoryRepository.listHistory(projectId, endpointId, Math.max(1, Math.min(limit, 50)));
+        return debugHistoryRepository.listHistory(
+                projectId,
+                endpointId,
+                environmentId,
+                statusCode,
+                createdFrom,
+                createdTo,
+                Math.max(1, Math.min(limit, 50)));
+    }
+
+    public int clearHistory(Long projectId,
+                            Long endpointId,
+                            Long environmentId,
+                            Integer statusCode,
+                            Instant createdFrom,
+                            Instant createdTo) {
+        projectRepository.findProject(projectId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        return debugHistoryRepository.deleteHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
     }
 
     private URI buildTargetUri(String baseUrl, String endpointPath, String queryString) {
