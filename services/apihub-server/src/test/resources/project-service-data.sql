@@ -4,14 +4,14 @@ VALUES (1, 'admin', 'Administrator', 'admin@local.dev', 'hash', 'active');
 INSERT INTO space (id, name, space_key, owner_id, status)
 VALUES (1, 'Default Space', 'default', 1, 'active');
 
-INSERT INTO project (id, space_id, name, project_key, description, owner_id, status)
-VALUES (1, 1, 'Default Project', 'default', 'Seed project', 1, 'active');
+INSERT INTO project (id, space_id, name, project_key, description, debug_allowed_hosts_json, owner_id, status)
+VALUES (1, 1, 'Default Project', 'default', 'Seed project', '[]', 1, 'active');
 
 ALTER TABLE project ALTER COLUMN id RESTART WITH 2;
 
 
-INSERT INTO environment (id, project_id, name, base_url, is_default, variables_json, default_headers_json, default_query_json, auth_mode, auth_key, auth_value, created_by)
-VALUES (1, 1, 'Local', 'https://local.dev', TRUE, '[]', '[]', '[]', 'none', '', '', 1);
+INSERT INTO environment (id, project_id, name, base_url, is_default, variables_json, default_headers_json, default_query_json, auth_mode, auth_key, auth_value, debug_host_mode, debug_allowed_hosts_json, created_by)
+VALUES (1, 1, 'Local', 'https://local.dev', TRUE, '[]', '[]', '[]', 'none', '', '', 'inherit', '[]', 1);
 
 INSERT INTO module (id, project_id, name, module_key, sort_order, created_by)
 VALUES (1, 1, 'Core', 'core-1', 0, 1);

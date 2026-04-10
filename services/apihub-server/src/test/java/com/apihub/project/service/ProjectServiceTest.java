@@ -10,6 +10,7 @@ import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
+import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
 import com.apihub.mock.service.MockRuntimeResolver;
@@ -45,11 +46,44 @@ class ProjectServiceTest {
     private ProjectService projectService;
 
     @Test
+    void shouldPersistProjectAndEnvironmentDebugPolicies() {
+        var project = projectService.createProject(new CreateProjectRequest(
+                "Secure",
+                "secure",
+                "debug policy",
+                java.util.List.of(new DebugTargetRuleEntry("api.partner.com", false))));
+
+        var savedProject = projectService.updateProject(project.id(), new UpdateProjectRequest(
+                "Secure",
+                "debug policy updated",
+                java.util.List.of(new DebugTargetRuleEntry("*.corp.example.com", false))));
+
+        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
+                "Staging",
+                "https://staging.example.com",
+                true,
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                "none",
+                "",
+                "",
+                "append",
+                java.util.List.of(new DebugTargetRuleEntry("10.10.1.8", true))));
+
+        assertThat(savedProject.debugAllowedHosts())
+                .containsExactly(new DebugTargetRuleEntry("*.corp.example.com", false));
+        assertThat(environment.debugHostMode()).isEqualTo("append");
+        assertThat(environment.debugAllowedHosts())
+                .containsExactly(new DebugTargetRuleEntry("10.10.1.8", true));
+    }
+
+    @Test
     void shouldCompleteProjectModuleGroupEndpointVersionFlowAgainstDatabase() {
         assertThat(projectService.listProjects()).extracting("projectKey").contains("default");
 
-        var project = projectService.createProject(new CreateProjectRequest("Demo", "demo", "first project"));
-        var updatedProject = projectService.updateProject(project.id(), new UpdateProjectRequest("Demo Updated", "desc"));
+        var project = projectService.createProject(new CreateProjectRequest("Demo", "demo", "first project", java.util.List.of()));
+        var updatedProject = projectService.updateProject(project.id(), new UpdateProjectRequest("Demo Updated", "desc", java.util.List.of()));
         var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
                 "Local",
                 "https://local.dev",
@@ -59,7 +93,9 @@ class ProjectServiceTest {
                 java.util.List.of(new EnvironmentEntry("locale", "zh-CN")),
                 "bearer",
                 "Authorization",
-                "dev-token"));
+                "dev-token",
+                "inherit",
+                java.util.List.of()));
         var updatedEnvironment = projectService.updateEnvironment(environment.id(), new UpdateEnvironmentRequest(
                 "Staging",
                 "https://staging.dev",
@@ -69,7 +105,9 @@ class ProjectServiceTest {
                 java.util.List.of(new EnvironmentEntry("region", "cn")),
                 "api_key_header",
                 "X-API-Key",
-                "staging-key"));
+                "staging-key",
+                "inherit",
+                java.util.List.of()));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -135,7 +173,7 @@ class ProjectServiceTest {
 
     @Test
     void shouldDeleteEndpointGroupAndModule() {
-        var project = projectService.createProject(new CreateProjectRequest("Cleanup", "cleanup", "cleanup project"));
+        var project = projectService.createProject(new CreateProjectRequest("Cleanup", "cleanup", "cleanup project", java.util.List.of()));
         var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
                 "Local",
                 "https://cleanup.dev",
@@ -145,7 +183,9 @@ class ProjectServiceTest {
                 java.util.List.of(),
                 "none",
                 "",
-                ""));
+                "",
+                "inherit",
+                java.util.List.of()));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Legacy"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("Deprecated"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -170,7 +210,7 @@ class ProjectServiceTest {
 
     @Test
     void shouldPublishAndListEndpointMockReleases() {
-        var project = projectService.createProject(new CreateProjectRequest("Mock Publish", "mock-publish", "mock publish"));
+        var project = projectService.createProject(new CreateProjectRequest("Mock Publish", "mock-publish", "mock publish", java.util.List.of()));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
@@ -206,7 +246,7 @@ class ProjectServiceTest {
 
     @Test
     void shouldSimulateEndpointMockDraftThroughResolver() {
-        var project = projectService.createProject(new CreateProjectRequest("Mock Simulate", "mock-simulate", "mock simulate"));
+        var project = projectService.createProject(new CreateProjectRequest("Mock Simulate", "mock-simulate", "mock simulate", java.util.List.of()));
         var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
         var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
         var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(

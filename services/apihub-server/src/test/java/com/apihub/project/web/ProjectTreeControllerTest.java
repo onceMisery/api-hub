@@ -45,7 +45,7 @@ class ProjectTreeControllerTest {
     @Test
     void shouldReturnProjectList() throws Exception {
         given(projectService.listProjects()).willReturn(List.of(
-                new ProjectDetail(1L, "Default Project", "default", "Seed project")));
+                new ProjectDetail(1L, "Default Project", "default", "Seed project", List.of())));
 
         mockMvc.perform(get("/api/v1/projects").with(user("tester")))
                 .andExpect(status().isOk())

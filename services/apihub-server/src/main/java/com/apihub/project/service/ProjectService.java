@@ -80,7 +80,8 @@ public class ProjectService {
         return projectRepository.updateProject(
                 projectId,
                 request.name() != null ? request.name() : current.name(),
-                request.description() != null ? request.description() : current.description());
+                request.description() != null ? request.description() : current.description(),
+                request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
     }
 
     @Transactional(readOnly = true)

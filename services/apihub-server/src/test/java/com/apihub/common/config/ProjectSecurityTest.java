@@ -43,7 +43,7 @@ class ProjectSecurityTest {
     void shouldAllowBearerTokenForProtectedEndpoint() throws Exception {
         given(jwtTokenService.parseAccessToken("access-42")).willReturn(Optional.of(42L));
         given(projectService.listProjects()).willReturn(List.of(
-                new ProjectDetail(1L, "Default Project", "default", "Seed project")));
+                new ProjectDetail(1L, "Default Project", "default", "Seed project", List.of())));
 
         mockMvc.perform(get("/api/v1/projects")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer access-42"))

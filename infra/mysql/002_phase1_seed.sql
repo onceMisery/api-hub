@@ -36,6 +36,7 @@ INSERT INTO project (
   name,
   project_key,
   description,
+  debug_allowed_hosts_json,
   owner_id,
   status
 ) VALUES (
@@ -44,6 +45,7 @@ INSERT INTO project (
   'Default Project',
   'default',
   'Seed project for phase 1 workbench',
+  JSON_ARRAY(),
   1,
   'active'
 );
@@ -60,6 +62,8 @@ INSERT INTO environment (
   auth_mode,
   auth_key,
   auth_value,
+  debug_host_mode,
+  debug_allowed_hosts_json,
   created_by
 ) VALUES (
   1,
@@ -73,6 +77,8 @@ INSERT INTO environment (
   'none',
   '',
   '',
+  'inherit',
+  JSON_ARRAY(),
   1
 );
 

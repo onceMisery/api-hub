@@ -23,6 +23,7 @@ CREATE TABLE project (
   name VARCHAR(128) NOT NULL,
   project_key VARCHAR(64) NOT NULL,
   description TEXT,
+  debug_allowed_hosts_json CLOB NOT NULL,
   owner_id BIGINT NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
@@ -39,6 +40,8 @@ CREATE TABLE environment (
   auth_mode VARCHAR(32) NOT NULL DEFAULT 'none',
   auth_key VARCHAR(128) NOT NULL DEFAULT '',
   auth_value VARCHAR(512) NOT NULL DEFAULT '',
+  debug_host_mode VARCHAR(16) NOT NULL DEFAULT 'inherit',
+  debug_allowed_hosts_json CLOB NOT NULL,
   created_by BIGINT NOT NULL
 );
 

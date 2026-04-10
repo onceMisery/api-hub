@@ -9,13 +9,16 @@ public final class ProjectDtos {
     private ProjectDtos() {
     }
 
-    public record CreateProjectRequest(String name, String projectKey, String description) {
+    public record DebugTargetRuleEntry(String pattern, boolean allowPrivate) {
     }
 
-    public record UpdateProjectRequest(String name, String description) {
+    public record CreateProjectRequest(String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
     }
 
-    public record ProjectDetail(Long id, String name, String projectKey, String description) {
+    public record UpdateProjectRequest(String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
+    }
+
+    public record ProjectDetail(Long id, String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
     }
 
     public record ProjectTreeResponse(List<ModuleTreeItem> modules) {
@@ -60,7 +63,9 @@ public final class ProjectDtos {
             List<EnvironmentEntry> defaultQuery,
             String authMode,
             String authKey,
-            String authValue
+            String authValue,
+            String debugHostMode,
+            List<DebugTargetRuleEntry> debugAllowedHosts
     ) {
     }
 
@@ -73,7 +78,9 @@ public final class ProjectDtos {
             List<EnvironmentEntry> defaultQuery,
             String authMode,
             String authKey,
-            String authValue
+            String authValue,
+            String debugHostMode,
+            List<DebugTargetRuleEntry> debugAllowedHosts
     ) {
     }
 
@@ -88,7 +95,9 @@ public final class ProjectDtos {
             List<EnvironmentEntry> defaultQuery,
             String authMode,
             String authKey,
-            String authValue
+            String authValue,
+            String debugHostMode,
+            List<DebugTargetRuleEntry> debugAllowedHosts
     ) {
     }
 

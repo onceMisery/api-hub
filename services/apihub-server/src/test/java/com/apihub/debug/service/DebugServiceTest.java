@@ -62,7 +62,9 @@ class DebugServiceTest {
                         List.of(new EnvironmentEntry("locale", "zh-CN"), new EnvironmentEntry("include", "summary")),
                         "bearer",
                         "Authorization",
-                        "env-token")));
+                        "env-token",
+                        "inherit",
+                        List.of())));
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
@@ -121,7 +123,9 @@ class DebugServiceTest {
                         List.of(),
                         "bearer",
                         "Authorization",
-                        "env-token")));
+                        "env-token",
+                        "inherit",
+                        List.of())));
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
@@ -144,7 +148,7 @@ class DebugServiceTest {
     @Test
     void shouldRejectUnsupportedBaseUrlScheme() {
         given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
-                new EnvironmentDetail(41L, 1L, "Local", "ftp://local.dev/api", true, List.of(), List.of(), List.of(), "none", "", "")));
+                new EnvironmentDetail(41L, 1L, "Local", "ftp://local.dev/api", true, List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
         given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
                 new EndpointRepository.EndpointReference(31L, 21L, 1L)));
         given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
@@ -164,7 +168,7 @@ class DebugServiceTest {
     @Test
     void shouldReturnProjectDebugHistory() {
         Instant createdAt = Instant.parse("2026-04-09T04:12:30Z");
-        given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed")));
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
         given(debugHistoryRepository.listHistory(1L, 31L, 10)).willReturn(List.of(
                 new DebugHistoryItem(
                         101L,
