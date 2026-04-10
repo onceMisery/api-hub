@@ -4,6 +4,7 @@ import com.apihub.auth.service.JwtTokenService;
 import com.apihub.common.config.SecurityConfig;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.debug.model.DebugDtos.ExecuteDebugResponse;
+import com.apihub.debug.service.DebugSecurityException;
 import com.apihub.debug.service.DebugService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,5 +62,31 @@ class DebugControllerTest {
                 .andExpect(jsonPath("$.data.finalUrl").value("https://local.dev/api/users/31?verbose=true"))
                 .andExpect(jsonPath("$.data.statusCode").value(200))
                 .andExpect(jsonPath("$.data.responseHeaders[0].name").value("Content-Type"));
+    }
+
+    @Test
+    void shouldReturnStructuredPolicyError() throws Exception {
+        given(debugService.execute(any())).willThrow(DebugSecurityException.forbidden(
+                "DEBUG_TARGET_NOT_ALLOWED",
+                "目标主机 blocked.example.com 未在调试白名单中",
+                "blocked.example.com",
+                List.of()));
+
+        mockMvc.perform(post("/api/v1/debug/execute")
+                        .with(user("tester"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "environmentId": 41,
+                                  "endpointId": 31,
+                                  "queryString": "",
+                                  "headers": [],
+                                  "body": ""
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("目标主机 blocked.example.com 未在调试白名单中"))
+                .andExpect(jsonPath("$.data.errorCode").value("DEBUG_TARGET_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.data.host").value("blocked.example.com"));
     }
 }
