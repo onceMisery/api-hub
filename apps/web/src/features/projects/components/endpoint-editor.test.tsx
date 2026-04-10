@@ -551,7 +551,7 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("Draft has unpublished mock changes.")).toBeInTheDocument();
     expect(screen.getByText("Published response fields")).toBeInTheDocument();
     expect(screen.getByText("1 field across 1 status group")).toBeInTheDocument();
-    expect(screen.getByText("Published rules")).toBeInTheDocument();
+    expect(screen.getAllByText("Published rules").length).toBeGreaterThan(0);
     expect(screen.getByText("0 enabled of 0 total")).toBeInTheDocument();
     expect(screen.getByText("Draft response fields")).toBeInTheDocument();
     expect(screen.getByText("2 fields across 1 status group")).toBeInTheDocument();
@@ -559,6 +559,45 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("1 enabled of 1 total")).toBeInTheDocument();
     expect(screen.getByText("Draft response fields changed from 1 to 2.")).toBeInTheDocument();
     expect(screen.getByText("Draft enabled rules changed from 0 to 1.")).toBeInTheDocument();
+  });
+
+  it("shows published runtime response groups and rule breakdown", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockReleases={[
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"},{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"role\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"admin\"}]",
+            rulesSnapshotJson:
+              "[{\"ruleName\":\"Unauthorized\",\"priority\":100,\"enabled\":true,\"queryConditions\":[{\"name\":\"mode\",\"value\":\"strict\"}],\"headerConditions\":[{\"name\":\"x-scenario\",\"value\":\"unauthorized\"}],\"statusCode\":401,\"mediaType\":\"application/json\",\"body\":\"{\\\"error\\\":\\\"token expired\\\"}\"}]",
+            createdAt: "2026-04-09T12:20:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Published response groups")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json")).toBeInTheDocument();
+    expect(screen.getByText("2 fields")).toBeInTheDocument();
+    expect(screen.getAllByText("Published rules").length).toBeGreaterThan(0);
+    expect(screen.getByText("Unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("Priority 100")).toBeInTheDocument();
+    expect(screen.getByText("query mode=strict")).toBeInTheDocument();
+    expect(screen.getByText("header x-scenario=unauthorized")).toBeInTheDocument();
   });
 
   it("shows unpublished runtime state when no release exists", () => {

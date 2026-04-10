@@ -85,6 +85,26 @@ type MockRuntimeSummary = {
   totalRuleCount: number;
   enabledRuleCount: number;
 };
+type MockReleaseRuleSnapshot = {
+  ruleName: string;
+  priority: number;
+  enabled: boolean;
+  queryConditions: MockConditionEntry[];
+  headerConditions: MockConditionEntry[];
+  statusCode: number;
+  mediaType: string;
+};
+type PublishedResponseGroup = {
+  key: string;
+  label: string;
+  fieldCount: number;
+};
+type PublishedRuleItem = {
+  key: string;
+  ruleName: string;
+  priorityLabel: string;
+  conditions: string[];
+};
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
@@ -246,6 +266,8 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => buildRuntimeDiffItems(publishedRuntimeSummary, draftRuntimeSummary, latestRelease !== null),
     [draftRuntimeSummary, latestRelease, publishedRuntimeSummary]
   );
+  const publishedResponseGroups = useMemo(() => buildPublishedResponseGroups(latestRelease), [latestRelease]);
+  const publishedRuleItems = useMemo(() => buildPublishedRuleItems(latestRelease), [latestRelease]);
 
   if (isLoading) {
     return (
@@ -814,6 +836,53 @@ export function EndpointEditor(props: EndpointEditorProps) {
               </div>
             )}
           </div>
+
+          {latestRelease ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Published response groups</p>
+                {publishedResponseGroups.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {publishedResponseGroups.map((group) => (
+                      <div key={group.key} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-sm font-semibold text-slate-900">{group.label}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {group.fieldCount} {pluralize(group.fieldCount, "field")}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">No published response groups in this release.</p>
+                )}
+              </div>
+
+              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Published rules</p>
+                {publishedRuleItems.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {publishedRuleItems.map((rule) => (
+                      <div key={rule.key} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900">{rule.ruleName}</p>
+                          <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
+                            {rule.priorityLabel}
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-2 text-sm text-slate-500">
+                          {rule.conditions.map((condition) => (
+                            <p key={`${rule.key}-${condition}`}>{condition}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">No published rules in this release.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex items-center gap-3">
             <button
@@ -1548,26 +1617,49 @@ function readReleaseResponses(snapshotJson: string): ResponseDraft[] {
   }
 }
 
-function readReleaseRules(snapshotJson: string): MockRuleDraft[] {
+function readReleaseRules(snapshotJson: string): MockReleaseRuleSnapshot[] {
   try {
-    const parsed = JSON.parse(snapshotJson) as Partial<MockRuleDraft>[];
-    return Array.isArray(parsed) ? parsed.map(normalizeMockRuleDraft) : [];
+    const parsed = JSON.parse(snapshotJson) as Partial<MockReleaseRuleSnapshot>[];
+    return Array.isArray(parsed) ? parsed.map(normalizeMockReleaseRule) : [];
   } catch {
     return [];
   }
 }
 
-function normalizeMockRuleDraft(rule: Partial<MockRuleDraft>): MockRuleDraft {
+function normalizeMockReleaseRule(rule: Partial<MockReleaseRuleSnapshot>): MockReleaseRuleSnapshot {
   return {
-    body: typeof rule.body === "string" ? rule.body : "{}",
     enabled: rule.enabled !== false,
-    headerConditionsText: typeof rule.headerConditionsText === "string" ? rule.headerConditionsText : "",
+    headerConditions: normalizeConditionEntries(rule.headerConditions),
     mediaType: typeof rule.mediaType === "string" ? rule.mediaType : "application/json",
     priority: typeof rule.priority === "number" ? rule.priority : 100,
-    queryConditionsText: typeof rule.queryConditionsText === "string" ? rule.queryConditionsText : "",
+    queryConditions: normalizeConditionEntries(rule.queryConditions),
     ruleName: typeof rule.ruleName === "string" ? rule.ruleName : "",
     statusCode: typeof rule.statusCode === "number" ? rule.statusCode : 200
   };
+}
+
+function normalizeConditionEntries(conditions: unknown): MockConditionEntry[] {
+  if (!Array.isArray(conditions)) {
+    return [];
+  }
+
+  return conditions
+    .map((condition) => {
+      if (!condition || typeof condition !== "object") {
+        return null;
+      }
+
+      const candidate = condition as Partial<MockConditionEntry>;
+      if (typeof candidate.name !== "string") {
+        return null;
+      }
+
+      return {
+        name: candidate.name,
+        value: typeof candidate.value === "string" ? candidate.value : ""
+      };
+    })
+    .filter((condition): condition is MockConditionEntry => condition !== null);
 }
 
 function buildRuntimeDiffItems(
@@ -1619,6 +1711,57 @@ function emptyMockRuntimeSummary(): MockRuntimeSummary {
     responseGroupCount: 0,
     totalRuleCount: 0
   };
+}
+
+function buildPublishedResponseGroups(release: MockReleaseDetail | null): PublishedResponseGroup[] {
+  if (!release) {
+    return [];
+  }
+
+  const groups = new Map<string, PublishedResponseGroup>();
+  for (const response of readReleaseResponses(release.responseSnapshotJson)) {
+    const key = `${response.httpStatusCode}:${response.mediaType}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.fieldCount += 1;
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      label: `${response.httpStatusCode} ${response.mediaType}`,
+      fieldCount: 1
+    });
+  }
+
+  return [...groups.values()];
+}
+
+function buildPublishedRuleItems(release: MockReleaseDetail | null): PublishedRuleItem[] {
+  if (!release) {
+    return [];
+  }
+
+  return readReleaseRules(release.rulesSnapshotJson)
+    .filter((rule) => rule.enabled)
+    .map((rule) => ({
+      conditions: buildPublishedRuleConditions(rule),
+      key: `${rule.ruleName}:${rule.priority}:${rule.statusCode}:${rule.mediaType}`,
+      priorityLabel: `Priority ${rule.priority}`,
+      ruleName: rule.ruleName || "Unnamed rule"
+    }));
+}
+
+function buildPublishedRuleConditions(rule: MockReleaseRuleSnapshot) {
+  const queryConditions = rule.queryConditions.map((condition) => `query ${condition.name}=${condition.value}`);
+  const headerConditions = rule.headerConditions.map((condition) => `header ${condition.name}=${condition.value}`);
+  const conditions = [...queryConditions, ...headerConditions];
+
+  if (conditions.length > 0) {
+    return conditions;
+  }
+
+  return [`Returns ${rule.statusCode} ${rule.mediaType}`];
 }
 
 function EditorPanel({ children, title }: { children: ReactNode; title: string }) {
