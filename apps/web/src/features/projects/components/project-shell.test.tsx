@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const {
   mockReplace,
+  fetchProject,
+  updateProject,
   fetchProjectTree,
   fetchEndpoint,
   fetchEndpointMockRules,
@@ -33,6 +35,8 @@ const {
   simulateEndpointMock
 } = vi.hoisted(() => ({
   mockReplace: vi.fn(),
+  fetchProject: vi.fn(),
+  updateProject: vi.fn(),
   fetchProjectTree: vi.fn(),
   fetchEndpoint: vi.fn(),
   fetchEndpointMockRules: vi.fn(),
@@ -70,6 +74,8 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@api-hub/api-sdk", () => ({
+  fetchProject,
+  updateProject,
   fetchProjectTree,
   fetchEndpoint,
   fetchEndpointMockRules,
@@ -98,6 +104,19 @@ vi.mock("@api-hub/api-sdk", () => ({
   createVersion,
   publishEndpointMockRelease,
   simulateEndpointMock,
+  ApiRequestError: class ApiRequestError extends Error {
+    status: number;
+    errorCode?: string;
+    data?: unknown;
+
+    constructor(status: number, message: string, errorCode?: string, data?: unknown) {
+      super(message);
+      this.name = "ApiRequestError";
+      this.status = status;
+      this.errorCode = errorCode;
+      this.data = data;
+    }
+  },
   isApiRequestError: () => false
 }));
 
@@ -106,6 +125,16 @@ import { ProjectShell } from "./project-shell";
 describe("ProjectShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    fetchProject.mockResolvedValue({
+      data: {
+        id: 1,
+        name: "Default Project",
+        projectKey: "default",
+        description: "Seed project",
+        debugAllowedHosts: [{ pattern: "*.corp.example.com", allowPrivate: false }]
+      }
+    });
 
     fetchProjectTree
       .mockResolvedValueOnce({
@@ -165,7 +194,7 @@ describe("ProjectShell", () => {
     fetchEndpointVersions.mockResolvedValue({ data: [] });
     fetchDebugHistory.mockResolvedValue({ data: [] });
     fetchEnvironments.mockResolvedValue({
-      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" }]
+      data: [{ id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "", debugHostMode: "inherit", debugAllowedHosts: [] }]
     });
     executeDebug.mockResolvedValue({
       data: {
@@ -178,9 +207,34 @@ describe("ProjectShell", () => {
       }
     });
     createModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
-    createEnvironment.mockResolvedValue({ data: { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" } });
+    createEnvironment.mockResolvedValue({
+      data: {
+        id: 42,
+        projectId: 1,
+        name: "Staging",
+        baseUrl: "https://staging.dev",
+        isDefault: false,
+        variables: [],
+        defaultHeaders: [],
+        defaultQuery: [],
+        authMode: "none",
+        authKey: "",
+        authValue: "",
+        debugHostMode: "inherit",
+        debugAllowedHosts: []
+      }
+    });
+    updateProject.mockResolvedValue({
+      data: {
+        id: 1,
+        name: "Default Project",
+        projectKey: "default",
+        description: "Seed project",
+        debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }]
+      }
+    });
     updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
-    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" } });
+    updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "", debugHostMode: "inherit", debugAllowedHosts: [] } });
     deleteModule.mockResolvedValue({ data: null });
     createGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
     updateGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
@@ -438,6 +492,8 @@ describe("ProjectShell", () => {
         authKey: "",
         authMode: "none",
         authValue: "",
+        debugAllowedHosts: [],
+        debugHostMode: "inherit",
         isDefault: false,
         name: "Staging",
         variables: []
@@ -458,6 +514,8 @@ describe("ProjectShell", () => {
         authKey: "",
         authMode: "none",
         authValue: "",
+        debugAllowedHosts: [],
+        debugHostMode: "inherit",
         isDefault: true,
         name: "Production",
         variables: []
@@ -468,11 +526,43 @@ describe("ProjectShell", () => {
     await waitFor(() => expect(deleteEnvironment).toHaveBeenCalledWith(41));
   });
 
+  it("loads project detail and saves project debug policy", async () => {
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByDisplayValue("*.corp.example.com")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Project debug rule 1 pattern"), { target: { value: "10.10.1.8" } });
+    fireEvent.click(screen.getByLabelText("Project debug rule 1 allow private"));
+    fireEvent.click(screen.getByRole("button", { name: "Save project debug policy" }));
+
+    await waitFor(() =>
+      expect(updateProject).toHaveBeenCalledWith(1, {
+        name: "Default Project",
+        description: "Seed project",
+        debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }]
+      })
+    );
+  });
+
   it("replays debug history and switches to the history environment", async () => {
     fetchEnvironments.mockResolvedValue({
       data: [
         { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" },
-        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" }
+        {
+          id: 42,
+          projectId: 1,
+          name: "Staging",
+          baseUrl: "https://staging.dev",
+          isDefault: false,
+          variables: [],
+          defaultHeaders: [],
+          defaultQuery: [],
+          authMode: "none",
+          authKey: "",
+          authValue: "",
+          debugHostMode: "inherit",
+          debugAllowedHosts: []
+        }
       ]
     });
     fetchDebugHistory.mockResolvedValue({
@@ -512,8 +602,36 @@ describe("ProjectShell", () => {
   it("runs a debug history item again through the execute pipeline", async () => {
     fetchEnvironments.mockResolvedValue({
       data: [
-        { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" },
-        { id: 42, projectId: 1, name: "Staging", baseUrl: "https://staging.dev", isDefault: false, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "" }
+        {
+          id: 41,
+          projectId: 1,
+          name: "Local",
+          baseUrl: "https://local.dev",
+          isDefault: true,
+          variables: [],
+          defaultHeaders: [],
+          defaultQuery: [],
+          authMode: "none",
+          authKey: "",
+          authValue: "",
+          debugHostMode: "inherit",
+          debugAllowedHosts: []
+        },
+        {
+          id: 42,
+          projectId: 1,
+          name: "Staging",
+          baseUrl: "https://staging.dev",
+          isDefault: false,
+          variables: [],
+          defaultHeaders: [],
+          defaultQuery: [],
+          authMode: "none",
+          authKey: "",
+          authValue: "",
+          debugHostMode: "inherit",
+          debugAllowedHosts: []
+        }
       ]
     });
     fetchDebugHistory

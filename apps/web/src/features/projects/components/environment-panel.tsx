@@ -1,22 +1,28 @@
 "use client";
 
-import type { CreateEnvironmentPayload, EnvironmentDetail, EnvironmentEntry, UpdateEnvironmentPayload } from "@api-hub/api-sdk";
-import { useState } from "react";
+import type { CreateEnvironmentPayload, DebugTargetRule, EnvironmentDetail, EnvironmentEntry, UpdateEnvironmentPayload } from "@api-hub/api-sdk";
+import { useEffect, useState } from "react";
+
+import { DebugTargetRuleEditor } from "./debug-target-rule-editor";
 
 type EnvironmentPanelProps = {
   environments: EnvironmentDetail[];
+  projectDebugAllowedHosts: DebugTargetRule[];
   onCreateEnvironment: (payload: CreateEnvironmentPayload) => Promise<void>;
   onDeleteEnvironment: (environmentId: number) => Promise<void>;
   onSelectEnvironment: (environmentId: number) => void;
+  onUpdateProjectDebugPolicy: (debugAllowedHosts: DebugTargetRule[]) => Promise<void>;
   onUpdateEnvironment: (environmentId: number, payload: UpdateEnvironmentPayload) => Promise<void>;
   selectedEnvironmentId: number | null;
 };
 
 export function EnvironmentPanel({
   environments,
+  projectDebugAllowedHosts,
   onCreateEnvironment,
   onDeleteEnvironment,
   onSelectEnvironment,
+  onUpdateProjectDebugPolicy,
   onUpdateEnvironment,
   selectedEnvironmentId
 }: EnvironmentPanelProps) {
@@ -27,13 +33,20 @@ export function EnvironmentPanel({
     authKey: "",
     authMode: "none",
     authValue: "",
+    debugAllowedHosts: [],
+    debugHostMode: "inherit",
     isDefault: false,
     name: "",
     variables: []
   });
+  const [projectDebugRules, setProjectDebugRules] = useState<DebugTargetRule[]>(projectDebugAllowedHosts);
   const [createVariablesText, setCreateVariablesText] = useState("");
   const [createHeadersText, setCreateHeadersText] = useState("");
   const [createQueryText, setCreateQueryText] = useState("");
+
+  useEffect(() => {
+    setProjectDebugRules(projectDebugAllowedHosts);
+  }, [projectDebugAllowedHosts]);
 
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -41,6 +54,21 @@ export function EnvironmentPanel({
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Environments</p>
         <h3 className="mt-2 text-xl font-semibold text-slate-950">Target environments</h3>
         <p className="mt-2 text-sm leading-6 text-slate-600">Manage base URLs before wiring real request debugging.</p>
+      </div>
+
+      <div className="mb-5 space-y-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Project Policy</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Control which hosts this project can debug against before environment overrides apply.</p>
+        </div>
+        <DebugTargetRuleEditor labelPrefix="Project" onChange={setProjectDebugRules} rules={projectDebugRules} />
+        <button
+          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+          onClick={() => void onUpdateProjectDebugPolicy(sanitizeDebugRules(projectDebugRules))}
+          type="button"
+        >
+          Save project debug policy
+        </button>
       </div>
 
       <form
@@ -59,6 +87,8 @@ export function EnvironmentPanel({
             authKey: createForm.authKey.trim(),
             authMode: createForm.authMode,
             authValue: createForm.authValue.trim(),
+            debugAllowedHosts: sanitizeDebugRules(createForm.debugAllowedHosts),
+            debugHostMode: createForm.debugHostMode,
             name: createForm.name.trim(),
             variables: parseEntries(createVariablesText, "=")
           }).then(() => {
@@ -69,6 +99,8 @@ export function EnvironmentPanel({
               authKey: "",
               authMode: "none",
               authValue: "",
+              debugAllowedHosts: [],
+              debugHostMode: "inherit",
               isDefault: false,
               name: "",
               variables: []
@@ -154,6 +186,30 @@ export function EnvironmentPanel({
             value={createForm.authValue}
           />
         </Field>
+        <Field label="New environment debug host mode">
+          <select
+            aria-label="New environment debug host mode"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) =>
+              setCreateForm((current) => ({
+                ...current,
+                debugHostMode: event.target.value as CreateEnvironmentPayload["debugHostMode"]
+              }))
+            }
+            value={createForm.debugHostMode}
+          >
+            <option value="inherit">Inherit global + project</option>
+            <option value="append">Append environment rules</option>
+            <option value="override">Override project rules</option>
+          </select>
+        </Field>
+        <Field label="New environment debug rules">
+          <DebugTargetRuleEditor
+            labelPrefix="New environment"
+            onChange={(debugAllowedHosts) => setCreateForm((current) => ({ ...current, debugAllowedHosts }))}
+            rules={createForm.debugAllowedHosts}
+          />
+        </Field>
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
           <input
             checked={createForm.isDefault}
@@ -209,6 +265,8 @@ function EnvironmentCard({
     authKey: environment.authKey,
     authMode: environment.authMode,
     authValue: environment.authValue,
+    debugAllowedHosts: environment.debugAllowedHosts ?? [],
+    debugHostMode: environment.debugHostMode ?? "inherit",
     isDefault: environment.isDefault,
     name: environment.name,
     variables: environment.variables
@@ -216,6 +274,25 @@ function EnvironmentCard({
   const [variablesText, setVariablesText] = useState(formatEntries(environment.variables, "="));
   const [headersText, setHeadersText] = useState(formatEntries(environment.defaultHeaders, ":"));
   const [queryText, setQueryText] = useState(formatEntries(environment.defaultQuery, "="));
+
+  useEffect(() => {
+    setDraft({
+      baseUrl: environment.baseUrl,
+      defaultHeaders: environment.defaultHeaders,
+      defaultQuery: environment.defaultQuery,
+      authKey: environment.authKey,
+      authMode: environment.authMode,
+      authValue: environment.authValue,
+      debugAllowedHosts: environment.debugAllowedHosts ?? [],
+      debugHostMode: environment.debugHostMode ?? "inherit",
+      isDefault: environment.isDefault,
+      name: environment.name,
+      variables: environment.variables
+    });
+    setVariablesText(formatEntries(environment.variables, "="));
+    setHeadersText(formatEntries(environment.defaultHeaders, ":"));
+    setQueryText(formatEntries(environment.defaultQuery, "="));
+  }, [environment]);
 
   return (
     <div className={`rounded-[1.6rem] border p-4 transition ${isSelected ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-white"}`}>
@@ -317,6 +394,31 @@ function EnvironmentCard({
             value={draft.authValue}
           />
         </Field>
+        <Field label={`Environment ${environment.id} debug host mode`} dark={isSelected}>
+          <select
+            aria-label={`Environment ${environment.id} debug host mode`}
+            className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                debugHostMode: event.target.value as UpdateEnvironmentPayload["debugHostMode"]
+              }))
+            }
+            value={draft.debugHostMode}
+          >
+            <option value="inherit">Inherit global + project</option>
+            <option value="append">Append environment rules</option>
+            <option value="override">Override project rules</option>
+          </select>
+        </Field>
+        <Field label={`Environment ${environment.id} debug rules`} dark={isSelected}>
+          <DebugTargetRuleEditor
+            dark={isSelected}
+            labelPrefix={`Environment ${environment.id}`}
+            onChange={(debugAllowedHosts) => setDraft((current) => ({ ...current, debugAllowedHosts }))}
+            rules={draft.debugAllowedHosts}
+          />
+        </Field>
         <label className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isSelected ? "border-white/15 bg-white/10 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
           <input
             aria-label={`Environment ${environment.id} default`}
@@ -340,6 +442,8 @@ function EnvironmentCard({
               authKey: draft.authKey.trim(),
               authMode: draft.authMode,
               authValue: draft.authValue.trim(),
+              debugAllowedHosts: sanitizeDebugRules(draft.debugAllowedHosts),
+              debugHostMode: draft.debugHostMode,
               isDefault: draft.isDefault,
               name: draft.name.trim(),
               variables: draft.variables
@@ -392,4 +496,13 @@ function parseEntries(value: string, separator: ":" | "="): EnvironmentEntry[] {
 
 function formatEntries(entries: EnvironmentEntry[], separator: ":" | "=") {
   return entries.map((entry) => `${entry.name}${separator} ${entry.value}`.trimEnd()).join("\n");
+}
+
+function sanitizeDebugRules(rules: DebugTargetRule[]) {
+  return rules
+    .map((rule) => ({
+      allowPrivate: rule.allowPrivate,
+      pattern: rule.pattern.trim()
+    }))
+    .filter((rule) => rule.pattern);
 }

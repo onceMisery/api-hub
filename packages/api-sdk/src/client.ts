@@ -5,11 +5,15 @@ export const REFRESH_TOKEN_STORAGE_KEY = "apihub.refreshToken";
 
 export class ApiRequestError extends Error {
   readonly status: number;
+  readonly errorCode?: string;
+  readonly data?: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, errorCode?: string, data?: unknown) {
     super(message);
     this.name = "ApiRequestError";
     this.status = status;
+    this.errorCode = errorCode;
+    this.data = data;
   }
 }
 
@@ -43,15 +47,21 @@ export async function apiFetch<T>(input: string, init?: RequestInit): Promise<Ap
   if (!response.ok) {
     const fallbackMessage = `Request failed with status ${response.status}`;
     let message = fallbackMessage;
+    let errorCode: string | undefined;
+    let data: unknown;
 
     try {
-      const payload = (await response.json()) as Partial<ApiResponse<T>>;
+      const payload = (await response.json()) as Partial<ApiResponse<T>> & {
+        data?: { errorCode?: unknown } | null;
+      };
       message = payload.message ?? fallbackMessage;
+      data = payload.data;
+      errorCode = typeof payload.data?.errorCode === "string" ? payload.data.errorCode : undefined;
     } catch {
       message = fallbackMessage;
     }
 
-    throw new ApiRequestError(response.status, message);
+    throw new ApiRequestError(response.status, message, errorCode, data);
   }
 
   return response.json();

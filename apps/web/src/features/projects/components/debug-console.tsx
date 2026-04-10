@@ -25,10 +25,12 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
   const [body, setBody] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [policyError, setPolicyError] = useState<{ errorCode: string; message: string } | null>(null);
   const [result, setResult] = useState<DebugExecutionResult | null>(null);
 
   useEffect(() => {
     setError(null);
+    setPolicyError(null);
     setResult(null);
     setHeadersText(formatHeaderEntries(environment?.defaultHeaders ?? []));
     setQueryString("");
@@ -45,6 +47,7 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
     setBody(replayDraft.body);
     setResult(null);
     setError(null);
+    setPolicyError(null);
   }, [replayDraft]);
 
   const previewUrl = useMemo(
@@ -76,6 +79,7 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
 
             setIsExecuting(true);
             setError(null);
+            setPolicyError(null);
 
             void onExecute({
               body,
@@ -85,7 +89,16 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
               queryString: queryString.trim()
             })
               .then((response) => setResult(response))
-              .catch((executionError) => setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request"))
+              .catch((executionError) => {
+                const nextPolicyError = extractPolicyError(executionError);
+                if (nextPolicyError) {
+                  setPolicyError(nextPolicyError);
+                  setError(null);
+                  return;
+                }
+
+                setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request");
+              })
               .finally(() => setIsExecuting(false));
           }}
         >
@@ -141,7 +154,15 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
             <p className="mt-2 font-mono text-sm text-slate-700">{previewUrl ?? "Invalid target"}</p>
           </div>
 
-          {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+          {policyError ? (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Request blocked by debug policy</p>
+              <p className="mt-1">{policyError.message}</p>
+              <p className="mt-2 font-mono text-xs">{policyError.errorCode}</p>
+            </div>
+          ) : null}
+
+          {!policyError && error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
 
           <button
             className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
@@ -213,10 +234,20 @@ export function DebugConsole({ endpoint, environment, history, isLoadingHistory,
                     onClick={() => {
                       setIsExecuting(true);
                       setError(null);
+                      setPolicyError(null);
 
                       void onRunHistory(item)
                         .then((response) => setResult(response))
-                        .catch((executionError) => setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request"))
+                        .catch((executionError) => {
+                          const nextPolicyError = extractPolicyError(executionError);
+                          if (nextPolicyError) {
+                            setPolicyError(nextPolicyError);
+                            setError(null);
+                            return;
+                          }
+
+                          setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request");
+                        })
                         .finally(() => setIsExecuting(false));
                     }}
                     type="button"
@@ -291,6 +322,33 @@ function buildPreviewUrl(baseUrl?: string, path?: string, defaultQuery?: { name:
 
 function formatHeaderEntries(entries: { name: string; value: string }[]) {
   return entries.map((entry) => `${entry.name}: ${entry.value}`.trimEnd()).join("\n");
+}
+
+function extractPolicyError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const maybeError = error as {
+    message?: unknown;
+    errorCode?: unknown;
+    data?: { errorCode?: unknown } | null;
+  };
+  const errorCode =
+    typeof maybeError.errorCode === "string"
+      ? maybeError.errorCode
+      : typeof maybeError.data?.errorCode === "string"
+        ? maybeError.data.errorCode
+        : undefined;
+
+  if (!errorCode) {
+    return null;
+  }
+
+  return {
+    errorCode,
+    message: typeof maybeError.message === "string" ? maybeError.message : "Request blocked by debug policy"
+  };
 }
 
 function Field({ children, label }: { children: React.ReactNode; label: string }) {

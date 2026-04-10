@@ -15,6 +15,7 @@ import {
   fetchEndpointMockRules,
   fetchEndpointMockReleases,
   fetchEnvironments,
+  fetchProject,
   fetchDebugHistory,
   fetchEndpointParameters,
   fetchEndpointResponses,
@@ -30,6 +31,8 @@ import {
   updateEnvironment,
   updateGroup,
   updateModule,
+  updateProject,
+  type DebugTargetRule,
   type EnvironmentDetail,
   type CreateEnvironmentPayload,
   type DebugExecutionResult,
@@ -43,6 +46,7 @@ import {
   type MockRuleUpsertItem,
   type ParameterDetail,
   type ParameterUpsertItem,
+  type ProjectDetail,
   type ResponseDetail,
   type ResponseUpsertItem,
   type UpdateEndpointPayload,
@@ -64,6 +68,7 @@ type ProjectShellProps = {
 export function ProjectShell({ projectId }: ProjectShellProps) {
   const router = useRouter();
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [environments, setEnvironments] = useState<EnvironmentDetail[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<number | null>(null);
@@ -85,6 +90,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void reloadProject();
+  }, [projectId]);
 
   useEffect(() => {
     void reloadTree();
@@ -296,9 +305,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         <div className="space-y-6">
           <EnvironmentPanel
             environments={environments}
+            projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             onCreateEnvironment={handleCreateEnvironment}
             onDeleteEnvironment={handleDeleteEnvironment}
             onSelectEnvironment={setSelectedEnvironmentId}
+            onUpdateProjectDebugPolicy={handleUpdateProjectPolicy}
             onUpdateEnvironment={handleUpdateEnvironment}
             selectedEnvironmentId={selectedEnvironmentId}
           />
@@ -354,6 +365,21 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load project tree");
     } finally {
       setIsLoadingTree(false);
+    }
+  }
+
+  async function reloadProject() {
+    setError(null);
+
+    try {
+      const response = await fetchProject(projectId);
+      setProject(response.data);
+    } catch (loadError) {
+      if (handleUnauthorized(loadError)) {
+        return;
+      }
+
+      setError(loadError instanceof Error ? loadError.message : "Failed to load project detail");
     }
   }
 
@@ -418,6 +444,29 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       }
 
       setError(updateError instanceof Error ? updateError.message : "Failed to update environment");
+    }
+  }
+
+  async function handleUpdateProjectPolicy(debugAllowedHosts: DebugTargetRule[]) {
+    if (!project) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const response = await updateProject(projectId, {
+        debugAllowedHosts,
+        description: project.description ?? "",
+        name: project.name
+      });
+      setProject(response.data);
+    } catch (updateError) {
+      if (handleUnauthorized(updateError)) {
+        return;
+      }
+
+      setError(updateError instanceof Error ? updateError.message : "Failed to update project debug policy");
     }
   }
 

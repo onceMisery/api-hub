@@ -7,6 +7,19 @@ export type ProjectSummary = {
   description: string | null;
 };
 
+export type DebugTargetRule = {
+  pattern: string;
+  allowPrivate: boolean;
+};
+
+export type ProjectDetail = {
+  id: number;
+  name: string;
+  projectKey: string;
+  description: string | null;
+  debugAllowedHosts: DebugTargetRule[];
+};
+
 export type EndpointTreeItem = {
   id: number;
   name: string;
@@ -77,6 +90,14 @@ export type EnvironmentDetail = {
   authMode: "none" | "bearer" | "api_key_header";
   authKey: string;
   authValue: string;
+  debugHostMode: "inherit" | "append" | "override";
+  debugAllowedHosts: DebugTargetRule[];
+};
+
+export type UpdateProjectPayload = {
+  name: string;
+  description: string;
+  debugAllowedHosts: DebugTargetRule[];
 };
 
 export type CreateModulePayload = {
@@ -121,6 +142,8 @@ export type CreateEnvironmentPayload = {
   authMode: "none" | "bearer" | "api_key_header";
   authKey: string;
   authValue: string;
+  debugHostMode: "inherit" | "append" | "override";
+  debugAllowedHosts: DebugTargetRule[];
 };
 
 export type UpdateEnvironmentPayload = {
@@ -133,6 +156,8 @@ export type UpdateEnvironmentPayload = {
   authMode: "none" | "bearer" | "api_key_header";
   authKey: string;
   authValue: string;
+  debugHostMode: "inherit" | "append" | "override";
+  debugAllowedHosts: DebugTargetRule[];
 };
 
 export type ParameterDetail = {
@@ -290,8 +315,19 @@ export function fetchProjects() {
   return apiFetch<ProjectSummary[]>("/api/v1/projects");
 }
 
+export function fetchProject(projectId: number) {
+  return apiFetch<ProjectDetail>(`/api/v1/projects/${projectId}`);
+}
+
 export function fetchProjectTree(projectId: number) {
   return apiFetch<ProjectTree>(`/api/v1/projects/${projectId}/tree`);
+}
+
+export function updateProject(projectId: number, payload: UpdateProjectPayload) {
+  return apiFetch<ProjectDetail>(`/api/v1/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function createModule(projectId: number, payload: CreateModulePayload) {
