@@ -4,11 +4,18 @@ VALUES (1, 'admin', 'Administrator', 'admin@local.dev', 'hash', 0, 'active');
 INSERT INTO space (id, name, space_key, owner_id, status)
 VALUES (1, 'Default Space', 'default', 1, 'active');
 
+INSERT INTO space_member (id, space_id, user_id, role_code, member_status)
+VALUES (1, 1, 1, 'space_admin', 'active');
+
 INSERT INTO project (id, space_id, name, project_key, description, debug_allowed_hosts_json, owner_id, status)
 VALUES (1, 1, 'Default Project', 'default', 'Seed project', '[]', 1, 'active');
 
-ALTER TABLE project ALTER COLUMN id RESTART WITH 2;
+INSERT INTO project_member (id, project_id, user_id, role_code, member_status)
+VALUES (1, 1, 1, 'project_admin', 'active');
 
+ALTER TABLE project ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE space_member ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE project_member ALTER COLUMN id RESTART WITH 2;
 
 INSERT INTO environment (id, project_id, name, base_url, is_default, variables_json, default_headers_json, default_query_json, auth_mode, auth_key, auth_value, debug_host_mode, debug_allowed_hosts_json, created_by)
 VALUES (1, 1, 'Local', 'https://local.dev', TRUE, '[]', '[]', '[]', 'none', '', '', 'inherit', '[]', 1);

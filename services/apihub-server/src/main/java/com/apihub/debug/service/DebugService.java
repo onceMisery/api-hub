@@ -56,10 +56,16 @@ public class DebugService {
     }
 
     public ExecuteDebugResponse execute(ExecuteDebugRequest request) {
+        return execute(1L, request);
+    }
+
+    public ExecuteDebugResponse execute(Long userId, ExecuteDebugRequest request) {
         EnvironmentDetail environment = projectRepository.findEnvironment(request.environmentId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
+        requireProjectAccess(userId, environment.projectId());
         EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(request.endpointId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
+        requireProjectAccess(userId, endpointReference.projectId());
         if (!environment.projectId().equals(endpointReference.projectId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Endpoint and environment do not belong to the same project");
         }
@@ -115,8 +121,18 @@ public class DebugService {
                                               Instant createdFrom,
                                               Instant createdTo,
                                               int limit) {
-        projectRepository.findProject(projectId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        return listHistory(1L, projectId, endpointId, environmentId, statusCode, createdFrom, createdTo, limit);
+    }
+
+    public List<DebugHistoryItem> listHistory(Long userId,
+                                              Long projectId,
+                                              Long endpointId,
+                                              Long environmentId,
+                                              Integer statusCode,
+                                              Instant createdFrom,
+                                              Instant createdTo,
+                                              int limit) {
+        requireProjectAccess(userId, projectId);
         return debugHistoryRepository.listHistory(
                 projectId,
                 endpointId,
@@ -133,9 +149,26 @@ public class DebugService {
                             Integer statusCode,
                             Instant createdFrom,
                             Instant createdTo) {
+        return clearHistory(1L, projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
+    }
+
+    public int clearHistory(Long userId,
+                            Long projectId,
+                            Long endpointId,
+                            Long environmentId,
+                            Integer statusCode,
+                            Instant createdFrom,
+                            Instant createdTo) {
+        requireProjectAccess(userId, projectId);
+        return debugHistoryRepository.deleteHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
+    }
+
+    private void requireProjectAccess(Long userId, Long projectId) {
         projectRepository.findProject(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
-        return debugHistoryRepository.deleteHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
+        if (!projectRepository.canAccessProject(userId, projectId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
     }
 
     private URI buildTargetUri(String baseUrl, String endpointPath, String queryString) {

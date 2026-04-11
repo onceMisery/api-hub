@@ -32,6 +32,20 @@ INSERT INTO space (
   'active'
 );
 
+INSERT INTO space_member (
+  id,
+  space_id,
+  user_id,
+  role_code,
+  member_status
+) VALUES (
+  1,
+  1,
+  1,
+  'space_admin',
+  'active'
+);
+
 INSERT INTO project (
   id,
   space_id,
@@ -49,6 +63,20 @@ INSERT INTO project (
   'Seed project for phase 1 workbench',
   JSON_ARRAY(),
   1,
+  'active'
+);
+
+INSERT INTO project_member (
+  id,
+  project_id,
+  user_id,
+  role_code,
+  member_status
+) VALUES (
+  1,
+  1,
+  1,
+  'project_admin',
   'active'
 );
 

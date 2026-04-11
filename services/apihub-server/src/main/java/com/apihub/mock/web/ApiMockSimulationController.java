@@ -4,6 +4,7 @@ import com.apihub.common.model.ApiResponse;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,7 +21,8 @@ public class ApiMockSimulationController {
 
     @PostMapping("/api/v1/endpoints/{endpointId}/mock-simulations")
     public ApiResponse<MockSimulationResult> simulate(@PathVariable Long endpointId,
-                                                      @RequestBody MockSimulationRequest request) {
-        return ApiResponse.success(projectService.simulateMock(endpointId, request));
+                                                      @RequestBody MockSimulationRequest request,
+                                                      Authentication authentication) {
+        return ApiResponse.success(projectService.simulateMock((Long) authentication.getPrincipal(), endpointId, request));
     }
 }

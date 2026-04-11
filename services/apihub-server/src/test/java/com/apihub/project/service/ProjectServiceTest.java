@@ -51,19 +51,51 @@ class ProjectServiceTest {
     private ProjectService projectService;
 
     @Test
+    void shouldListOnlyProjectsVisibleToCurrentUser() {
+        assertThat(projectService.listProjects(1L))
+                .extracting("projectKey")
+                .containsExactly("default");
+        assertThat(projectService.listProjects(9L)).isEmpty();
+    }
+
+    @Test
+    void shouldRejectProjectResourcesWhenUserCannotAccessParentProject() {
+        assertThatThrownBy(() -> projectService.listModules(9L, 1L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThatThrownBy(() -> projectService.getProjectTree(9L, 1L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void shouldCreateProjectForCurrentUserAndScopeVisibility() {
+        var project = projectService.createProject(7L, new CreateProjectRequest("Owned", "owned", "by user", java.util.List.of()));
+
+        assertThat(projectService.listProjects(7L))
+                .extracting("projectKey")
+                .contains("owned");
+        assertThat(projectService.listProjects(1L))
+                .extracting("projectKey")
+                .doesNotContain("owned");
+    }
+
+    @Test
     void shouldPersistProjectAndEnvironmentDebugPolicies() {
-        var project = projectService.createProject(new CreateProjectRequest(
+        var project = projectService.createProject(1L, new CreateProjectRequest(
                 "Secure",
                 "secure",
                 "debug policy",
                 java.util.List.of(new DebugTargetRuleEntry("api.partner.com", false))));
 
-        var savedProject = projectService.updateProject(project.id(), new UpdateProjectRequest(
+        var savedProject = projectService.updateProject(1L, project.id(), new UpdateProjectRequest(
                 "Secure",
                 "debug policy updated",
                 java.util.List.of(new DebugTargetRuleEntry("*.corp.example.com", false))));
 
-        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
+        var environment = projectService.createEnvironment(1L, project.id(), new CreateEnvironmentRequest(
                 "Staging",
                 "https://staging.example.com",
                 true,
@@ -85,7 +117,7 @@ class ProjectServiceTest {
 
     @Test
     void shouldRejectInvalidDebugRulePattern() {
-        assertThatThrownBy(() -> projectService.updateProject(1L, new UpdateProjectRequest(
+        assertThatThrownBy(() -> projectService.updateProject(1L, 1L, new UpdateProjectRequest(
                 "Default Project",
                 "Seed project",
                 java.util.List.of(new DebugTargetRuleEntry("https://bad.example.com/path", false)))))
@@ -96,7 +128,7 @@ class ProjectServiceTest {
 
     @Test
     void shouldRejectInvalidEnvironmentDebugMode() {
-        assertThatThrownBy(() -> projectService.updateEnvironment(1L, new UpdateEnvironmentRequest(
+        assertThatThrownBy(() -> projectService.updateEnvironment(1L, 1L, new UpdateEnvironmentRequest(
                 "Local",
                 "https://local.dev",
                 true,
@@ -115,11 +147,11 @@ class ProjectServiceTest {
 
     @Test
     void shouldCompleteProjectModuleGroupEndpointVersionFlowAgainstDatabase() {
-        assertThat(projectService.listProjects()).extracting("projectKey").contains("default");
+        assertThat(projectService.listProjects(1L)).extracting("projectKey").contains("default");
 
-        var project = projectService.createProject(new CreateProjectRequest("Demo", "demo", "first project", java.util.List.of()));
-        var updatedProject = projectService.updateProject(project.id(), new UpdateProjectRequest("Demo Updated", "desc", java.util.List.of()));
-        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
+        var project = projectService.createProject(1L, new CreateProjectRequest("Demo", "demo", "first project", java.util.List.of()));
+        var updatedProject = projectService.updateProject(1L, project.id(), new UpdateProjectRequest("Demo Updated", "desc", java.util.List.of()));
+        var environment = projectService.createEnvironment(1L, project.id(), new CreateEnvironmentRequest(
                 "Local",
                 "https://local.dev",
                 true,
@@ -131,7 +163,7 @@ class ProjectServiceTest {
                 "dev-token",
                 "inherit",
                 java.util.List.of()));
-        var updatedEnvironment = projectService.updateEnvironment(environment.id(), new UpdateEnvironmentRequest(
+        var updatedEnvironment = projectService.updateEnvironment(1L, environment.id(), new UpdateEnvironmentRequest(
                 "Staging",
                 "https://staging.dev",
                 true,
@@ -143,17 +175,17 @@ class ProjectServiceTest {
                 "staging-key",
                 "inherit",
                 java.util.List.of()));
-        var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
-        var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
-        var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
+        var module = projectService.createModule(1L, project.id(), new CreateModuleRequest("Core"));
+        var group = projectService.createGroup(1L, module.id(), new CreateGroupRequest("User APIs"));
+        var endpoint = projectService.createEndpoint(1L, group.id(), new CreateEndpointRequest(
                 "Get User",
                 "GET",
                 "/users/{id}",
                 "load user",
                 true));
-        var renamedModule = projectService.updateModule(module.id(), new UpdateModuleRequest("Core Services"));
-        var renamedGroup = projectService.updateGroup(group.id(), new UpdateGroupRequest("User Management"));
-        var updatedEndpoint = projectService.updateEndpoint(endpoint.id(), new UpdateEndpointRequest(
+        var renamedModule = projectService.updateModule(1L, module.id(), new UpdateModuleRequest("Core Services"));
+        var renamedGroup = projectService.updateGroup(1L, group.id(), new UpdateGroupRequest("User Management"));
+        var updatedEndpoint = projectService.updateEndpoint(1L, endpoint.id(), new UpdateEndpointRequest(
                 "Get User Detail",
                 "GET",
                 "/users/{id}",
@@ -174,9 +206,9 @@ class ProjectServiceTest {
                 true,
                 "Primary identifier",
                 "u_1001");
-        projectService.replaceParameters(endpoint.id(), java.util.List.of(parameter));
-        projectService.replaceResponses(endpoint.id(), java.util.List.of(response));
-        var version = projectService.createVersion(endpoint.id(), new CreateVersionRequest(
+        projectService.replaceParameters(1L, endpoint.id(), java.util.List.of(parameter));
+        projectService.replaceResponses(1L, endpoint.id(), java.util.List.of(response));
+        var version = projectService.createVersion(1L, endpoint.id(), new CreateVersionRequest(
                 "v1",
                 "initial",
                 "{\"path\":\"/users/{id}\"}"));
@@ -190,26 +222,26 @@ class ProjectServiceTest {
         assertThat(updatedEnvironment.authMode()).isEqualTo("api_key_header");
         assertThat(updatedEnvironment.authKey()).isEqualTo("X-API-Key");
         assertThat(updatedEnvironment.authValue()).isEqualTo("staging-key");
-        assertThat(projectService.listEnvironments(project.id())).extracting("name").containsExactly("Staging");
+        assertThat(projectService.listEnvironments(1L, project.id())).extracting("name").containsExactly("Staging");
         assertThat(renamedModule.name()).isEqualTo("Core Services");
         assertThat(renamedGroup.name()).isEqualTo("User Management");
-        assertThat(projectService.getProject(project.id()).projectKey()).isEqualTo("demo");
-        assertThat(projectService.listModules(project.id())).extracting("name").containsExactly("Core Services");
-        assertThat(projectService.listGroups(module.id())).extracting("name").containsExactly("User Management");
-        assertThat(projectService.listEndpoints(group.id())).extracting("name").containsExactly("Get User Detail");
+        assertThat(projectService.getProject(1L, project.id()).projectKey()).isEqualTo("demo");
+        assertThat(projectService.listModules(1L, project.id())).extracting("name").containsExactly("Core Services");
+        assertThat(projectService.listGroups(1L, module.id())).extracting("name").containsExactly("User Management");
+        assertThat(projectService.listEndpoints(1L, group.id())).extracting("name").containsExactly("Get User Detail");
         assertThat(updatedEndpoint.description()).isEqualTo("load detailed user");
-        assertThat(projectService.getEndpoint(endpoint.id()).description()).isEqualTo("load detailed user");
-        assertThat(projectService.listParameters(endpoint.id())).singleElement().extracting("name").isEqualTo("id");
-        assertThat(projectService.listResponses(endpoint.id())).singleElement().extracting("name").isEqualTo("userId");
-        assertThat(projectService.listVersions(endpoint.id())).extracting("version").containsExactly("v1");
+        assertThat(projectService.getEndpoint(1L, endpoint.id()).description()).isEqualTo("load detailed user");
+        assertThat(projectService.listParameters(1L, endpoint.id())).singleElement().extracting("name").isEqualTo("id");
+        assertThat(projectService.listResponses(1L, endpoint.id())).singleElement().extracting("name").isEqualTo("userId");
+        assertThat(projectService.listVersions(1L, endpoint.id())).extracting("version").containsExactly("v1");
         assertThat(version.changeSummary()).isEqualTo("initial");
-        assertThat(projectService.getProjectTree(project.id()).modules()).hasSize(1);
+        assertThat(projectService.getProjectTree(1L, project.id()).modules()).hasSize(1);
     }
 
     @Test
     void shouldDeleteEndpointGroupAndModule() {
-        var project = projectService.createProject(new CreateProjectRequest("Cleanup", "cleanup", "cleanup project", java.util.List.of()));
-        var environment = projectService.createEnvironment(project.id(), new CreateEnvironmentRequest(
+        var project = projectService.createProject(1L, new CreateProjectRequest("Cleanup", "cleanup", "cleanup project", java.util.List.of()));
+        var environment = projectService.createEnvironment(1L, project.id(), new CreateEnvironmentRequest(
                 "Local",
                 "https://cleanup.dev",
                 false,
@@ -221,43 +253,43 @@ class ProjectServiceTest {
                 "",
                 "inherit",
                 java.util.List.of()));
-        var module = projectService.createModule(project.id(), new CreateModuleRequest("Legacy"));
-        var group = projectService.createGroup(module.id(), new CreateGroupRequest("Deprecated"));
-        var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
+        var module = projectService.createModule(1L, project.id(), new CreateModuleRequest("Legacy"));
+        var group = projectService.createGroup(1L, module.id(), new CreateGroupRequest("Deprecated"));
+        var endpoint = projectService.createEndpoint(1L, group.id(), new CreateEndpointRequest(
                 "Delete Me",
                 "DELETE",
                 "/legacy",
                 "remove soon",
                 false));
 
-        projectService.deleteEndpoint(endpoint.id());
-        assertThat(projectService.listEndpoints(group.id())).isEmpty();
+        projectService.deleteEndpoint(1L, endpoint.id());
+        assertThat(projectService.listEndpoints(1L, group.id())).isEmpty();
 
-        projectService.deleteGroup(group.id());
-        assertThat(projectService.listGroups(module.id())).isEmpty();
+        projectService.deleteGroup(1L, group.id());
+        assertThat(projectService.listGroups(1L, module.id())).isEmpty();
 
-        projectService.deleteModule(module.id());
-        assertThat(projectService.listModules(project.id())).isEmpty();
+        projectService.deleteModule(1L, module.id());
+        assertThat(projectService.listModules(1L, project.id())).isEmpty();
 
-        projectService.deleteEnvironment(environment.id());
-        assertThat(projectService.listEnvironments(project.id())).isEmpty();
+        projectService.deleteEnvironment(1L, environment.id());
+        assertThat(projectService.listEnvironments(1L, project.id())).isEmpty();
     }
 
     @Test
     void shouldPublishAndListEndpointMockReleases() {
-        var project = projectService.createProject(new CreateProjectRequest("Mock Publish", "mock-publish", "mock publish", java.util.List.of()));
-        var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
-        var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
-        var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
+        var project = projectService.createProject(1L, new CreateProjectRequest("Mock Publish", "mock-publish", "mock publish", java.util.List.of()));
+        var module = projectService.createModule(1L, project.id(), new CreateModuleRequest("Core"));
+        var group = projectService.createGroup(1L, module.id(), new CreateGroupRequest("User APIs"));
+        var endpoint = projectService.createEndpoint(1L, group.id(), new CreateEndpointRequest(
                 "Get User",
                 "GET",
                 "/users/{id}",
                 "load user",
                 true));
 
-        projectService.replaceResponses(endpoint.id(), java.util.List.of(
+        projectService.replaceResponses(1L, endpoint.id(), java.util.List.of(
                 new ResponseUpsertItem(200, "application/json", "userId", "string", true, "", "u_1001")));
-        projectService.replaceMockRules(endpoint.id(), java.util.List.of(
+        projectService.replaceMockRules(1L, endpoint.id(), java.util.List.of(
                 new MockRuleUpsertItem(
                         "Unauthorized",
                         100,
@@ -269,9 +301,9 @@ class ProjectServiceTest {
                         "application/json",
                         "{\"error\":\"token expired\"}")));
 
-        var firstRelease = projectService.publishMockRelease(endpoint.id());
-        var secondRelease = projectService.publishMockRelease(endpoint.id());
-        var releases = projectService.listMockReleases(endpoint.id());
+        var firstRelease = projectService.publishMockRelease(1L, endpoint.id());
+        var secondRelease = projectService.publishMockRelease(1L, endpoint.id());
+        var releases = projectService.listMockReleases(1L, endpoint.id());
 
         assertThat(firstRelease.releaseNo()).isEqualTo(1);
         assertThat(secondRelease.releaseNo()).isEqualTo(2);
@@ -284,17 +316,17 @@ class ProjectServiceTest {
 
     @Test
     void shouldSimulateEndpointMockDraftThroughResolver() {
-        var project = projectService.createProject(new CreateProjectRequest("Mock Simulate", "mock-simulate", "mock simulate", java.util.List.of()));
-        var module = projectService.createModule(project.id(), new CreateModuleRequest("Core"));
-        var group = projectService.createGroup(module.id(), new CreateGroupRequest("User APIs"));
-        var endpoint = projectService.createEndpoint(group.id(), new CreateEndpointRequest(
+        var project = projectService.createProject(1L, new CreateProjectRequest("Mock Simulate", "mock-simulate", "mock simulate", java.util.List.of()));
+        var module = projectService.createModule(1L, project.id(), new CreateModuleRequest("Core"));
+        var group = projectService.createGroup(1L, module.id(), new CreateGroupRequest("User APIs"));
+        var endpoint = projectService.createEndpoint(1L, group.id(), new CreateEndpointRequest(
                 "Get User",
                 "GET",
                 "/users/{id}",
                 "load user",
                 true));
 
-        MockSimulationResult result = projectService.simulateMock(endpoint.id(), new MockSimulationRequest(
+        MockSimulationResult result = projectService.simulateMock(1L, endpoint.id(), new MockSimulationRequest(
                 java.util.List.of(new MockRuleUpsertItem(
                         "Unauthorized",
                         100,

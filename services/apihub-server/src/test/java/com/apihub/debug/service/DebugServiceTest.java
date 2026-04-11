@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class DebugServiceTest {
@@ -69,6 +70,7 @@ class DebugServiceTest {
                 new DebugTargetPolicyResolver(),
                 new DebugTargetMatcher(),
                 debugSecurityProperties);
+        lenient().when(projectRepository.canAccessProject(1L, 1L)).thenReturn(true);
     }
 
     @Test
@@ -230,6 +232,31 @@ class DebugServiceTest {
                 .isInstanceOf(DebugSecurityException.class)
                 .extracting(error -> ((DebugSecurityException) error).getErrorCode())
                 .isEqualTo("DEBUG_PRIVATE_TARGET_NOT_ALLOWED");
+    }
+
+    @Test
+    void shouldRejectDebugExecutionWhenUserCannotAccessProject() {
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "https://local.dev/api", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(projectRepository.canAccessProject(9L, 1L)).willReturn(false);
+
+        assertThatThrownBy(() -> debugService.execute(9L, new ExecuteDebugRequest(
+                41L,
+                31L,
+                "",
+                List.of(),
+                "")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(projectRepository).canAccessProject(9L, 1L);
+        verify(endpointRepository, never()).findEndpointReference(anyLong());
+        verify(debugHttpExecutor, never()).execute(any());
+        verify(debugHistoryRepository, never()).saveHistory(anyLong(), anyLong(), anyLong(), anyString(), anyString(), anyList(), anyString(), anyInt(), anyList(), anyString(), anyLong());
     }
 
     @Test

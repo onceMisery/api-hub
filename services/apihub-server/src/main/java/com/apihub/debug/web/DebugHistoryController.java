@@ -3,6 +3,7 @@ package com.apihub.debug.web;
 import com.apihub.common.model.ApiResponse;
 import com.apihub.debug.model.DebugDtos.DebugHistoryItem;
 import com.apihub.debug.service.DebugService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,8 +32,9 @@ public class DebugHistoryController {
                                                            @RequestParam(required = false) Integer statusCode,
                                                            @RequestParam(required = false) Instant createdFrom,
                                                            @RequestParam(required = false) Instant createdTo,
-                                                           @RequestParam(defaultValue = "10") int limit) {
-        return ApiResponse.success(debugService.listHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo, limit));
+                                                           @RequestParam(defaultValue = "10") int limit,
+                                                           Authentication authentication) {
+        return ApiResponse.success(debugService.listHistory((Long) authentication.getPrincipal(), projectId, endpointId, environmentId, statusCode, createdFrom, createdTo, limit));
     }
 
     @DeleteMapping
@@ -41,8 +43,9 @@ public class DebugHistoryController {
                                                           @RequestParam(required = false) Long environmentId,
                                                           @RequestParam(required = false) Integer statusCode,
                                                           @RequestParam(required = false) Instant createdFrom,
-                                                          @RequestParam(required = false) Instant createdTo) {
-        int deletedCount = debugService.clearHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
+                                                          @RequestParam(required = false) Instant createdTo,
+                                                          Authentication authentication) {
+        int deletedCount = debugService.clearHistory((Long) authentication.getPrincipal(), projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
         return ApiResponse.success(Map.of("deletedCount", deletedCount));
     }
 }

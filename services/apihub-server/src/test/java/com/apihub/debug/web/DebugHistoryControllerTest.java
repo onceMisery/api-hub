@@ -1,5 +1,6 @@
 package com.apihub.debug.web;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.service.JwtTokenService;
 import com.apihub.common.config.SecurityConfig;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
@@ -10,14 +11,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.BDDMockito.given;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,9 +38,12 @@ class DebugHistoryControllerTest {
     @MockBean
     private JwtTokenService jwtTokenService;
 
+    @MockBean
+    private AuthUserRepository authUserRepository;
+
     @Test
     void shouldReturnProjectDebugHistory() throws Exception {
-        given(debugService.listHistory(1L, 31L, null, null, null, null, 5)).willReturn(List.of(
+        given(debugService.listHistory(1L, 1L, 31L, null, null, null, null, 5)).willReturn(List.of(
                 new DebugHistoryItem(
                         101L,
                         1L,
@@ -55,7 +60,7 @@ class DebugHistoryControllerTest {
                         Instant.parse("2026-04-09T04:12:30Z"))));
 
         mockMvc.perform(get("/api/v1/projects/1/debug-history")
-                        .with(user("tester"))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(1L, "token", List.of())))
                         .param("endpointId", "31")
                         .param("limit", "5"))
                 .andExpect(status().isOk())
@@ -67,10 +72,10 @@ class DebugHistoryControllerTest {
     void shouldReturnFilteredProjectDebugHistory() throws Exception {
         Instant from = Instant.parse("2026-04-09T00:00:00Z");
         Instant to = Instant.parse("2026-04-10T00:00:00Z");
-        given(debugService.listHistory(1L, 31L, 41L, 500, from, to, 5)).willReturn(List.of());
+        given(debugService.listHistory(1L, 1L, 31L, 41L, 500, from, to, 5)).willReturn(List.of());
 
         mockMvc.perform(get("/api/v1/projects/1/debug-history")
-                        .with(user("tester"))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(1L, "token", List.of())))
                         .param("endpointId", "31")
                         .param("environmentId", "41")
                         .param("statusCode", "500")
@@ -84,10 +89,10 @@ class DebugHistoryControllerTest {
     void shouldDeleteFilteredProjectDebugHistory() throws Exception {
         Instant from = Instant.parse("2026-04-09T00:00:00Z");
         Instant to = Instant.parse("2026-04-10T00:00:00Z");
-        given(debugService.clearHistory(1L, 31L, 41L, 500, from, to)).willReturn(3);
+        given(debugService.clearHistory(1L, 1L, 31L, 41L, 500, from, to)).willReturn(3);
 
         mockMvc.perform(delete("/api/v1/projects/1/debug-history")
-                        .with(user("tester"))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(1L, "token", List.of())))
                         .param("endpointId", "31")
                         .param("environmentId", "41")
                         .param("statusCode", "500")

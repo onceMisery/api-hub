@@ -113,6 +113,10 @@ public class EndpointRepository {
     }
 
     public EndpointDetail createEndpoint(GroupReference groupReference, CreateEndpointRequest request) {
+        return createEndpoint(DEFAULT_USER_ID, groupReference, request);
+    }
+
+    public EndpointDetail createEndpoint(Long userId, GroupReference groupReference, CreateEndpointRequest request) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
@@ -142,8 +146,8 @@ public class EndpointRepository {
             statement.setString(8, request.path());
             statement.setBoolean(9, Boolean.TRUE.equals(request.mockEnabled()));
             statement.setInt(10, nextEndpointSortOrder(groupReference.id()));
-            statement.setLong(11, DEFAULT_USER_ID);
-            statement.setLong(12, DEFAULT_USER_ID);
+            statement.setLong(11, userId);
+            statement.setLong(12, userId);
             return statement;
         }, keyHolder);
         return findEndpoint(requireGeneratedId(keyHolder)).orElseThrow();
@@ -169,6 +173,10 @@ public class EndpointRepository {
     }
 
     public EndpointDetail updateEndpoint(Long endpointId, UpdateEndpointRequest request) {
+        return updateEndpoint(DEFAULT_USER_ID, endpointId, request);
+    }
+
+    public EndpointDetail updateEndpoint(Long userId, Long endpointId, UpdateEndpointRequest request) {
         jdbcTemplate.update("""
                 update api_endpoint
                 set name = ?, description = ?, route_key = ?, http_method = ?, path = ?, mock_enabled = ?, updated_by = ?
@@ -180,7 +188,7 @@ public class EndpointRepository {
                 request.method(),
                 request.path(),
                 Boolean.TRUE.equals(request.mockEnabled()),
-                DEFAULT_USER_ID,
+                userId,
                 endpointId);
         return findEndpoint(endpointId).orElseThrow();
     }
@@ -300,6 +308,10 @@ public class EndpointRepository {
     }
 
     public void replaceMockRules(Long endpointId, List<MockRuleUpsertItem> items) {
+        replaceMockRules(DEFAULT_USER_ID, endpointId, items);
+    }
+
+    public void replaceMockRules(Long userId, Long endpointId, List<MockRuleUpsertItem> items) {
         jdbcTemplate.update("delete from mock_rule where endpoint_id = ?", endpointId);
 
         for (MockRuleUpsertItem item : items) {
@@ -329,8 +341,8 @@ public class EndpointRepository {
                     item.statusCode(),
                     item.mediaType(),
                     item.body(),
-                    DEFAULT_USER_ID,
-                    DEFAULT_USER_ID);
+                    userId,
+                    userId);
         }
     }
 
@@ -364,6 +376,10 @@ public class EndpointRepository {
     }
 
     public MockReleaseDetail createMockRelease(Long endpointId, String responseSnapshotJson, String rulesSnapshotJson) {
+        return createMockRelease(DEFAULT_USER_ID, endpointId, responseSnapshotJson, rulesSnapshotJson);
+    }
+
+    public MockReleaseDetail createMockRelease(Long userId, Long endpointId, String responseSnapshotJson, String rulesSnapshotJson) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
@@ -379,7 +395,7 @@ public class EndpointRepository {
             statement.setInt(2, nextMockReleaseNo(endpointId));
             statement.setString(3, responseSnapshotJson);
             statement.setString(4, rulesSnapshotJson);
-            statement.setLong(5, DEFAULT_USER_ID);
+            statement.setLong(5, userId);
             return statement;
         }, keyHolder);
         return findMockRelease(requireGeneratedId(keyHolder)).orElseThrow();
@@ -399,6 +415,10 @@ public class EndpointRepository {
     }
 
     public VersionDetail createVersion(Long endpointId, CreateVersionRequest request) {
+        return createVersion(DEFAULT_USER_ID, endpointId, request);
+    }
+
+    public VersionDetail createVersion(Long userId, Long endpointId, CreateVersionRequest request) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
@@ -410,7 +430,7 @@ public class EndpointRepository {
             statement.setString(3, request.version());
             statement.setString(4, request.snapshotJson());
             statement.setString(5, request.changeSummary());
-            statement.setLong(6, DEFAULT_USER_ID);
+            statement.setLong(6, userId);
             return statement;
         }, keyHolder);
         return findVersion(requireGeneratedId(keyHolder)).orElseThrow();

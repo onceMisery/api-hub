@@ -68,21 +68,39 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ProjectDetail> listProjects() {
-        return projectRepository.listProjects();
+        return listProjects(1L);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectDetail> listProjects(Long userId) {
+        return projectRepository.listProjects(userId);
     }
 
     public ProjectDetail createProject(CreateProjectRequest request) {
+        return createProject(1L, request);
+    }
+
+    public ProjectDetail createProject(Long userId, CreateProjectRequest request) {
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
-        return projectRepository.createProject(request);
+        return projectRepository.createProject(userId, request);
     }
 
     @Transactional(readOnly = true)
     public ProjectDetail getProject(Long projectId) {
-        return requireProject(projectId);
+        return getProject(1L, projectId);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectDetail getProject(Long userId, Long projectId) {
+        return requireProject(userId, projectId);
     }
 
     public ProjectDetail updateProject(Long projectId, UpdateProjectRequest request) {
-        ProjectDetail current = requireProject(projectId);
+        return updateProject(1L, projectId, request);
+    }
+
+    public ProjectDetail updateProject(Long userId, Long projectId, UpdateProjectRequest request) {
+        ProjectDetail current = requireProject(userId, projectId);
         List<DebugTargetRuleEntry> debugAllowedHosts = request.debugAllowedHosts() != null
                 ? request.debugAllowedHosts()
                 : current.debugAllowedHosts();
@@ -96,16 +114,21 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectTreeResponse getProjectTree(Long projectId) {
-        requireProject(projectId);
-        return new ProjectTreeResponse(listModules(projectId).stream()
+        return getProjectTree(1L, projectId);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectTreeResponse getProjectTree(Long userId, Long projectId) {
+        requireProject(userId, projectId);
+        return new ProjectTreeResponse(listModules(userId, projectId).stream()
                 .map(module -> new ModuleTreeItem(
                         module.id(),
                         module.name(),
-                        listGroups(module.id()).stream()
+                        listGroups(userId, module.id()).stream()
                                 .map(group -> new GroupTreeItem(
                                         group.id(),
                                         group.name(),
-                                        listEndpoints(group.id()).stream()
+                                        listEndpoints(userId, group.id()).stream()
                                                 .map(endpoint -> new EndpointTreeItem(
                                                         endpoint.id(),
                                                         endpoint.name(),
@@ -118,89 +141,158 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ModuleDetail> listModules(Long projectId) {
-        requireProject(projectId);
+        return listModules(1L, projectId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ModuleDetail> listModules(Long userId, Long projectId) {
+        requireProject(userId, projectId);
         return projectRepository.listModules(projectId);
     }
 
     public ModuleDetail createModule(Long projectId, CreateModuleRequest request) {
-        requireProject(projectId);
-        return projectRepository.createModule(projectId, request);
+        return createModule(1L, projectId, request);
+    }
+
+    public ModuleDetail createModule(Long userId, Long projectId, CreateModuleRequest request) {
+        requireProject(userId, projectId);
+        return projectRepository.createModule(userId, projectId, request);
     }
 
     public ModuleDetail updateModule(Long moduleId, UpdateModuleRequest request) {
-        requireModule(moduleId);
+        return updateModule(1L, moduleId, request);
+    }
+
+    public ModuleDetail updateModule(Long userId, Long moduleId, UpdateModuleRequest request) {
+        requireModule(userId, moduleId);
         return projectRepository.updateModule(moduleId, request);
     }
 
     public void deleteModule(Long moduleId) {
-        requireModule(moduleId);
+        deleteModule(1L, moduleId);
+    }
+
+    public void deleteModule(Long userId, Long moduleId) {
+        requireModule(userId, moduleId);
         projectRepository.deleteModule(moduleId);
     }
 
     @Transactional(readOnly = true)
     public List<GroupDetail> listGroups(Long moduleId) {
-        requireModule(moduleId);
+        return listGroups(1L, moduleId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GroupDetail> listGroups(Long userId, Long moduleId) {
+        requireModule(userId, moduleId);
         return projectRepository.listGroups(moduleId);
     }
 
     public GroupDetail createGroup(Long moduleId, CreateGroupRequest request) {
-        requireModule(moduleId);
-        return projectRepository.createGroup(moduleId, request);
+        return createGroup(1L, moduleId, request);
+    }
+
+    public GroupDetail createGroup(Long userId, Long moduleId, CreateGroupRequest request) {
+        requireModule(userId, moduleId);
+        return projectRepository.createGroup(userId, moduleId, request);
     }
 
     public GroupDetail updateGroup(Long groupId, UpdateGroupRequest request) {
-        requireGroup(groupId);
+        return updateGroup(1L, groupId, request);
+    }
+
+    public GroupDetail updateGroup(Long userId, Long groupId, UpdateGroupRequest request) {
+        requireGroup(userId, groupId);
         return projectRepository.updateGroup(groupId, request);
     }
 
     public void deleteGroup(Long groupId) {
-        requireGroup(groupId);
+        deleteGroup(1L, groupId);
+    }
+
+    public void deleteGroup(Long userId, Long groupId) {
+        requireGroup(userId, groupId);
         projectRepository.deleteGroup(groupId);
     }
 
     @Transactional(readOnly = true)
     public List<EnvironmentDetail> listEnvironments(Long projectId) {
-        requireProject(projectId);
+        return listEnvironments(1L, projectId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnvironmentDetail> listEnvironments(Long userId, Long projectId) {
+        requireProject(userId, projectId);
         return projectRepository.listEnvironments(projectId);
     }
 
     public EnvironmentDetail createEnvironment(Long projectId, CreateEnvironmentRequest request) {
-        requireProject(projectId);
+        return createEnvironment(1L, projectId, request);
+    }
+
+    public EnvironmentDetail createEnvironment(Long userId, Long projectId, CreateEnvironmentRequest request) {
+        requireProject(userId, projectId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode());
-        return projectRepository.createEnvironment(projectId, request);
+        return projectRepository.createEnvironment(userId, projectId, request);
     }
 
     public EnvironmentDetail updateEnvironment(Long environmentId, UpdateEnvironmentRequest request) {
-        EnvironmentDetail current = requireEnvironment(environmentId);
+        return updateEnvironment(1L, environmentId, request);
+    }
+
+    public EnvironmentDetail updateEnvironment(Long userId, Long environmentId, UpdateEnvironmentRequest request) {
+        EnvironmentDetail current = requireEnvironment(userId, environmentId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode() != null ? request.debugHostMode() : current.debugHostMode());
         return projectRepository.updateEnvironment(environmentId, request);
     }
 
     public void deleteEnvironment(Long environmentId) {
-        requireEnvironment(environmentId);
+        deleteEnvironment(1L, environmentId);
+    }
+
+    public void deleteEnvironment(Long userId, Long environmentId) {
+        requireEnvironment(userId, environmentId);
         projectRepository.deleteEnvironment(environmentId);
     }
 
     @Transactional(readOnly = true)
     public List<EndpointDetail> listEndpoints(Long groupId) {
-        requireGroup(groupId);
+        return listEndpoints(1L, groupId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EndpointDetail> listEndpoints(Long userId, Long groupId) {
+        requireGroup(userId, groupId);
         return endpointRepository.listEndpoints(groupId);
     }
 
     public EndpointDetail createEndpoint(Long groupId, CreateEndpointRequest request) {
-        return endpointRepository.createEndpoint(requireGroup(groupId), request);
+        return createEndpoint(1L, groupId, request);
+    }
+
+    public EndpointDetail createEndpoint(Long userId, Long groupId, CreateEndpointRequest request) {
+        return endpointRepository.createEndpoint(userId, requireGroup(userId, groupId), request);
     }
 
     @Transactional(readOnly = true)
     public EndpointDetail getEndpoint(Long endpointId) {
-        return requireEndpoint(endpointId);
+        return getEndpoint(1L, endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public EndpointDetail getEndpoint(Long userId, Long endpointId) {
+        return requireEndpoint(userId, endpointId);
     }
 
     public EndpointDetail updateEndpoint(Long endpointId, UpdateEndpointRequest request) {
-        EndpointDetail current = requireEndpoint(endpointId);
-        return endpointRepository.updateEndpoint(endpointId, new UpdateEndpointRequest(
+        return updateEndpoint(1L, endpointId, request);
+    }
+
+    public EndpointDetail updateEndpoint(Long userId, Long endpointId, UpdateEndpointRequest request) {
+        EndpointDetail current = requireEndpoint(userId, endpointId);
+        return endpointRepository.updateEndpoint(userId, endpointId, new UpdateEndpointRequest(
                 request.name() != null ? request.name() : current.name(),
                 request.method() != null ? request.method() : current.method(),
                 request.path() != null ? request.path() : current.path(),
@@ -209,51 +301,91 @@ public class ProjectService {
     }
 
     public void deleteEndpoint(Long endpointId) {
-        requireEndpoint(endpointId);
+        deleteEndpoint(1L, endpointId);
+    }
+
+    public void deleteEndpoint(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
         endpointRepository.deleteEndpoint(endpointId);
     }
 
     @Transactional(readOnly = true)
     public List<ParameterDetail> listParameters(Long endpointId) {
-        requireEndpoint(endpointId);
+        return listParameters(1L, endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ParameterDetail> listParameters(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
         return endpointRepository.listParameters(endpointId);
     }
 
     public void replaceParameters(Long endpointId, List<ParameterUpsertItem> items) {
-        requireEndpoint(endpointId);
+        replaceParameters(1L, endpointId, items);
+    }
+
+    public void replaceParameters(Long userId, Long endpointId, List<ParameterUpsertItem> items) {
+        requireEndpoint(userId, endpointId);
         endpointRepository.replaceParameters(endpointId, items);
     }
 
     @Transactional(readOnly = true)
     public List<ResponseDetail> listResponses(Long endpointId) {
-        requireEndpoint(endpointId);
+        return listResponses(1L, endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ResponseDetail> listResponses(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
         return endpointRepository.listResponses(endpointId);
     }
 
     public void replaceResponses(Long endpointId, List<ResponseUpsertItem> items) {
-        requireEndpoint(endpointId);
+        replaceResponses(1L, endpointId, items);
+    }
+
+    public void replaceResponses(Long userId, Long endpointId, List<ResponseUpsertItem> items) {
+        requireEndpoint(userId, endpointId);
         endpointRepository.replaceResponses(endpointId, items);
     }
 
     @Transactional(readOnly = true)
     public List<MockRuleDetail> listMockRules(Long endpointId) {
-        requireEndpoint(endpointId);
+        return listMockRules(1L, endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MockRuleDetail> listMockRules(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
         return endpointRepository.listMockRules(endpointId);
     }
 
     public void replaceMockRules(Long endpointId, List<MockRuleUpsertItem> items) {
-        requireEndpoint(endpointId);
-        endpointRepository.replaceMockRules(endpointId, items);
+        replaceMockRules(1L, endpointId, items);
+    }
+
+    public void replaceMockRules(Long userId, Long endpointId, List<MockRuleUpsertItem> items) {
+        requireEndpoint(userId, endpointId);
+        endpointRepository.replaceMockRules(userId, endpointId, items);
     }
 
     @Transactional(readOnly = true)
     public List<MockReleaseDetail> listMockReleases(Long endpointId) {
-        requireEndpoint(endpointId);
+        return listMockReleases(1L, endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MockReleaseDetail> listMockReleases(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
         return endpointRepository.listMockReleases(endpointId);
     }
 
     public MockReleaseDetail publishMockRelease(Long endpointId) {
-        requireEndpoint(endpointId);
+        return publishMockRelease(1L, endpointId);
+    }
+
+    public MockReleaseDetail publishMockRelease(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
 
         String responseSnapshotJson = writeJson(endpointRepository.listResponses(endpointId).stream()
                 .map(response -> new MockSimulationResponseItem(
@@ -279,48 +411,74 @@ public class ProjectService {
                         rule.body()))
                 .toList());
 
-        return endpointRepository.createMockRelease(endpointId, responseSnapshotJson, rulesSnapshotJson);
+        return endpointRepository.createMockRelease(userId, endpointId, responseSnapshotJson, rulesSnapshotJson);
     }
 
     public MockSimulationResult simulateMock(Long endpointId, MockSimulationRequest request) {
-        requireEndpoint(endpointId);
+        return simulateMock(1L, endpointId, request);
+    }
+
+    public MockSimulationResult simulateMock(Long userId, Long endpointId, MockSimulationRequest request) {
+        requireEndpoint(userId, endpointId);
         return mockRuntimeResolver.resolveDraft(request);
     }
 
     @Transactional(readOnly = true)
     public List<VersionDetail> listVersions(Long endpointId) {
-        requireEndpoint(endpointId);
+        return listVersions(1L, endpointId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VersionDetail> listVersions(Long userId, Long endpointId) {
+        requireEndpoint(userId, endpointId);
         return endpointRepository.listVersions(endpointId);
     }
 
     public VersionDetail createVersion(Long endpointId, CreateVersionRequest request) {
-        requireEndpoint(endpointId);
-        return endpointRepository.createVersion(endpointId, request);
+        return createVersion(1L, endpointId, request);
     }
 
-    private ProjectDetail requireProject(Long projectId) {
-        return projectRepository.findProject(projectId)
+    public VersionDetail createVersion(Long userId, Long endpointId, CreateVersionRequest request) {
+        requireEndpoint(userId, endpointId);
+        return endpointRepository.createVersion(userId, endpointId, request);
+    }
+
+    private ProjectDetail requireProject(Long userId, Long projectId) {
+        ProjectDetail project = projectRepository.findProject(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        if (!projectRepository.canAccessProject(userId, projectId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
+        return project;
     }
 
-    private ProjectRepository.ModuleReference requireModule(Long moduleId) {
-        return projectRepository.findModuleReference(moduleId)
+    private ProjectRepository.ModuleReference requireModule(Long userId, Long moduleId) {
+        ProjectRepository.ModuleReference module = projectRepository.findModuleReference(moduleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Module not found"));
+        requireProject(userId, module.projectId());
+        return module;
     }
 
-    private ProjectRepository.GroupReference requireGroup(Long groupId) {
-        return projectRepository.findGroupReference(groupId)
+    private ProjectRepository.GroupReference requireGroup(Long userId, Long groupId) {
+        ProjectRepository.GroupReference group = projectRepository.findGroupReference(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+        requireProject(userId, group.projectId());
+        return group;
     }
 
-    private EndpointDetail requireEndpoint(Long endpointId) {
+    private EndpointDetail requireEndpoint(Long userId, Long endpointId) {
+        EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
+        requireProject(userId, endpointReference.projectId());
         return endpointRepository.findEndpoint(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
     }
 
-    private EnvironmentDetail requireEnvironment(Long environmentId) {
-        return projectRepository.findEnvironment(environmentId)
+    private EnvironmentDetail requireEnvironment(Long userId, Long environmentId) {
+        EnvironmentDetail environment = projectRepository.findEnvironment(environmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
+        requireProject(userId, environment.projectId());
+        return environment;
     }
 
     private String writeJson(Object value) {

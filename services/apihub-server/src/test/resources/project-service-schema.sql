@@ -18,6 +18,14 @@ CREATE TABLE space (
   status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 
+CREATE TABLE space_member (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  space_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  member_status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
 CREATE TABLE project (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   space_id BIGINT NOT NULL,
@@ -27,6 +35,14 @@ CREATE TABLE project (
   debug_allowed_hosts_json CLOB NOT NULL,
   owner_id BIGINT NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE project_member (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  member_status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 
 CREATE TABLE environment (

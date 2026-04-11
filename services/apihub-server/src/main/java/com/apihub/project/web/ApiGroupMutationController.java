@@ -4,6 +4,7 @@ import com.apihub.common.model.ApiResponse;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,13 +24,15 @@ public class ApiGroupMutationController {
 
     @PatchMapping
     public ApiResponse<GroupDetail> updateGroup(@PathVariable Long groupId,
-                                                @RequestBody UpdateGroupRequest request) {
-        return ApiResponse.success(projectService.updateGroup(groupId, request));
+                                                @RequestBody UpdateGroupRequest request,
+                                                Authentication authentication) {
+        return ApiResponse.success(projectService.updateGroup((Long) authentication.getPrincipal(), groupId, request));
     }
 
     @DeleteMapping
-    public ApiResponse<Void> deleteGroup(@PathVariable Long groupId) {
-        projectService.deleteGroup(groupId);
+    public ApiResponse<Void> deleteGroup(@PathVariable Long groupId,
+                                         Authentication authentication) {
+        projectService.deleteGroup((Long) authentication.getPrincipal(), groupId);
         return ApiResponse.success(null);
     }
 }
