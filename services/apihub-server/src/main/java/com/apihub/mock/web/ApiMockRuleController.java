@@ -4,6 +4,7 @@ import com.apihub.common.model.ApiResponse;
 import com.apihub.mock.model.MockDtos.MockRuleDetail;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,14 +23,16 @@ public class ApiMockRuleController {
     }
 
     @GetMapping("/api/v1/endpoints/{endpointId}/mock-rules")
-    public ApiResponse<List<MockRuleDetail>> listMockRules(@PathVariable Long endpointId) {
-        return ApiResponse.success(projectService.listMockRules(endpointId));
+    public ApiResponse<List<MockRuleDetail>> listMockRules(@PathVariable Long endpointId,
+                                                           Authentication authentication) {
+        return ApiResponse.success(projectService.listMockRules((Long) authentication.getPrincipal(), endpointId));
     }
 
     @PutMapping("/api/v1/endpoints/{endpointId}/mock-rules")
     public ApiResponse<Void> replaceMockRules(@PathVariable Long endpointId,
-                                              @RequestBody List<MockRuleUpsertItem> items) {
-        projectService.replaceMockRules(endpointId, items);
+                                              @RequestBody List<MockRuleUpsertItem> items,
+                                              Authentication authentication) {
+        projectService.replaceMockRules((Long) authentication.getPrincipal(), endpointId, items);
         return ApiResponse.success(null);
     }
 }

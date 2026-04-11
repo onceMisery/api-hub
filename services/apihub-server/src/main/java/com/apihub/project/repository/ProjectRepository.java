@@ -71,11 +71,25 @@ public class ProjectRepository {
     }
 
     public List<ProjectDetail> listProjects() {
+        return listProjects(DEFAULT_USER_ID);
+    }
+
+    public List<ProjectDetail> listProjects(Long userId) {
         return jdbcTemplate.query("""
-                select id, name, project_key, description, debug_allowed_hosts_json
+                select distinct project.id,
+                                project.name,
+                                project.project_key,
+                                project.description,
+                                project.debug_allowed_hosts_json
                 from project
-                order by id
-                """, PROJECT_ROW_MAPPER);
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.owner_id = ?
+                   or project_member.id is not null
+                order by project.id
+                """, PROJECT_ROW_MAPPER, userId, userId);
     }
 
     public Optional<ProjectDetail> findProject(Long projectId) {
@@ -86,7 +100,25 @@ public class ProjectRepository {
                 """, PROJECT_ROW_MAPPER, projectId).stream().findFirst();
     }
 
+    public boolean canAccessProject(Long userId, Long projectId) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from project
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.id = ?
+                  and (project.owner_id = ? or project_member.id is not null)
+                """, Integer.class, userId, projectId, userId);
+        return matched != null && matched > 0;
+    }
+
     public ProjectDetail createProject(CreateProjectRequest request) {
+        return createProject(DEFAULT_USER_ID, request);
+    }
+
+    public ProjectDetail createProject(Long userId, CreateProjectRequest request) {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
@@ -97,11 +129,16 @@ public class ProjectRepository {
             statement.setString(2, request.name());
             statement.setString(3, request.projectKey());
             statement.setString(4, request.description());
-            statement.setLong(5, DEFAULT_USER_ID);
+            statement.setLong(5, userId);
             statement.setString(6, serializeDebugRules(request.debugAllowedHosts()));
             return statement;
         }, keyHolder);
-        return findProject(requireGeneratedId(keyHolder)).orElseThrow();
+        long projectId = requireGeneratedId(keyHolder);
+        jdbcTemplate.update("""
+                insert into project_member (project_id, user_id, role_code, member_status)
+                values (?, ?, 'project_admin', 'active')
+                """, projectId, userId);
+        return findProject(projectId).orElseThrow();
     }
 
     public ProjectDetail updateProject(Long projectId, String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
@@ -133,6 +170,10 @@ public class ProjectRepository {
     }
 
     public ModuleDetail createModule(Long projectId, CreateModuleRequest request) {
+        return createModule(DEFAULT_USER_ID, projectId, request);
+    }
+
+    public ModuleDetail createModule(Long userId, Long projectId, CreateModuleRequest request) {
         String moduleKey = nextModuleKey(projectId, request.name());
         int sortOrder = nextSortOrder("module", "project_id", projectId);
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
@@ -145,7 +186,7 @@ public class ProjectRepository {
             statement.setString(2, request.name());
             statement.setString(3, moduleKey);
             statement.setInt(4, sortOrder);
-            statement.setLong(5, DEFAULT_USER_ID);
+            statement.setLong(5, userId);
             return statement;
         }, keyHolder);
         return findModule(requireGeneratedId(keyHolder)).orElseThrow();
@@ -194,6 +235,10 @@ public class ProjectRepository {
     }
 
     public GroupDetail createGroup(Long moduleId, CreateGroupRequest request) {
+        return createGroup(DEFAULT_USER_ID, moduleId, request);
+    }
+
+    public GroupDetail createGroup(Long userId, Long moduleId, CreateGroupRequest request) {
         String groupKey = nextGroupKey(moduleId, request.name());
         int sortOrder = nextSortOrder("api_group", "module_id", moduleId);
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
@@ -206,7 +251,7 @@ public class ProjectRepository {
             statement.setString(2, request.name());
             statement.setString(3, groupKey);
             statement.setInt(4, sortOrder);
-            statement.setLong(5, DEFAULT_USER_ID);
+            statement.setLong(5, userId);
             return statement;
         }, keyHolder);
         return findGroup(requireGeneratedId(keyHolder)).orElseThrow();
@@ -253,6 +298,10 @@ public class ProjectRepository {
     }
 
     public EnvironmentDetail createEnvironment(Long projectId, CreateEnvironmentRequest request) {
+        return createEnvironment(DEFAULT_USER_ID, projectId, request);
+    }
+
+    public EnvironmentDetail createEnvironment(Long userId, Long projectId, CreateEnvironmentRequest request) {
         if (Boolean.TRUE.equals(request.isDefault())) {
             clearDefaultEnvironment(projectId);
         }
@@ -275,7 +324,7 @@ public class ProjectRepository {
             statement.setString(10, normalizeNullableString(request.authValue()));
             statement.setString(11, normalizeDebugHostMode(request.debugHostMode()));
             statement.setString(12, serializeDebugRules(request.debugAllowedHosts()));
-            statement.setLong(13, DEFAULT_USER_ID);
+            statement.setLong(13, userId);
             return statement;
         }, keyHolder);
         return findEnvironment(requireGeneratedId(keyHolder)).orElseThrow();

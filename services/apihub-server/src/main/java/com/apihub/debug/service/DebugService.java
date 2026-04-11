@@ -18,6 +18,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,10 +57,16 @@ public class DebugService {
     }
 
     public ExecuteDebugResponse execute(ExecuteDebugRequest request) {
+        return execute(1L, request);
+    }
+
+    public ExecuteDebugResponse execute(Long userId, ExecuteDebugRequest request) {
         EnvironmentDetail environment = projectRepository.findEnvironment(request.environmentId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
+        requireProjectAccess(userId, environment.projectId());
         EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(request.endpointId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
+        requireProjectAccess(userId, endpointReference.projectId());
         if (!environment.projectId().equals(endpointReference.projectId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Endpoint and environment do not belong to the same project");
         }
@@ -78,6 +86,7 @@ public class DebugService {
         enforceTargetPolicy(project, environment, targetUri);
         List<DebugHeader> headers = mergeHeaders(environment.defaultHeaders(), request.headers(), environment, variables);
         String requestBody = substituteVariables(request.body(), variables);
+        requireRequestBodyWithinLimit(requestBody);
 
         DebugHttpResult result = debugHttpExecutor.execute(new DebugHttpRequest(
                 endpoint.method(),
@@ -107,10 +116,68 @@ public class DebugService {
                 result.durationMs());
     }
 
-    public List<DebugHistoryItem> listHistory(Long projectId, Long endpointId, int limit) {
+    public List<DebugHistoryItem> listHistory(Long projectId,
+                                              Long endpointId,
+                                              Long environmentId,
+                                              Integer statusCode,
+                                              Instant createdFrom,
+                                              Instant createdTo,
+                                              int limit) {
+        return listHistory(1L, projectId, endpointId, environmentId, statusCode, createdFrom, createdTo, limit);
+    }
+
+    public List<DebugHistoryItem> listHistory(Long userId,
+                                              Long projectId,
+                                              Long endpointId,
+                                              Long environmentId,
+                                              Integer statusCode,
+                                              Instant createdFrom,
+                                              Instant createdTo,
+                                              int limit) {
+        requireProjectAccess(userId, projectId);
+        return debugHistoryRepository.listHistory(
+                projectId,
+                endpointId,
+                environmentId,
+                statusCode,
+                createdFrom,
+                createdTo,
+                Math.max(1, Math.min(limit, 50)));
+    }
+
+    public int clearHistory(Long projectId,
+                            Long endpointId,
+                            Long environmentId,
+                            Integer statusCode,
+                            Instant createdFrom,
+                            Instant createdTo) {
+        return clearHistory(1L, projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
+    }
+
+    public int clearHistory(Long userId,
+                            Long projectId,
+                            Long endpointId,
+                            Long environmentId,
+                            Integer statusCode,
+                            Instant createdFrom,
+                            Instant createdTo) {
+        requireProjectAccess(userId, projectId);
+        return debugHistoryRepository.deleteHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
+    }
+
+    private void requireProjectAccess(Long userId, Long projectId) {
         projectRepository.findProject(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
-        return debugHistoryRepository.listHistory(projectId, endpointId, Math.max(1, Math.min(limit, 50)));
+        if (!projectRepository.canAccessProject(userId, projectId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
+    }
+
+    private void requireRequestBodyWithinLimit(String requestBody) {
+        byte[] bodyBytes = requestBody == null ? new byte[0] : requestBody.getBytes(StandardCharsets.UTF_8);
+        if (bodyBytes.length > debugSecurityProperties.getMaxRequestBodyBytes()) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Debug request body exceeded configured size limit");
+        }
     }
 
     private URI buildTargetUri(String baseUrl, String endpointPath, String queryString) {

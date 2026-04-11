@@ -1,5 +1,6 @@
 package com.apihub.common.config;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.security.BearerAuthenticationFilter;
 import com.apihub.auth.service.JwtTokenService;
 import org.springframework.context.annotation.Bean;
@@ -16,8 +17,8 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     @Bean
-    public BearerAuthenticationFilter bearerAuthenticationFilter(JwtTokenService jwtTokenService) {
-        return new BearerAuthenticationFilter(jwtTokenService);
+    public BearerAuthenticationFilter bearerAuthenticationFilter(JwtTokenService jwtTokenService, AuthUserRepository authUserRepository) {
+        return new BearerAuthenticationFilter(jwtTokenService, authUserRepository);
     }
 
     @Bean
@@ -31,7 +32,7 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint((request, response, authException) ->
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/**", "/api/health", "/mock/**").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/health", "/mock/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(bearerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

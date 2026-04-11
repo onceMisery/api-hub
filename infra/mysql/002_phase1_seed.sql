@@ -6,6 +6,7 @@ INSERT INTO sys_user (
   display_name,
   email,
   password_hash,
+  token_version,
   status
 ) VALUES (
   1,
@@ -13,6 +14,7 @@ INSERT INTO sys_user (
   'Administrator',
   'admin@local.dev',
   '$2a$10$QnVh6b3y4f1DgYI2TgQeMeD2f0t4lRj4D0u8D6RAV8w0Q6N3F4WkK',
+  0,
   'active'
 );
 
@@ -27,6 +29,20 @@ INSERT INTO space (
   'Default Space',
   'default',
   1,
+  'active'
+);
+
+INSERT INTO space_member (
+  id,
+  space_id,
+  user_id,
+  role_code,
+  member_status
+) VALUES (
+  1,
+  1,
+  1,
+  'space_admin',
   'active'
 );
 
@@ -47,6 +63,20 @@ INSERT INTO project (
   'Seed project for phase 1 workbench',
   JSON_ARRAY(),
   1,
+  'active'
+);
+
+INSERT INTO project_member (
+  id,
+  project_id,
+  user_id,
+  role_code,
+  member_status
+) VALUES (
+  1,
+  1,
+  1,
+  'project_admin',
   'active'
 );
 

@@ -17,7 +17,7 @@ public class AuthUserRepository {
     public Optional<UserCredential> findActiveByUsername(String username) {
         return jdbcTemplate.query(
                 """
-                select id, username, password_hash, status
+                select id, username, display_name, password_hash, status, token_version
                 from sys_user
                 where username = ? and status = 'active'
                 """,
@@ -25,13 +25,53 @@ public class AuthUserRepository {
                         ? Optional.of(new UserCredential(
                         rs.getLong("id"),
                         rs.getString("username"),
+                        rs.getString("display_name"),
                         rs.getString("password_hash"),
-                        rs.getString("status")))
+                        rs.getString("status"),
+                        rs.getInt("token_version")))
                         : Optional.empty(),
                 username
         );
     }
 
-    public record UserCredential(Long id, String username, String passwordHash, String status) {
+    public Optional<UserCredential> findActiveById(Long userId) {
+        return jdbcTemplate.query(
+                """
+                select id, username, display_name, password_hash, status, token_version
+                from sys_user
+                where id = ? and status = 'active'
+                """,
+                rs -> rs.next()
+                        ? Optional.of(new UserCredential(
+                        rs.getLong("id"),
+                        rs.getString("username"),
+                        rs.getString("display_name"),
+                        rs.getString("password_hash"),
+                        rs.getString("status"),
+                        rs.getInt("token_version")))
+                        : Optional.empty(),
+                userId
+        );
+    }
+
+    public int incrementTokenVersion(Long userId) {
+        jdbcTemplate.update(
+                """
+                update sys_user
+                set token_version = token_version + 1
+                where id = ?
+                """,
+                userId
+        );
+
+        Integer tokenVersion = jdbcTemplate.queryForObject(
+                "select token_version from sys_user where id = ?",
+                Integer.class,
+                userId
+        );
+        return tokenVersion == null ? 0 : tokenVersion;
+    }
+
+    public record UserCredential(Long id, String username, String displayName, String passwordHash, String status, int tokenVersion) {
     }
 }

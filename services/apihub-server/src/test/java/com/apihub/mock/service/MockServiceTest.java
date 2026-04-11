@@ -50,7 +50,7 @@ class MockServiceTest {
                         Instant.parse("2026-04-09T12:00:00Z")
                 )));
 
-        MockService.MockResponse response = mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of());
+        MockService.MockResponse response = mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of(), "");
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers()).containsExactly(new DebugHeader("Content-Type", "application/json"));
@@ -74,7 +74,7 @@ class MockServiceTest {
                         Instant.parse("2026-04-09T12:00:00Z")
                 )));
 
-        MockService.MockResponse response = mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of());
+        MockService.MockResponse response = mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of(), "");
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo("{\"enabled\":true,\"count\":0}");
@@ -103,7 +103,8 @@ class MockServiceTest {
                 "GET",
                 "/users/31",
                 Map.of("mode", List.of("strict")),
-                Map.of("x-scenario", "unauthorized"));
+                Map.of("x-scenario", "unauthorized"),
+                "");
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(response.headers()).containsExactly(new DebugHeader("Content-Type", "application/json"));
@@ -111,10 +112,40 @@ class MockServiceTest {
     }
 
     @Test
+    void shouldPreferReleasedBodyConditionRuleWhenRequestBodyMatches() {
+        given(endpointRepository.listMockEndpoints(1L, "POST")).willReturn(List.of(
+                new EndpointDetail(31L, 21L, "Create User", "POST", "/users/{id}", "Create user", true)));
+        given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.of(
+                new MockReleaseDetail(
+                        5L,
+                        31L,
+                        1,
+                        """
+                        [{"httpStatusCode":200,"mediaType":"application/json","name":"userId","dataType":"string","required":true,"description":"","exampleValue":"u_1001"}]
+                        """,
+                        """
+                        [{"ruleName":"body-match","priority":120,"enabled":true,"queryConditions":[],"headerConditions":[],"bodyConditions":[{"jsonPath":"$.user.id","expectedValue":"31"}],"statusCode":202,"mediaType":"application/json","body":"{\\"matched\\":true}"}]
+                        """,
+                        Instant.parse("2026-04-09T12:00:00Z")
+                )));
+
+        MockService.MockResponse response = mockService.resolve(
+                1L,
+                "POST",
+                "/users/31",
+                Map.of(),
+                Map.of(),
+                "{\"user\":{\"id\":31}}");
+
+        assertThat(response.statusCode()).isEqualTo(202);
+        assertThat(response.body()).isEqualTo("{\"matched\":true}");
+    }
+
+    @Test
     void shouldRejectUnknownMockRoute() {
         given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of());
 
-        assertThatThrownBy(() -> mockService.resolve(1L, "GET", "/missing", Map.of(), Map.of()))
+        assertThatThrownBy(() -> mockService.resolve(1L, "GET", "/missing", Map.of(), Map.of(), ""))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -126,7 +157,7 @@ class MockServiceTest {
                 new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{id}", "Load user", true)));
         given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of()))
+        assertThatThrownBy(() -> mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of(), ""))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);

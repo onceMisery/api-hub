@@ -4,6 +4,7 @@ import com.apihub.common.model.ApiResponse;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,13 +25,15 @@ public class ProjectEnvironmentController {
     }
 
     @GetMapping
-    public ApiResponse<List<EnvironmentDetail>> listEnvironments(@PathVariable Long projectId) {
-        return ApiResponse.success(projectService.listEnvironments(projectId));
+    public ApiResponse<List<EnvironmentDetail>> listEnvironments(@PathVariable Long projectId,
+                                                                 Authentication authentication) {
+        return ApiResponse.success(projectService.listEnvironments((Long) authentication.getPrincipal(), projectId));
     }
 
     @PostMapping
     public ApiResponse<EnvironmentDetail> createEnvironment(@PathVariable Long projectId,
-                                                            @RequestBody CreateEnvironmentRequest request) {
-        return ApiResponse.success(projectService.createEnvironment(projectId, request));
+                                                            @RequestBody CreateEnvironmentRequest request,
+                                                            Authentication authentication) {
+        return ApiResponse.success(projectService.createEnvironment((Long) authentication.getPrincipal(), projectId, request));
     }
 }

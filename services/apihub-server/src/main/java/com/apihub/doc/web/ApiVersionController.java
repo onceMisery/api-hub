@@ -4,6 +4,7 @@ import com.apihub.common.model.ApiResponse;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,13 +23,15 @@ public class ApiVersionController {
     }
 
     @GetMapping("/api/v1/endpoints/{endpointId}/versions")
-    public ApiResponse<List<VersionDetail>> listVersions(@PathVariable Long endpointId) {
-        return ApiResponse.success(projectService.listVersions(endpointId));
+    public ApiResponse<List<VersionDetail>> listVersions(@PathVariable Long endpointId,
+                                                         Authentication authentication) {
+        return ApiResponse.success(projectService.listVersions((Long) authentication.getPrincipal(), endpointId));
     }
 
     @PostMapping("/api/v1/endpoints/{endpointId}/versions")
     public ApiResponse<VersionDetail> createVersion(@PathVariable Long endpointId,
-                                                    @RequestBody CreateVersionRequest request) {
-        return ApiResponse.success(projectService.createVersion(endpointId, request));
+                                                    @RequestBody CreateVersionRequest request,
+                                                    Authentication authentication) {
+        return ApiResponse.success(projectService.createVersion((Long) authentication.getPrincipal(), endpointId, request));
     }
 }

@@ -6,6 +6,7 @@ CREATE TABLE sys_user (
   display_name VARCHAR(128) NOT NULL,
   email VARCHAR(128) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  token_version INT NOT NULL DEFAULT 0,
   status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 
@@ -17,6 +18,14 @@ CREATE TABLE space (
   status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 
+CREATE TABLE space_member (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  space_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  member_status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
 CREATE TABLE project (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   space_id BIGINT NOT NULL,
@@ -26,6 +35,14 @@ CREATE TABLE project (
   debug_allowed_hosts_json CLOB NOT NULL,
   owner_id BIGINT NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE project_member (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  member_status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 
 CREATE TABLE environment (
@@ -127,6 +144,7 @@ CREATE TABLE mock_rule (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   query_conditions_json CLOB NOT NULL,
   header_conditions_json CLOB NOT NULL,
+  body_conditions_json CLOB NOT NULL,
   status_code INT NOT NULL DEFAULT 200,
   media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
   body_json CLOB NOT NULL,

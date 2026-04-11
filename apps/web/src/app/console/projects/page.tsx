@@ -4,6 +4,7 @@ import { fetchProjects, isApiRequestError, type ProjectSummary } from "@api-hub/
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { SessionBar } from "../../../features/auth/components/session-bar";
 import { ProjectCard } from "../../../features/projects/components/project-card";
 
 export default function ProjectsPage() {
@@ -53,6 +54,7 @@ export default function ProjectsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1320px] flex-col gap-8 p-6 text-slate-900">
+      <SessionBar />
       <section className="rounded-[2.4rem] border border-white/60 bg-white/65 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Projects</p>
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

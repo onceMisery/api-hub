@@ -1,5 +1,6 @@
 package com.apihub.auth.security;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.service.JwtTokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,9 +16,11 @@ import java.util.List;
 public class BearerAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenService jwtTokenService;
+    private final AuthUserRepository authUserRepository;
 
-    public BearerAuthenticationFilter(JwtTokenService jwtTokenService) {
+    public BearerAuthenticationFilter(JwtTokenService jwtTokenService, AuthUserRepository authUserRepository) {
         this.jwtTokenService = jwtTokenService;
+        this.authUserRepository = authUserRepository;
     }
 
     @Override
@@ -26,10 +29,14 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
         String authorization = request.getHeader("Authorization");
         if (authorization != null && authorization.startsWith("Bearer ")) {
             String token = authorization.substring("Bearer ".length()).trim();
-            jwtTokenService.parseAccessToken(token).ifPresent(userId -> {
-                var authentication = new UsernamePasswordAuthenticationToken(userId, token, List.of());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            });
+            jwtTokenService.parseAccessTokenClaims(token)
+                    .flatMap(claims -> authUserRepository.findActiveById(claims.userId())
+                            .filter(user -> user.tokenVersion() == claims.tokenVersion())
+                            .map(AuthUserRepository.UserCredential::id))
+                    .ifPresent(userId -> {
+                        var authentication = new UsernamePasswordAuthenticationToken(userId, token, List.of());
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    });
         }
 
         filterChain.doFilter(request, response);

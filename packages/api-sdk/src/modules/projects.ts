@@ -207,6 +207,11 @@ export type MockConditionEntry = {
   value: string;
 };
 
+export type MockBodyConditionEntry = {
+  jsonPath: string;
+  expectedValue: string;
+};
+
 export type MockRuleDetail = {
   id: number;
   endpointId: number;
@@ -215,6 +220,7 @@ export type MockRuleDetail = {
   enabled: boolean;
   queryConditions: MockConditionEntry[];
   headerConditions: MockConditionEntry[];
+  bodyConditions: MockBodyConditionEntry[];
   statusCode: number;
   mediaType: string;
   body: string;
@@ -226,6 +232,7 @@ export type MockRuleUpsertItem = {
   enabled: boolean;
   queryConditions: MockConditionEntry[];
   headerConditions: MockConditionEntry[];
+  bodyConditions: MockBodyConditionEntry[];
   statusCode: number;
   mediaType: string;
   body: string;
@@ -255,6 +262,7 @@ export type MockSimulationPayload = {
   draftResponses: MockSimulationResponseItem[];
   querySamples: MockConditionEntry[];
   headerSamples: MockConditionEntry[];
+  bodySample: string;
 };
 
 export type MockSimulationResult = {
@@ -309,6 +317,15 @@ export type DebugHistoryItem = {
   responseBody: string;
   durationMs: number;
   createdAt: string;
+};
+
+export type DebugHistoryFilters = {
+  endpointId?: number;
+  environmentId?: number;
+  statusCode?: number;
+  createdFrom?: string;
+  createdTo?: string;
+  limit?: number;
 };
 
 export function fetchProjects() {
@@ -486,11 +503,47 @@ export function executeDebug(payload: ExecuteDebugPayload) {
   });
 }
 
-export function fetchDebugHistory(projectId: number, endpointId?: number, limit = 10) {
-  const searchParams = new URLSearchParams({ limit: String(limit) });
-  if (endpointId) {
-    searchParams.set("endpointId", String(endpointId));
+export function fetchDebugHistory(projectId: number, filters: DebugHistoryFilters = {}) {
+  const searchParams = new URLSearchParams({ limit: String(filters.limit ?? 10) });
+  if (filters.endpointId) {
+    searchParams.set("endpointId", String(filters.endpointId));
+  }
+  if (filters.environmentId) {
+    searchParams.set("environmentId", String(filters.environmentId));
+  }
+  if (filters.statusCode) {
+    searchParams.set("statusCode", String(filters.statusCode));
+  }
+  if (filters.createdFrom) {
+    searchParams.set("createdFrom", filters.createdFrom);
+  }
+  if (filters.createdTo) {
+    searchParams.set("createdTo", filters.createdTo);
   }
 
   return apiFetch<DebugHistoryItem[]>(`/api/v1/projects/${projectId}/debug-history?${searchParams.toString()}`);
+}
+
+export function clearDebugHistory(projectId: number, filters: Omit<DebugHistoryFilters, "limit"> = {}) {
+  const searchParams = new URLSearchParams();
+  if (filters.endpointId) {
+    searchParams.set("endpointId", String(filters.endpointId));
+  }
+  if (filters.environmentId) {
+    searchParams.set("environmentId", String(filters.environmentId));
+  }
+  if (filters.statusCode) {
+    searchParams.set("statusCode", String(filters.statusCode));
+  }
+  if (filters.createdFrom) {
+    searchParams.set("createdFrom", filters.createdFrom);
+  }
+  if (filters.createdTo) {
+    searchParams.set("createdTo", filters.createdTo);
+  }
+
+  const query = searchParams.toString();
+  return apiFetch<{ deletedCount: number }>(`/api/v1/projects/${projectId}/debug-history${query ? `?${query}` : ""}`, {
+    method: "DELETE"
+  });
 }

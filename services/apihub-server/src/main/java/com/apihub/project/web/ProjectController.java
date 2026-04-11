@@ -6,6 +6,7 @@ import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,28 +28,32 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ApiResponse<List<ProjectDetail>> listProjects() {
-        return ApiResponse.success(projectService.listProjects());
+    public ApiResponse<List<ProjectDetail>> listProjects(Authentication authentication) {
+        return ApiResponse.success(projectService.listProjects((Long) authentication.getPrincipal()));
     }
 
     @PostMapping
-    public ApiResponse<ProjectDetail> createProject(@RequestBody CreateProjectRequest request) {
-        return ApiResponse.success(projectService.createProject(request));
+    public ApiResponse<ProjectDetail> createProject(@RequestBody CreateProjectRequest request,
+                                                    Authentication authentication) {
+        return ApiResponse.success(projectService.createProject((Long) authentication.getPrincipal(), request));
     }
 
     @GetMapping("/{projectId}")
-    public ApiResponse<ProjectDetail> getProject(@PathVariable Long projectId) {
-        return ApiResponse.success(projectService.getProject(projectId));
+    public ApiResponse<ProjectDetail> getProject(@PathVariable Long projectId,
+                                                 Authentication authentication) {
+        return ApiResponse.success(projectService.getProject((Long) authentication.getPrincipal(), projectId));
     }
 
     @PatchMapping("/{projectId}")
     public ApiResponse<ProjectDetail> updateProject(@PathVariable Long projectId,
-                                                    @RequestBody UpdateProjectRequest request) {
-        return ApiResponse.success(projectService.updateProject(projectId, request));
+                                                    @RequestBody UpdateProjectRequest request,
+                                                    Authentication authentication) {
+        return ApiResponse.success(projectService.updateProject((Long) authentication.getPrincipal(), projectId, request));
     }
 
     @GetMapping("/{projectId}/tree")
-    public ApiResponse<ProjectTreeResponse> getProjectTree(@PathVariable Long projectId) {
-        return ApiResponse.success(projectService.getProjectTree(projectId));
+    public ApiResponse<ProjectTreeResponse> getProjectTree(@PathVariable Long projectId,
+                                                           Authentication authentication) {
+        return ApiResponse.success(projectService.getProjectTree((Long) authentication.getPrincipal(), projectId));
     }
 }

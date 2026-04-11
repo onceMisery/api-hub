@@ -5,6 +5,7 @@ import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,30 +27,35 @@ public class ApiEndpointController {
     }
 
     @GetMapping("/api/v1/groups/{groupId}/endpoints")
-    public ApiResponse<List<EndpointDetail>> listEndpoints(@PathVariable Long groupId) {
-        return ApiResponse.success(projectService.listEndpoints(groupId));
+    public ApiResponse<List<EndpointDetail>> listEndpoints(@PathVariable Long groupId,
+                                                           Authentication authentication) {
+        return ApiResponse.success(projectService.listEndpoints((Long) authentication.getPrincipal(), groupId));
     }
 
     @PostMapping("/api/v1/groups/{groupId}/endpoints")
     public ApiResponse<EndpointDetail> createEndpoint(@PathVariable Long groupId,
-                                                      @RequestBody CreateEndpointRequest request) {
-        return ApiResponse.success(projectService.createEndpoint(groupId, request));
+                                                      @RequestBody CreateEndpointRequest request,
+                                                      Authentication authentication) {
+        return ApiResponse.success(projectService.createEndpoint((Long) authentication.getPrincipal(), groupId, request));
     }
 
     @GetMapping("/api/v1/endpoints/{endpointId}")
-    public ApiResponse<EndpointDetail> getEndpoint(@PathVariable Long endpointId) {
-        return ApiResponse.success(projectService.getEndpoint(endpointId));
+    public ApiResponse<EndpointDetail> getEndpoint(@PathVariable Long endpointId,
+                                                   Authentication authentication) {
+        return ApiResponse.success(projectService.getEndpoint((Long) authentication.getPrincipal(), endpointId));
     }
 
     @PatchMapping("/api/v1/endpoints/{endpointId}")
     public ApiResponse<EndpointDetail> updateEndpoint(@PathVariable Long endpointId,
-                                                      @RequestBody UpdateEndpointRequest request) {
-        return ApiResponse.success(projectService.updateEndpoint(endpointId, request));
+                                                      @RequestBody UpdateEndpointRequest request,
+                                                      Authentication authentication) {
+        return ApiResponse.success(projectService.updateEndpoint((Long) authentication.getPrincipal(), endpointId, request));
     }
 
     @DeleteMapping("/api/v1/endpoints/{endpointId}")
-    public ApiResponse<Void> deleteEndpoint(@PathVariable Long endpointId) {
-        projectService.deleteEndpoint(endpointId);
+    public ApiResponse<Void> deleteEndpoint(@PathVariable Long endpointId,
+                                            Authentication authentication) {
+        projectService.deleteEndpoint((Long) authentication.getPrincipal(), endpointId);
         return ApiResponse.success(null);
     }
 }

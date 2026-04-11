@@ -43,7 +43,8 @@ public class MockService {
                                 String method,
                                 String path,
                                 Map<String, List<String>> queryParameters,
-                                Map<String, String> requestHeaders) {
+                                Map<String, String> requestHeaders,
+                                String requestBody) {
         EndpointDetail endpoint = endpointRepository.listMockEndpoints(projectId, method).stream()
                 .filter(candidate -> matches(candidate.path(), path))
                 .min(Comparator
@@ -58,7 +59,8 @@ public class MockService {
                 readMockRules(release.rulesSnapshotJson()),
                 readResponses(release.responseSnapshotJson()),
                 toQueryConditionEntries(queryParameters),
-                toHeaderConditionEntries(requestHeaders)
+                toHeaderConditionEntries(requestHeaders),
+                requestBody
         ));
         return new MockResponse(
                 document.statusCode(),

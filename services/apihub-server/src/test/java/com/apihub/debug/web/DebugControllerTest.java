@@ -1,5 +1,6 @@
 package com.apihub.debug.web;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.service.JwtTokenService;
 import com.apihub.common.config.SecurityConfig;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
@@ -12,13 +13,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,9 +41,12 @@ class DebugControllerTest {
     @MockBean
     private JwtTokenService jwtTokenService;
 
+    @MockBean
+    private AuthUserRepository authUserRepository;
+
     @Test
     void shouldExecuteDebugRequest() throws Exception {
-        given(debugService.execute(any())).willReturn(new ExecuteDebugResponse(
+        given(debugService.execute(eq(1L), any())).willReturn(new ExecuteDebugResponse(
                 "GET",
                 "https://local.dev/api/users/31?verbose=true",
                 200,
@@ -47,7 +55,7 @@ class DebugControllerTest {
                 42));
 
         mockMvc.perform(post("/api/v1/debug/execute")
-                        .with(user("tester"))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(1L, "token", List.of())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -66,14 +74,14 @@ class DebugControllerTest {
 
     @Test
     void shouldReturnStructuredPolicyError() throws Exception {
-        given(debugService.execute(any())).willThrow(DebugSecurityException.forbidden(
+        given(debugService.execute(eq(1L), any())).willThrow(DebugSecurityException.forbidden(
                 "DEBUG_TARGET_NOT_ALLOWED",
-                "目标主机 blocked.example.com 未在调试白名单中",
+                "Target host blocked.example.com is not allowed",
                 "blocked.example.com",
                 List.of()));
 
         mockMvc.perform(post("/api/v1/debug/execute")
-                        .with(user("tester"))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(1L, "token", List.of())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -85,8 +93,29 @@ class DebugControllerTest {
                                 }
                                 """))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("目标主机 blocked.example.com 未在调试白名单中"))
+                .andExpect(jsonPath("$.message").value("Target host blocked.example.com is not allowed"))
                 .andExpect(jsonPath("$.data.errorCode").value("DEBUG_TARGET_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.data.host").value("blocked.example.com"));
+    }
+
+    @Test
+    void shouldReturnPayloadTooLargeWhenDebugBodyExceedsLimit() throws Exception {
+        given(debugService.execute(eq(1L), any()))
+                .willThrow(new ResponseStatusException(PAYLOAD_TOO_LARGE, "Debug request body exceeded configured size limit"));
+
+        mockMvc.perform(post("/api/v1/debug/execute")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(1L, "token", List.of())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "environmentId": 41,
+                                  "endpointId": 31,
+                                  "queryString": "",
+                                  "headers": [],
+                                  "body": "{\\\"payload\\\":\\\"too-large\\\"}"
+                                }
+                                """))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.message").value("Debug request body exceeded configured size limit"));
     }
 }

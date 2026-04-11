@@ -4,6 +4,7 @@ import com.apihub.common.model.ApiResponse;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.service.ProjectService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,13 +25,15 @@ public class ModuleController {
     }
 
     @GetMapping
-    public ApiResponse<List<ModuleDetail>> listModules(@PathVariable Long projectId) {
-        return ApiResponse.success(projectService.listModules(projectId));
+    public ApiResponse<List<ModuleDetail>> listModules(@PathVariable Long projectId,
+                                                       Authentication authentication) {
+        return ApiResponse.success(projectService.listModules((Long) authentication.getPrincipal(), projectId));
     }
 
     @PostMapping
     public ApiResponse<ModuleDetail> createModule(@PathVariable Long projectId,
-                                                  @RequestBody CreateModuleRequest request) {
-        return ApiResponse.success(projectService.createModule(projectId, request));
+                                                  @RequestBody CreateModuleRequest request,
+                                                  Authentication authentication) {
+        return ApiResponse.success(projectService.createModule((Long) authentication.getPrincipal(), projectId, request));
     }
 }

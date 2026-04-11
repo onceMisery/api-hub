@@ -1,10 +1,10 @@
 "use client";
 
-import { login } from "@api-hub/api-sdk";
+import { fetchMe, login } from "@api-hub/api-sdk";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
-import { saveTokens } from "../../../lib/auth-store";
+import { clearTokens, loadTokens, saveTokens } from "../../../lib/auth-store";
 
 export function LoginForm() {
   const router = useRouter();
@@ -12,6 +12,31 @@ export function LoginForm() {
   const [password, setPassword] = useState("123456");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const { accessToken, refreshToken } = loadTokens();
+    if (!accessToken && !refreshToken) {
+      return;
+    }
+
+    let isMounted = true;
+
+    void fetchMe()
+      .then(() => {
+        if (isMounted) {
+          router.replace("/console/projects");
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          clearTokens();
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,6 +1,5 @@
 import type {
   EndpointDetail,
-  MockConditionEntry,
   MockReleaseDetail,
   MockRuleDetail,
   MockRuleUpsertItem,
@@ -13,7 +12,35 @@ import type {
   UpdateEndpointPayload,
   VersionDetail
 } from "@api-hub/api-sdk";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+
+import { EndpointBasicsPanel } from "./endpoint-basics-panel";
+import { EditorPanel } from "./endpoint-editor-shared";
+import {
+  buildPublishedResponseGroups,
+  buildPublishedRuleItems,
+  buildRuleSummary,
+  buildRuntimeDiffItems,
+  formatBodyConditions,
+  buildSnapshotDiff,
+  formatConditions,
+  formatRulePreviewBody,
+  normalizeSnapshot,
+  parseBodyConditions,
+  parseConditions,
+  summarizeDraftRuntime,
+  summarizeMockRelease,
+  type MockRuleDraft,
+  type ParameterDraft,
+  type ResponseDraft,
+  type SnapshotShape
+} from "./endpoint-editor-utils";
+import { EndpointMockRulesPanel } from "./endpoint-mock-rules-panel";
+import { EndpointMockSimulatorPanel } from "./endpoint-mock-simulator-panel";
+import { EndpointParametersPanel } from "./endpoint-parameters-panel";
+import { EndpointResponsesPanel } from "./endpoint-responses-panel";
+import { EndpointVersionPanel } from "./endpoint-version-panel";
+import { PublishedRuntimePanel } from "./published-runtime-panel";
 
 type EndpointEditorProps = {
   endpoint: EndpointDetail | null;
@@ -34,51 +61,10 @@ type EndpointEditorProps = {
   versions: VersionDetail[];
 };
 
-type ParameterDraft = {
-  sectionType: string;
-  name: string;
-  dataType: string;
-  required: boolean;
-  description: string;
-  exampleValue: string;
-};
-
-type ResponseDraft = {
-  httpStatusCode: number;
-  mediaType: string;
-  name: string;
-  dataType: string;
-  required: boolean;
-  description: string;
-  exampleValue: string;
-};
-
-type MockRuleDraft = {
-  ruleName: string;
-  priority: number;
-  enabled: boolean;
-  queryConditionsText: string;
-  headerConditionsText: string;
-  statusCode: number;
-  mediaType: string;
-  body: string;
-};
-
 const EMPTY_PARAMETERS: ParameterDetail[] = [];
 const EMPTY_RESPONSES: ResponseDetail[] = [];
 const EMPTY_MOCK_RULES: MockRuleDetail[] = [];
 const EMPTY_MOCK_RELEASES: MockReleaseDetail[] = [];
-type SnapshotShape = {
-  endpoint: {
-    name: string;
-    method: string;
-    path: string;
-    description: string;
-  };
-  parameters: ParameterDraft[];
-  responses: ResponseDraft[];
-};
-type PreviewSource = "draft" | "latest-version";
 
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
@@ -111,8 +97,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [mockRuleRows, setMockRuleRows] = useState<MockRuleDraft[]>([]);
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
   const [compareVersionId, setCompareVersionId] = useState("");
+  const [inspectedReleaseId, setInspectedReleaseId] = useState("");
   const [simulationQueryText, setSimulationQueryText] = useState("");
   const [simulationHeaderText, setSimulationHeaderText] = useState("");
+  const [simulationBodyText, setSimulationBodyText] = useState("");
   const [simulationResult, setSimulationResult] = useState<MockSimulationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -141,6 +129,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setCompareVersionId("");
     setSimulationQueryText("");
     setSimulationHeaderText("");
+    setSimulationBodyText("");
     setSimulationResult(null);
     setPublishMessage(null);
     setSaveMessage(null);
@@ -150,6 +139,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setSimulationMessage(null);
     setVersionMessage(null);
   }, [endpoint]);
+
+  useEffect(() => {
+    setInspectedReleaseId(mockReleases[0] ? String(mockReleases[0].id) : "");
+  }, [endpoint?.id, mockReleases]);
 
   useEffect(() => {
     setParameterRows(
@@ -182,6 +175,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setMockRuleRows(
       mockRules.map((rule) => ({
         body: rule.body ?? "{}",
+        bodyConditionsText: formatBodyConditions(rule.bodyConditions),
         enabled: rule.enabled,
         headerConditionsText: formatConditions(rule.headerConditions),
         mediaType: rule.mediaType,
@@ -231,6 +225,21 @@ export function EndpointEditor(props: EndpointEditorProps) {
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
   const latestRelease = mockReleases[0] ?? null;
+  const inspectedRelease = useMemo(
+    () => mockReleases.find((release) => String(release.id) === inspectedReleaseId) ?? latestRelease,
+    [inspectedReleaseId, latestRelease, mockReleases]
+  );
+  const publishedRuntimeSummary = useMemo(() => summarizeMockRelease(inspectedRelease), [inspectedRelease]);
+  const draftRuntimeSummary = useMemo(
+    () => summarizeDraftRuntime(responseRows, mockRuleRows),
+    [responseRows, mockRuleRows]
+  );
+  const runtimeDiffItems = useMemo(
+    () => buildRuntimeDiffItems(publishedRuntimeSummary, draftRuntimeSummary, inspectedRelease !== null),
+    [draftRuntimeSummary, inspectedRelease, publishedRuntimeSummary]
+  );
+  const publishedResponseGroups = useMemo(() => buildPublishedResponseGroups(inspectedRelease), [inspectedRelease]);
+  const publishedRuleItems = useMemo(() => buildPublishedRuleItems(inspectedRelease), [inspectedRelease]);
 
   if (isLoading) {
     return (
@@ -254,645 +263,94 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
   return (
     <section className="space-y-6">
-      <EditorPanel title="Basics">
-        <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-2xl font-semibold text-slate-950">Endpoint basics</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Edit the current endpoint and persist the changes to the backend workspace.
-              </p>
-            </div>
-            <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">#{endpoint.id}</span>
-          </div>
+      <EndpointBasicsPanel
+        canDelete={Boolean(onDelete)}
+        canSave={Boolean(onSave)}
+        endpointId={endpoint.id}
+        formState={formState}
+        isSaving={isSaving}
+        mockUrl={buildMockUrl(projectId, formState.path)}
+        onDelete={() => void onDelete?.()}
+        onFieldChange={updateField}
+        onSubmit={(event) => void handleSubmit(event)}
+        saveMessage={saveMessage}
+      />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Endpoint name">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => updateField("name", event.target.value)}
-                value={formState.name}
-              />
-            </Field>
-            <Field label="Method">
-              <select
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => updateField("method", event.target.value)}
-                value={formState.method}
-              >
-                {["GET", "POST", "PUT", "PATCH", "DELETE"].map((method) => (
-                  <option key={method} value={method}>
-                    {method}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
+      <EndpointParametersPanel
+        canSave={Boolean(onSaveParameters)}
+        onAddRow={() => setParameterRows((current) => [...current, createParameterDraft()])}
+        onRemoveRow={(index) => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        onSave={() => void handleSaveParameters()}
+        onUpdateRow={updateParameterRow}
+        parameterMessage={parameterMessage}
+        parameterRows={parameterRows}
+      />
 
-          <Field label="Path">
-            <input
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-700 outline-none transition focus:border-slate-400"
-              onChange={(event) => updateField("path", event.target.value)}
-              value={formState.path}
-            />
-          </Field>
+      <EndpointResponsesPanel
+        canSave={Boolean(onSaveResponses)}
+        onAddRow={() => setResponseRows((current) => [...current, createResponseDraft()])}
+        onRemoveRow={(index) => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        onSave={() => void handleSaveResponses()}
+        onUpdateRow={updateResponseRow}
+        responseMessage={responseMessage}
+        responseRows={responseRows}
+      />
 
-          <Field label="Description">
-            <textarea
-              className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-              onChange={(event) => updateField("description", event.target.value)}
-              value={formState.description}
-            />
-          </Field>
+      <EndpointMockRulesPanel
+        buildRuleSummary={buildRuleSummary}
+        canSave={Boolean(onSaveMockRules)}
+        formatRulePreviewBody={formatRulePreviewBody}
+        mockRuleMessage={mockRuleMessage}
+        mockRuleRows={mockRuleRows}
+        onAddRule={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
+        onRemoveRule={(index) => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        onSaveRules={() => void handleSaveMockRules()}
+        onUpdateRule={updateMockRuleRow}
+      />
 
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-            <Field label="Mock URL">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-700">
-                {buildMockUrl(projectId, formState.path)}
-              </div>
-            </Field>
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
-              <input
-                aria-label="Enable mock"
-                checked={formState.mockEnabled}
-                onChange={(event) => updateField("mockEnabled", event.target.checked)}
-                type="checkbox"
-              />
-              Enable mock
-            </label>
-          </div>
+      <EndpointMockSimulatorPanel
+        canRun={Boolean(onSimulateMock)}
+        isSimulating={isSimulating}
+        onBodyTextChange={setSimulationBodyText}
+        onHeaderTextChange={setSimulationHeaderText}
+        onQueryTextChange={setSimulationQueryText}
+        onRun={() => void handleRunSimulation()}
+        simulationBodyText={simulationBodyText}
+        simulationHeaderText={simulationHeaderText}
+        simulationMessage={simulationMessage}
+        simulationQueryText={simulationQueryText}
+        simulationResult={simulationResult}
+      />
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={isSaving || !onSave}
-              type="submit"
-            >
-              {isSaving ? "Saving..." : "Save endpoint"}
-            </button>
-            <button
-              className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!onDelete}
-              onClick={() => void onDelete?.()}
-              type="button"
-            >
-              Delete endpoint
-            </button>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              {formState.method}
-            </span>
-            {saveMessage ? <p className="text-sm text-emerald-600">{saveMessage}</p> : null}
-          </div>
-        </form>
-      </EditorPanel>
+      <PublishedRuntimePanel
+        draftRuntimeSummary={draftRuntimeSummary}
+        inspectedRelease={inspectedRelease}
+        inspectedReleaseId={inspectedRelease ? String(inspectedRelease.id) : ""}
+        isPublishing={isPublishing}
+        latestRelease={latestRelease}
+        mockUrl={buildMockUrl(projectId, formState.path)}
+        mockReleases={mockReleases}
+        onInspectedReleaseChange={setInspectedReleaseId}
+        onPublish={onPublishMockRelease ? () => void handlePublishMock() : undefined}
+        publishMessage={publishMessage}
+        publishedResponseGroups={publishedResponseGroups}
+        publishedRuleItems={publishedRuleItems}
+        publishedRuntimeSummary={publishedRuntimeSummary}
+        runtimeDiffItems={runtimeDiffItems}
+      />
 
-      <EditorPanel title="Request Parameters">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Flat rows for query, path, header, or body fields.</p>
-            <button
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              onClick={() => setParameterRows((current) => [...current, createParameterDraft()])}
-              type="button"
-            >
-              Add parameter row
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {parameterRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
-                No request parameters yet.
-              </p>
-            ) : (
-              parameterRows.map((parameter, index) => (
-                <div key={`parameter-${index}`} className="grid gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Field label={`Parameter ${index + 1} name`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "name", event.target.value)}
-                      value={parameter.name}
-                    />
-                  </Field>
-                  <Field label={`Parameter ${index + 1} type`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "dataType", event.target.value)}
-                      value={parameter.dataType}
-                    />
-                  </Field>
-                  <Field label={`Parameter ${index + 1} section`}>
-                    <select
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "sectionType", event.target.value)}
-                      value={parameter.sectionType}
-                    >
-                      {["query", "path", "header", "body"].map((sectionType) => (
-                        <option key={sectionType} value={sectionType}>
-                          {sectionType}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label={`Parameter ${index + 1} example`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "exampleValue", event.target.value)}
-                      value={parameter.exampleValue}
-                    />
-                  </Field>
-                  <Field label={`Parameter ${index + 1} description`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "description", event.target.value)}
-                      value={parameter.description}
-                    />
-                  </Field>
-                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    <input
-                      checked={parameter.required}
-                      onChange={(event) => updateParameterRow(index, "required", event.target.checked)}
-                      type="checkbox"
-                    />
-                    Required
-                  </label>
-                  <div className="flex items-end">
-                    <button
-                      className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                      onClick={() => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-                      type="button"
-                    >
-                      Remove parameter row {index + 1}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveParameters}
-              onClick={() => void handleSaveParameters()}
-              type="button"
-            >
-              Save parameters
-            </button>
-            {parameterMessage ? <p className="text-sm text-emerald-600">{parameterMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Response Structure">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Flat response fields with status code and media type.</p>
-            <button
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              onClick={() => setResponseRows((current) => [...current, createResponseDraft()])}
-              type="button"
-            >
-              Add response row
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {responseRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
-                No response fields yet.
-              </p>
-            ) : (
-              responseRows.map((response, index) => (
-                <div key={`response-${index}`} className="grid gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Field label={`Response ${index + 1} name`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "name", event.target.value)}
-                      value={response.name}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} type`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "dataType", event.target.value)}
-                      value={response.dataType}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} status`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "httpStatusCode", Number(event.target.value) || 200)}
-                      value={response.httpStatusCode}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} media type`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "mediaType", event.target.value)}
-                      value={response.mediaType}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} description`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "description", event.target.value)}
-                      value={response.description}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} example`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "exampleValue", event.target.value)}
-                      value={response.exampleValue}
-                    />
-                  </Field>
-                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    <input
-                      checked={response.required}
-                      onChange={(event) => updateResponseRow(index, "required", event.target.checked)}
-                      type="checkbox"
-                    />
-                    Required
-                  </label>
-                  <div className="flex items-end">
-                    <button
-                      className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                      onClick={() => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-                      type="button"
-                    >
-                      Remove response row {index + 1}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveResponses}
-              onClick={() => void handleSaveResponses()}
-              type="button"
-            >
-              Save responses
-            </button>
-            {responseMessage ? <p className="text-sm text-emerald-600">{responseMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Mock Rules">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Match exact query or header values before falling back to the default mock preview.</p>
-            <button
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              onClick={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
-              type="button"
-            >
-              Add mock rule
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {mockRuleRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
-                No conditional mock rules yet.
-              </p>
-            ) : (
-              mockRuleRows.map((rule, index) => (
-                <div key={`mock-rule-${index}`} className="space-y-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <Field label={`Mock rule ${index + 1} name`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "ruleName", event.target.value)}
-                        value={rule.ruleName}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} priority`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "priority", Number(event.target.value) || 0)}
-                        value={rule.priority}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} response status`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "statusCode", Number(event.target.value) || 200)}
-                        value={rule.statusCode}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} media type`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "mediaType", event.target.value)}
-                        value={rule.mediaType}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <Field label={`Mock rule ${index + 1} query conditions`}>
-                      <textarea
-                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "queryConditionsText", event.target.value)}
-                        placeholder="mode=strict"
-                        value={rule.queryConditionsText}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} header conditions`}>
-                      <textarea
-                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "headerConditionsText", event.target.value)}
-                        placeholder="x-scenario=unauthorized"
-                        value={rule.headerConditionsText}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-                    <Field label={`Mock rule ${index + 1} body`}>
-                      <textarea
-                        className="min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "body", event.target.value)}
-                        value={rule.body}
-                      />
-                    </Field>
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                        <input
-                          checked={rule.enabled}
-                          onChange={(event) => updateMockRuleRow(index, "enabled", event.target.checked)}
-                          type="checkbox"
-                        />
-                        Enabled
-                      </label>
-                      <button
-                        className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                        onClick={() => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-                        type="button"
-                      >
-                        Remove mock rule {index + 1}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Match summary</p>
-                      <div className="mt-3 space-y-2 text-sm text-slate-600">
-                        {buildRuleSummary(rule).map((item, itemIndex) => (
-                          <p key={`${item}-${itemIndex}`}>{item}</p>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Rule response preview</p>
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                        <span className="rounded-full border border-slate-200 px-3 py-1">{rule.statusCode}</span>
-                        <span className="rounded-full border border-slate-200 px-3 py-1">{rule.mediaType}</span>
-                      </div>
-                      <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
-                        {formatRulePreviewBody(rule.body)}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveMockRules}
-              onClick={() => void handleSaveMockRules()}
-              type="button"
-            >
-              Save mock rules
-            </button>
-            {mockRuleMessage ? <p className="text-sm text-emerald-600">{mockRuleMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Mock Simulator">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">
-            Send query and header samples to the backend resolver. This only simulates exact `query/header` matches against the current draft.
-          </p>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Simulator query samples">
-              <textarea
-                aria-label="Simulator query samples"
-                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setSimulationQueryText(event.target.value)}
-                placeholder="mode=strict"
-                value={simulationQueryText}
-              />
-            </Field>
-            <Field label="Simulator header samples">
-              <textarea
-                aria-label="Simulator header samples"
-                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setSimulationHeaderText(event.target.value)}
-                placeholder="x-scenario=unauthorized"
-                value={simulationHeaderText}
-              />
-            </Field>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSimulateMock || isSimulating}
-              onClick={() => void handleRunSimulation()}
-              type="button"
-            >
-              {isSimulating ? "Running..." : "Run mock simulation"}
-            </button>
-            {simulationMessage ? <p className="text-sm text-emerald-600">{simulationMessage}</p> : null}
-          </div>
-
-          {simulationResult ? (
-            <>
-              <div className="grid gap-4 md:grid-cols-3">
-                <PreviewMetric label="Source" value={simulationResult.source} />
-                <PreviewMetric label="Status" value={String(simulationResult.statusCode)} />
-                <PreviewMetric label="Content-Type" value={simulationResult.mediaType} />
-              </div>
-
-              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation details</p>
-                  {simulationResult.matchedRuleName ? (
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
-                      {simulationResult.matchedRuleName}
-                    </span>
-                  ) : null}
-                  {simulationResult.matchedRulePriority !== null ? (
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
-                      Priority {simulationResult.matchedRulePriority}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
-                  {simulationResult.explanations.map((line, index) => (
-                    <p key={`${line}-${index}`}>{line}</p>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation Body</p>
-                <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{simulationResult.body}</pre>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Published Runtime">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">
-            Runtime requests to `{buildMockUrl(projectId, formState.path)}` only read the latest published mock release.
-          </p>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <PreviewMetric label="Mock URL" value={buildMockUrl(projectId, formState.path)} mono />
-            <PreviewMetric label="Latest Release" value={latestRelease ? `Release #${latestRelease.releaseNo}` : "Not published"} />
-            <PreviewMetric label="Created At" value={latestRelease?.createdAt ?? "N/A"} mono />
-          </div>
-
-          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-            {latestRelease ? (
-              <p>Release #{latestRelease.releaseNo}</p>
-            ) : (
-              <p>No published release yet.</p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onPublishMockRelease || isPublishing}
-              onClick={() => void handlePublishMock()}
-              type="button"
-            >
-              {isPublishing ? "Publishing..." : "Publish mock"}
-            </button>
-            {publishMessage ? <p className="text-sm text-emerald-600">{publishMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Versions">
-        <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-            <Field label="Compare against version">
-              <select
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setCompareVersionId(event.target.value)}
-                value={compareVersionId}
-              >
-                <option value="">Current draft only</option>
-                {versions.map((version) => (
-                  <option key={version.id} value={String(version.id)}>
-                    {version.version}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Version Diff</p>
-                {compareVersion ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{compareVersion.version}</span>
-                ) : null}
-              </div>
-
-              {compareVersion ? (
-                diffItems.length > 0 ? (
-                  <div className="mt-4 space-y-3">
-                    {diffItems.map((item, index) => (
-                      <div key={`${item.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                        <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                        <p className="mt-1 text-sm text-slate-500">{item.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-slate-500">No visible changes between the selected version and the current draft.</p>
-                )
-              ) : (
-                <p className="mt-4 text-sm text-slate-500">Choose a historical snapshot to compare against the current draft.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Version label">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setVersionForm((current) => ({ ...current, version: event.target.value }))}
-                value={versionForm.version}
-              />
-            </Field>
-            <Field label="Version summary">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setVersionForm((current) => ({ ...current, changeSummary: event.target.value }))}
-                value={versionForm.changeSummary}
-              />
-            </Field>
-          </div>
-
-          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Generated Snapshot</p>
-            <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{latestSnapshot}</pre>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveVersion}
-              onClick={() => void handleSaveVersion()}
-              type="button"
-            >
-              Save version snapshot
-            </button>
-            {versionMessage ? <p className="text-sm text-emerald-600">{versionMessage}</p> : null}
-          </div>
-
-          {versions.length === 0 ? (
-            <p className="text-sm text-slate-500">No version snapshots yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {versions.map((version) => (
-                <div key={version.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{version.version}</p>
-                      <p className="mt-1 text-sm text-slate-500">{version.changeSummary || "No change summary."}</p>
-                    </div>
-                    <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">v#{version.id}</span>
-                  </div>
-                  <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
-                    {version.snapshotJson || "{}"}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </EditorPanel>
+      <EndpointVersionPanel
+        compareVersion={compareVersion}
+        compareVersionId={compareVersionId}
+        diffItems={diffItems}
+        latestSnapshot={latestSnapshot}
+        onCompareVersionChange={setCompareVersionId}
+        onSaveVersion={onSaveVersion ? () => void handleSaveVersion() : undefined}
+        onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
+        versionForm={versionForm}
+        versionMessage={versionMessage}
+        versions={versions}
+      />
     </section>
   );
 
@@ -1005,6 +463,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     return {
       draftRules: mockRuleRows.map((rule) => ({
         body: rule.body,
+        bodyConditions: parseBodyConditions(rule.bodyConditionsText),
         enabled: rule.enabled,
         headerConditions: parseConditions(rule.headerConditionsText),
         mediaType: rule.mediaType,
@@ -1013,6 +472,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
         ruleName: rule.ruleName,
         statusCode: rule.statusCode
       })),
+      bodySample: simulationBodyText,
       draftResponses: responseRows.map((response) => ({
         dataType: response.dataType,
         description: response.description,
@@ -1054,6 +514,7 @@ function createResponseDraft(): ResponseDraft {
 function createMockRuleDraft(): MockRuleDraft {
   return {
     body: "{}",
+    bodyConditionsText: "",
     enabled: true,
     headerConditionsText: "",
     mediaType: "application/json",
@@ -1067,357 +528,4 @@ function createMockRuleDraft(): MockRuleDraft {
 function buildMockUrl(projectId: number, path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `/mock/${projectId}${normalizedPath}`;
-}
-
-function buildPreviewOptions(responseRows: ResponseDraft[]) {
-  const options = new Map<string, { key: string; label: string }>();
-
-  for (const response of responseRows) {
-    const mediaType = response.mediaType || "application/json";
-    const key = `${response.httpStatusCode}:${mediaType}`;
-    if (!options.has(key)) {
-      options.set(key, {
-        key,
-        label: `${response.httpStatusCode} ${mediaType}`
-      });
-    }
-  }
-
-  return [...options.values()];
-}
-
-function buildMockPreview(responseRows: ResponseDraft[], previewKey: string) {
-  if (responseRows.length === 0) {
-    return {
-      body: "{}",
-      mediaType: "application/json",
-      statusCode: 200
-    };
-  }
-
-  const fallbackRow = responseRows[0];
-  const [selectedStatus, selectedMediaType] = previewKey.split(":");
-  const activeRows = responseRows.filter((response) => {
-    const mediaType = response.mediaType || "application/json";
-    if (!previewKey) {
-      return response.httpStatusCode === fallbackRow.httpStatusCode && mediaType === fallbackRow.mediaType;
-    }
-
-    return String(response.httpStatusCode) === selectedStatus && mediaType === selectedMediaType;
-  });
-  const activeRow = activeRows[0] ?? fallbackRow;
-
-  return {
-    body: JSON.stringify(buildMockPayload(activeRows), null, 2),
-    mediaType: activeRow.mediaType || "application/json",
-    statusCode: activeRow.httpStatusCode || 200
-  };
-}
-
-function buildMockPayload(responseRows: ResponseDraft[]) {
-  if (responseRows.length === 1 && !responseRows[0].name.trim()) {
-    return resolveMockValue(responseRows[0]);
-  }
-
-  return responseRows.reduce<Record<string, unknown>>((payload, response) => {
-    const fieldName = response.name.trim();
-    if (!fieldName) {
-      return payload;
-    }
-
-    payload[fieldName] = resolveMockValue(response);
-    return payload;
-  }, {});
-}
-
-function resolveMockValue(response: ResponseDraft) {
-  if (response.exampleValue.trim()) {
-    return parseMockExample(response.dataType, response.exampleValue.trim());
-  }
-
-  return defaultMockValue(response.dataType);
-}
-
-function parseMockExample(dataType: string, exampleValue: string) {
-  try {
-    switch (dataType.toLowerCase()) {
-      case "integer":
-      case "int":
-      case "long":
-        return Number.parseInt(exampleValue, 10);
-      case "number":
-      case "float":
-      case "double":
-      case "decimal":
-        return Number.parseFloat(exampleValue);
-      case "boolean":
-        return exampleValue === "true";
-      case "array":
-      case "object":
-        return JSON.parse(exampleValue);
-      default:
-        return exampleValue;
-    }
-  } catch {
-    return defaultMockValue(dataType);
-  }
-}
-
-function defaultMockValue(dataType: string) {
-  switch (dataType.toLowerCase()) {
-    case "integer":
-    case "int":
-    case "long":
-      return 0;
-    case "number":
-    case "float":
-    case "double":
-    case "decimal":
-      return 0;
-    case "boolean":
-      return true;
-    case "array":
-      return [];
-    case "object":
-      return {};
-    default:
-      return "";
-  }
-}
-
-function formatConditions(conditions: MockConditionEntry[]) {
-  return conditions.map((condition) => `${condition.name}=${condition.value}`).join("\n");
-}
-
-function parseConditions(text: string): MockConditionEntry[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const separatorIndex = line.indexOf("=");
-      if (separatorIndex === -1) {
-        return {
-          name: line,
-          value: ""
-        };
-      }
-
-      return {
-        name: line.slice(0, separatorIndex).trim(),
-        value: line.slice(separatorIndex + 1).trim()
-      };
-    })
-    .filter((condition) => condition.name);
-}
-
-function buildRuleSummary(rule: MockRuleDraft) {
-  const queryConditions = parseConditions(rule.queryConditionsText).map(
-    (condition) => `query ${condition.name}=${condition.value}`
-  );
-  const headerConditions = parseConditions(rule.headerConditionsText).map(
-    (condition) => `header ${condition.name}=${condition.value}`
-  );
-  const conditions = [...queryConditions, ...headerConditions];
-
-  if (conditions.length === 0) {
-    return ["Matches any request for this endpoint."];
-  }
-
-  return conditions;
-}
-
-function buildPreviewDetails(
-  previewSource: PreviewSource,
-  mockRuleRows: MockRuleDraft[],
-  selectedPreviewKey: string,
-  mockPreview: { statusCode: number; mediaType: string; body: string }
-) {
-  const activeKey = selectedPreviewKey || `${mockPreview.statusCode}:${mockPreview.mediaType}`;
-  const matchingRule = mockRuleRows.find((rule) => {
-    if (!rule.enabled) {
-      return false;
-    }
-
-    const ruleKey = `${rule.statusCode}:${rule.mediaType || "application/json"}`;
-    return ruleKey === activeKey;
-  });
-
-  if (matchingRule) {
-    return {
-      badge: "Conditional rule override",
-      lines: [`Rule: ${matchingRule.ruleName || "Unnamed rule"}`, ...buildRuleSummary(matchingRule)],
-      priorityLabel: `Priority ${matchingRule.priority}`
-    };
-  }
-
-  if (previewSource === "latest-version") {
-    return {
-      badge: "Latest saved version",
-      lines: ["Preview is generated from the latest saved version snapshot.", `Status group: ${activeKey}`],
-      priorityLabel: null
-    };
-  }
-
-  return {
-    badge: "Current draft",
-    lines: ["Preview is generated from the current draft response rows.", `Status group: ${activeKey}`],
-    priorityLabel: null
-  };
-}
-
-function formatRulePreviewBody(body: string) {
-  if (!body.trim()) {
-    return "{}";
-  }
-
-  try {
-    return JSON.stringify(JSON.parse(body), null, 2);
-  } catch {
-    return body;
-  }
-}
-
-function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {
-  if (!snapshotJson) {
-    return emptySnapshot();
-  }
-
-  try {
-    const parsed = JSON.parse(snapshotJson) as Partial<SnapshotShape> & {
-      path?: string;
-      method?: string;
-      name?: string;
-      description?: string;
-    };
-
-    const endpointSource = parsed.endpoint ?? parsed;
-
-    return {
-      endpoint: {
-        description: typeof endpointSource.description === "string" ? endpointSource.description : "",
-        method: typeof endpointSource.method === "string" ? endpointSource.method : "GET",
-        name: typeof endpointSource.name === "string" ? endpointSource.name : "",
-        path: typeof endpointSource.path === "string" ? endpointSource.path : ""
-      },
-      parameters: Array.isArray(parsed.parameters) ? parsed.parameters.map(normalizeParameterDraft) : [],
-      responses: Array.isArray(parsed.responses) ? parsed.responses.map(normalizeResponseDraft) : []
-    };
-  } catch {
-    return emptySnapshot();
-  }
-}
-
-function normalizeParameterDraft(parameter: Partial<ParameterDraft>): ParameterDraft {
-  return {
-    dataType: typeof parameter.dataType === "string" ? parameter.dataType : "string",
-    description: typeof parameter.description === "string" ? parameter.description : "",
-    exampleValue: typeof parameter.exampleValue === "string" ? parameter.exampleValue : "",
-    name: typeof parameter.name === "string" ? parameter.name : "",
-    required: Boolean(parameter.required),
-    sectionType: typeof parameter.sectionType === "string" ? parameter.sectionType : "query"
-  };
-}
-
-function normalizeResponseDraft(response: Partial<ResponseDraft>): ResponseDraft {
-  return {
-    dataType: typeof response.dataType === "string" ? response.dataType : "string",
-    description: typeof response.description === "string" ? response.description : "",
-    exampleValue: typeof response.exampleValue === "string" ? response.exampleValue : "",
-    httpStatusCode: typeof response.httpStatusCode === "number" ? response.httpStatusCode : 200,
-    mediaType: typeof response.mediaType === "string" ? response.mediaType : "application/json",
-    name: typeof response.name === "string" ? response.name : "",
-    required: Boolean(response.required)
-  };
-}
-
-function emptySnapshot(): SnapshotShape {
-  return {
-    endpoint: {
-      description: "",
-      method: "GET",
-      name: "",
-      path: ""
-    },
-    parameters: [],
-    responses: []
-  };
-}
-
-function buildSnapshotDiff(previous: SnapshotShape, current: SnapshotShape) {
-  const items: Array<{ title: string; detail: string }> = [];
-
-  if (previous.endpoint.path !== current.endpoint.path) {
-    items.push({
-      title: "Changed endpoint path",
-      detail: `${previous.endpoint.path || "(empty)"} -> ${current.endpoint.path || "(empty)"}`
-    });
-  }
-
-  if (previous.endpoint.method !== current.endpoint.method) {
-    items.push({
-      title: "Changed endpoint method",
-      detail: `${previous.endpoint.method || "(empty)"} -> ${current.endpoint.method || "(empty)"}`
-    });
-  }
-
-  if (previous.endpoint.description !== current.endpoint.description) {
-    items.push({
-      title: "Changed endpoint description",
-      detail: `${previous.endpoint.description || "(empty)"} -> ${current.endpoint.description || "(empty)"}`
-    });
-  }
-
-  const previousParameters = new Set(previous.parameters.map((parameter) => `${parameter.sectionType}.${parameter.name}`));
-  for (const parameter of current.parameters) {
-    const parameterKey = `${parameter.sectionType}.${parameter.name}`;
-    if (!previousParameters.has(parameterKey)) {
-      items.push({
-        title: "Added request parameter",
-        detail: parameterKey
-      });
-    }
-  }
-
-  const previousResponses = new Set(previous.responses.map((response) => `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim()));
-  for (const response of current.responses) {
-    const responseKey = `${response.httpStatusCode} ${response.mediaType} ${response.name}`.trim();
-    if (!previousResponses.has(responseKey)) {
-      items.push({
-        title: "Added response field",
-        detail: responseKey
-      });
-    }
-  }
-
-  return items;
-}
-
-function EditorPanel({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <div className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{title}</p>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Field({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function PreviewMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className={`mt-3 text-sm text-slate-700 ${mono ? "break-all font-mono" : ""}`}>{value}</p>
-    </div>
-  );
 }
