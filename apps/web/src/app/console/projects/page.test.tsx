@@ -60,14 +60,16 @@ describe("ProjectsPage", () => {
   it("filters the project catalog by search text and access mode", async () => {
     render(<ProjectsPage />);
 
-    expect(await screen.findByText("Default Project")).toBeInTheDocument();
+    expect((await screen.findAllByText("Default Project")).length).toBeGreaterThan(0);
     expect(fetchProjects).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Project radar" })).toBeInTheDocument();
+    expect(screen.getByText("Operations pulse")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Search projects"), { target: { value: "review" } });
     expect(screen.queryByText("Default Project")).not.toBeInTheDocument();
-    expect(screen.getByText("Docs Review")).toBeInTheDocument();
+    expect(screen.getAllByText("Docs Review").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /可编辑/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Editable/ }));
     expect(screen.queryByText("Docs Review")).not.toBeInTheDocument();
     expect(fetchProjects).toHaveBeenCalledTimes(1);
   });

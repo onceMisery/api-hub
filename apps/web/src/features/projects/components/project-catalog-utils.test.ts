@@ -1,7 +1,8 @@
 import {
   buildProjectCatalogGroups,
   filterProjects,
-  normalizeProjectKey
+  normalizeProjectKey,
+  validateProjectDraft
 } from "./project-catalog-utils";
 
 describe("project-catalog-utils", () => {
@@ -56,6 +57,21 @@ describe("project-catalog-utils", () => {
     expect(groups[1]?.count).toBe(1);
     expect(groups[2]?.count).toBe(2);
     expect(groups[3]?.count).toBe(1);
-    expect(groups[1]?.description).toContain("成员");
+    expect(groups[0]?.label).toBe("All projects");
+    expect(groups[1]?.description).toContain("collaborators");
+  });
+
+  it("returns translation keys for draft validation errors", () => {
+    expect(
+      validateProjectDraft({
+        name: "",
+        projectKey: "Billing Hub",
+        description: "x".repeat(281)
+      })
+    ).toEqual({
+      name: "catalog.createDrawer.error.nameRequired",
+      projectKey: "catalog.createDrawer.error.keyFormat",
+      description: "catalog.createDrawer.error.descriptionTooLong"
+    });
   });
 });
