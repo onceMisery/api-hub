@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  clearEndpointRelease,
   clearDebugHistory,
   createEndpoint,
   executeDebug,
@@ -26,6 +27,7 @@ import {
   fetchEndpointVersions,
   fetchProjectTree,
   isApiRequestError,
+  releaseEndpointVersion,
   replaceEndpointParameters,
   replaceEndpointMockRules,
   replaceEndpointResponses,
@@ -454,9 +456,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           <EndpointEditor
             canWrite={canWrite}
             endpoint={endpoint}
+            onClearReleasedVersion={handleClearEndpointRelease}
             isLoading={isLoadingEndpoint}
             onDelete={handleDeleteEndpoint}
             onPublishMockRelease={handlePublishMockRelease}
+            onReleaseVersion={handleReleaseVersion}
             onRestoreVersion={handleRestoreVersion}
             onSave={handleSaveEndpoint}
             onSaveMockRules={handleSaveMockRules}
@@ -1158,6 +1162,56 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  async function handleReleaseVersion(version: VersionDetail) {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const releaseResponse = await releaseEndpointVersion(selectedEndpointId, version.id);
+      const versionsResponse = await fetchEndpointVersions(selectedEndpointId);
+      setEndpoint(releaseResponse.data);
+      setVersions(versionsResponse.data);
+      pushSuccess("Version released", `${version.version} is now the live endpoint version.`);
+    } catch (releaseError) {
+      if (handleUnauthorized(releaseError)) {
+        return;
+      }
+
+      const message = getErrorMessage(releaseError, `Failed to release version ${version.version}`);
+      setError(message);
+      pushError("Version release failed", message);
+      throw releaseError;
+    }
+  }
+
+  async function handleClearEndpointRelease() {
+    if (!selectedEndpointId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const endpointResponse = await clearEndpointRelease(selectedEndpointId);
+      const versionsResponse = await fetchEndpointVersions(selectedEndpointId);
+      setEndpoint(endpointResponse.data);
+      setVersions(versionsResponse.data);
+      pushSuccess("Draft lane restored", `${endpoint?.name ?? "Endpoint"} returned to draft lane.`);
+    } catch (clearReleaseError) {
+      if (handleUnauthorized(clearReleaseError)) {
+        return;
+      }
+
+      const message = getErrorMessage(clearReleaseError, "Failed to return endpoint to draft lane");
+      setError(message);
+      pushError("Draft lane restore failed", message);
+      throw clearReleaseError;
+    }
+  }
+
   async function handleRestoreVersion(version: VersionDetail, snapshot: SnapshotShape) {
     if (!selectedEndpointId || !endpoint) {
       return;
@@ -1309,7 +1363,7 @@ function isProjectAccessForbidden(error: unknown) {
   return isApiRequestError(error) && error.status === 403;
 }
 
-function buildCurrentUserAccessFeedback(
+export function buildCurrentUserAccessFeedback(
   previousProject: ProjectDetail | null,
   nextProject: ProjectDetail | null,
   removed = false
@@ -1344,6 +1398,13 @@ function buildCurrentUserAccessFeedback(
     return {
       title: "Your access changed",
       detail: "This project is now read-only for your session."
+    };
+  }
+
+  if (!previousAccess.canWrite && nextAccess.canWrite && !previousAccess.canManageMembers && nextAccess.canManageMembers) {
+    return {
+      title: "Your access changed",
+      detail: "Editing and member management are now available for your session."
     };
   }
 

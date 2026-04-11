@@ -512,6 +512,29 @@ public class ProjectService {
         return endpointRepository.createVersion(userId, endpointId, request);
     }
 
+    public EndpointDetail releaseVersion(Long endpointId, Long versionId) {
+        return releaseVersion(1L, endpointId, versionId);
+    }
+
+    public EndpointDetail releaseVersion(Long userId, Long endpointId, Long versionId) {
+        requireEndpointWriteAccess(userId, endpointId);
+        VersionDetail version = endpointRepository.findVersion(versionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found"));
+        if (!endpointId.equals(version.endpointId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found");
+        }
+        return endpointRepository.releaseVersion(userId, endpointId, versionId);
+    }
+
+    public EndpointDetail clearEndpointRelease(Long endpointId) {
+        return clearEndpointRelease(1L, endpointId);
+    }
+
+    public EndpointDetail clearEndpointRelease(Long userId, Long endpointId) {
+        requireEndpointWriteAccess(userId, endpointId);
+        return endpointRepository.clearReleasedVersion(userId, endpointId);
+    }
+
     private ProjectDetail requireProjectReadAccess(Long userId, Long projectId) {
         ProjectDetail project = projectRepository.findProject(userId, projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));

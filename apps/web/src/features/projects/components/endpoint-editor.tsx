@@ -54,7 +54,9 @@ type EndpointEditorProps = {
   onSaveMockRules?: (payload: MockRuleUpsertItem[]) => Promise<void>;
   onSaveParameters?: (payload: ParameterUpsertItem[]) => Promise<void>;
   onSaveResponses?: (payload: ResponseUpsertItem[]) => Promise<void>;
+  onReleaseVersion?: (version: VersionDetail) => Promise<void>;
   onRestoreVersion?: (version: VersionDetail, snapshot: SnapshotShape) => Promise<void>;
+  onClearReleasedVersion?: () => Promise<void>;
   onSimulateMock?: (payload: MockSimulationPayload) => Promise<MockSimulationResult>;
   onSaveVersion?: (payload: { version: string; changeSummary: string }) => Promise<void>;
   mockReleases?: MockReleaseDetail[];
@@ -81,7 +83,9 @@ export function EndpointEditor(props: EndpointEditorProps) {
     onSaveMockRules,
     onSaveParameters,
     onSaveResponses,
+    onReleaseVersion,
     onRestoreVersion,
+    onClearReleasedVersion,
     onSimulateMock,
     onSaveVersion,
     mockReleases = EMPTY_MOCK_RELEASES,
@@ -109,6 +113,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [simulationResult, setSimulationResult] = useState<MockSimulationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isManagingRelease, setIsManagingRelease] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
@@ -118,6 +123,8 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [responseMessage, setResponseMessage] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [releaseMessage, setReleaseMessage] = useState<string | null>(null);
   const [simulationMessage, setSimulationMessage] = useState<string | null>(null);
   const [versionMessage, setVersionMessage] = useState<string | null>(null);
 
@@ -144,6 +151,8 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setMockRuleMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
+    setReleaseError(null);
+    setReleaseMessage(null);
     setRestoreError(null);
     setRestoreMessage(null);
     setSimulationMessage(null);
@@ -280,6 +289,11 @@ export function EndpointEditor(props: EndpointEditorProps) {
         formState={formState}
         isSaving={isSaving}
         mockUrl={buildMockUrl(projectId, formState.path)}
+        releaseState={{
+          releasedAt: endpoint.releasedAt ?? null,
+          releasedVersionLabel: endpoint.releasedVersionLabel ?? null,
+          status: endpoint.status ?? "draft"
+        }}
         onDelete={() => void onDelete?.()}
         onFieldChange={updateField}
         onSubmit={(event) => void handleSubmit(event)}
@@ -353,12 +367,21 @@ export function EndpointEditor(props: EndpointEditorProps) {
         compareVersion={compareVersion}
         compareVersionId={compareVersionId}
         diffResult={diffResult}
+        endpointStatus={endpoint.status ?? "draft"}
         isRestoring={isRestoring}
+        isManagingRelease={isManagingRelease}
         latestSnapshot={latestSnapshot}
+        onClearReleasedVersion={canWrite && onClearReleasedVersion ? () => void handleClearReleasedVersion() : undefined}
         onCompareVersionChange={setCompareVersionId}
+        onReleaseVersion={canWrite && onReleaseVersion ? (version) => void handleReleaseVersion(version) : undefined}
         onRestoreVersion={canWrite && onRestoreVersion ? (version) => void handleRestoreVersion(version) : undefined}
         onSaveVersion={canWrite && onSaveVersion ? () => void handleSaveVersion() : undefined}
         onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
+        releaseError={releaseError}
+        releasedVersionId={endpoint.releasedVersionId ?? null}
+        releasedVersionLabel={endpoint.releasedVersionLabel ?? null}
+        releasedAt={endpoint.releasedAt ?? null}
+        releaseMessage={releaseMessage}
         restoreError={restoreError}
         restoreMessage={restoreMessage}
         versionForm={versionForm}
@@ -452,6 +475,45 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
     await onSaveVersion(versionForm);
     setVersionMessage("Saved");
+  }
+
+  async function handleReleaseVersion(version: VersionDetail) {
+    if (!onReleaseVersion) {
+      return;
+    }
+
+    setIsManagingRelease(true);
+    setReleaseError(null);
+    setReleaseMessage(null);
+
+    try {
+      await onReleaseVersion(version);
+      setCompareVersionId(String(version.id));
+      setReleaseMessage(`${version.version} is now the live endpoint version.`);
+    } catch (error) {
+      setReleaseError(error instanceof Error ? error.message : "Failed to release version.");
+    } finally {
+      setIsManagingRelease(false);
+    }
+  }
+
+  async function handleClearReleasedVersion() {
+    if (!onClearReleasedVersion) {
+      return;
+    }
+
+    setIsManagingRelease(true);
+    setReleaseError(null);
+    setReleaseMessage(null);
+
+    try {
+      await onClearReleasedVersion();
+      setReleaseMessage("Endpoint returned to the draft lane.");
+    } catch (error) {
+      setReleaseError(error instanceof Error ? error.message : "Failed to return endpoint to draft lane.");
+    } finally {
+      setIsManagingRelease(false);
+    }
   }
 
   async function handleRestoreVersion(version: VersionDetail) {

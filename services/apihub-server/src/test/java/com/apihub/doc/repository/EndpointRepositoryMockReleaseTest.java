@@ -33,4 +33,31 @@ class EndpointRepositoryMockReleaseTest {
         assertThat(endpointRepository.findLatestMockRelease(1L)).isPresent();
         assertThat(endpointRepository.listMockReleases(1L)).hasSize(1);
     }
+
+    @Test
+    void shouldReleaseEndpointVersionAndReturnToDraftLane() {
+        endpointRepository.releaseVersion(1L, 1L, 1L);
+
+        var releasedEndpoint = endpointRepository.findEndpoint(1L).orElseThrow();
+        var releasedVersion = endpointRepository.listVersions(1L).get(0);
+
+        assertThat(releasedEndpoint.status()).isEqualTo("released");
+        assertThat(releasedEndpoint.releasedVersionId()).isEqualTo(1L);
+        assertThat(releasedEndpoint.releasedVersionLabel()).isEqualTo("v1");
+        assertThat(releasedEndpoint.releasedAt()).isNotNull();
+        assertThat(releasedVersion.released()).isTrue();
+        assertThat(releasedVersion.releasedAt()).isNotNull();
+
+        endpointRepository.clearReleasedVersion(1L, 1L);
+
+        var draftEndpoint = endpointRepository.findEndpoint(1L).orElseThrow();
+        var clearedVersion = endpointRepository.listVersions(1L).get(0);
+
+        assertThat(draftEndpoint.status()).isEqualTo("draft");
+        assertThat(draftEndpoint.releasedVersionId()).isNull();
+        assertThat(draftEndpoint.releasedVersionLabel()).isNull();
+        assertThat(draftEndpoint.releasedAt()).isNull();
+        assertThat(clearedVersion.released()).isFalse();
+        assertThat(clearedVersion.releasedAt()).isNull();
+    }
 }

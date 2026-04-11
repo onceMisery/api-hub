@@ -38,7 +38,9 @@ const {
   replaceEndpointResponses,
   createVersion,
   publishEndpointMockRelease,
-  simulateEndpointMock
+  simulateEndpointMock,
+  releaseEndpointVersion,
+  clearEndpointRelease
 } = vi.hoisted(() => ({
   ApiRequestError: class ApiRequestError extends Error {
     status: number;
@@ -88,7 +90,9 @@ const {
   replaceEndpointResponses: vi.fn(),
   createVersion: vi.fn(),
   publishEndpointMockRelease: vi.fn(),
-  simulateEndpointMock: vi.fn()
+  simulateEndpointMock: vi.fn(),
+  releaseEndpointVersion: vi.fn(),
+  clearEndpointRelease: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({
@@ -137,11 +141,13 @@ vi.mock("@api-hub/api-sdk", () => ({
   createVersion,
   publishEndpointMockRelease,
   simulateEndpointMock,
+  releaseEndpointVersion,
+  clearEndpointRelease,
   ApiRequestError,
   isApiRequestError: (error: unknown) => error instanceof ApiRequestError
 }));
 
-import { ProjectShell } from "./project-shell";
+import { buildCurrentUserAccessFeedback, ProjectShell } from "./project-shell";
 
 describe("ProjectShell", () => {
   beforeEach(() => {
@@ -343,6 +349,36 @@ describe("ProjectShell", () => {
         version: "v2",
         changeSummary: "Added editable schema",
         snapshotJson: "{}"
+      }
+    });
+    releaseEndpointVersion.mockResolvedValue({
+      data: {
+        id: 31,
+        groupId: 21,
+        name: "Get User",
+        method: "GET",
+        path: "/users/{id}",
+        description: "Updated",
+        mockEnabled: false,
+        status: "released",
+        releasedVersionId: 2,
+        releasedVersionLabel: "v2",
+        releasedAt: "2026-04-11T10:00:00Z"
+      }
+    });
+    clearEndpointRelease.mockResolvedValue({
+      data: {
+        id: 31,
+        groupId: 21,
+        name: "Get User",
+        method: "GET",
+        path: "/users/{id}",
+        description: "Updated",
+        mockEnabled: false,
+        status: "draft",
+        releasedVersionId: null,
+        releasedVersionLabel: null,
+        releasedAt: null
       }
     });
   });
@@ -613,6 +649,36 @@ describe("ProjectShell", () => {
       ])
     );
     expect(await screen.findByDisplayValue("Get User Legacy")).toBeInTheDocument();
+  });
+
+  it("shows the current published release lane summary inside the project workbench", async () => {
+    fetchEndpointVersions.mockResolvedValueOnce({
+      data: [
+        {
+          id: 1,
+          endpointId: 31,
+          version: "v1",
+          changeSummary: "Baseline",
+          snapshotJson: JSON.stringify({
+            endpoint: {
+              name: "Get User",
+              method: "GET",
+              path: "/users",
+              description: "Endpoint detail"
+            },
+            parameters: [],
+            responses: []
+          })
+        }
+      ]
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("No published release yet.")).toBeInTheDocument();
+    expect((await screen.findAllByText("Draft lane")).length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByRole("button", { name: "Compare snapshot v1" }));
+    expect((await screen.findAllByText("1 total changes")).length).toBeGreaterThan(0);
   });
 
   it("filters modules, groups, and endpoints from the tree search", async () => {
@@ -1331,5 +1397,37 @@ describe("ProjectShell", () => {
     const matchboard = await screen.findByRole("region", { name: "Rule Matchboard" });
     expect(within(matchboard).getByText("Unauthorized")).toBeInTheDocument();
     expect(within(matchboard).getAllByText("Matched header x-scenario=unauthorized").length).toBeGreaterThan(0);
+  });
+});
+
+describe("buildCurrentUserAccessFeedback", () => {
+  it("explains when editing and member management become available together", () => {
+    const feedback = buildCurrentUserAccessFeedback(
+      {
+        id: 1,
+        name: "Default Project",
+        projectKey: "default",
+        description: "Seed project",
+        debugAllowedHosts: [],
+        currentUserRole: "viewer",
+        canWrite: false,
+        canManageMembers: false
+      },
+      {
+        id: 1,
+        name: "Default Project",
+        projectKey: "default",
+        description: "Seed project",
+        debugAllowedHosts: [],
+        currentUserRole: "project_admin",
+        canWrite: true,
+        canManageMembers: true
+      }
+    );
+
+    expect(feedback).toEqual({
+      title: "Your access changed",
+      detail: "Editing and member management are now available for your session."
+    });
   });
 });

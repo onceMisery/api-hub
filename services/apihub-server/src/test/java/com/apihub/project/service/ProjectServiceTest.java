@@ -492,4 +492,46 @@ class ProjectServiceTest {
         assertThat(result.statusCode()).isEqualTo(401);
         assertThat(result.body()).isEqualTo("{\"error\":\"token expired\"}");
     }
+
+    @Test
+    void shouldReleaseSelectedEndpointVersionAndReturnToDraftLane() {
+        var releasedEndpoint = projectService.releaseVersion(1L, 1L, 1L);
+
+        assertThat(releasedEndpoint.status()).isEqualTo("released");
+        assertThat(releasedEndpoint.releasedVersionId()).isEqualTo(1L);
+        assertThat(releasedEndpoint.releasedVersionLabel()).isEqualTo("v1");
+        assertThat(projectService.listVersions(1L, 1L)).singleElement().satisfies(version -> {
+            assertThat(version.released()).isTrue();
+            assertThat(version.releasedAt()).isNotNull();
+        });
+
+        var draftEndpoint = projectService.clearEndpointRelease(1L, 1L);
+
+        assertThat(draftEndpoint.status()).isEqualTo("draft");
+        assertThat(draftEndpoint.releasedVersionId()).isNull();
+        assertThat(draftEndpoint.releasedVersionLabel()).isNull();
+        assertThat(projectService.listVersions(1L, 1L)).singleElement().satisfies(version -> {
+            assertThat(version.released()).isFalse();
+            assertThat(version.releasedAt()).isNull();
+        });
+    }
+
+    @Test
+    void shouldRejectReleasingVersionFromAnotherEndpoint() {
+        var otherEndpoint = projectService.createEndpoint(1L, 1L, new CreateEndpointRequest(
+                "Create User",
+                "POST",
+                "/users",
+                "create user",
+                false));
+        var otherVersion = projectService.createVersion(1L, otherEndpoint.id(), new CreateVersionRequest(
+                "v2",
+                "second endpoint",
+                "{\"endpoint\":{\"path\":\"/users\"}}"));
+
+        assertThatThrownBy(() -> projectService.releaseVersion(1L, 1L, otherVersion.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }

@@ -2,9 +2,11 @@ package com.apihub.doc.web;
 
 import com.apihub.common.model.ApiResponse;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
+import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.project.service.ProjectService;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,5 +35,18 @@ public class ApiVersionController {
                                                     @RequestBody CreateVersionRequest request,
                                                     Authentication authentication) {
         return ApiResponse.success(projectService.createVersion((Long) authentication.getPrincipal(), endpointId, request));
+    }
+
+    @PostMapping("/api/v1/endpoints/{endpointId}/versions/{versionId}/release")
+    public ApiResponse<EndpointDetail> releaseVersion(@PathVariable Long endpointId,
+                                                      @PathVariable Long versionId,
+                                                      Authentication authentication) {
+        return ApiResponse.success(projectService.releaseVersion((Long) authentication.getPrincipal(), endpointId, versionId));
+    }
+
+    @DeleteMapping("/api/v1/endpoints/{endpointId}/release")
+    public ApiResponse<EndpointDetail> clearEndpointRelease(@PathVariable Long endpointId,
+                                                            Authentication authentication) {
+        return ApiResponse.success(projectService.clearEndpointRelease((Long) authentication.getPrincipal(), endpointId));
     }
 }

@@ -48,14 +48,20 @@ public class EndpointRepository {
             rs.getString("http_method"),
             rs.getString("path"),
             rs.getString("description"),
-            rs.getBoolean("mock_enabled"));
+            rs.getBoolean("mock_enabled"),
+            rs.getString("status"),
+            rs.getObject("released_version_id", Long.class),
+            rs.getString("released_version_label"),
+            rs.getTimestamp("released_at") == null ? null : rs.getTimestamp("released_at").toInstant());
 
     private static final RowMapper<VersionDetail> VERSION_ROW_MAPPER = (rs, rowNum) -> new VersionDetail(
             rs.getLong("id"),
             rs.getLong("endpoint_id"),
             rs.getString("version_label"),
             rs.getString("change_summary"),
-            rs.getString("snapshot_json"));
+            rs.getString("snapshot_json"),
+            rs.getBoolean("released"),
+            rs.getTimestamp("released_at") == null ? null : rs.getTimestamp("released_at").toInstant());
 
     private static final RowMapper<ParameterDetail> PARAMETER_ROW_MAPPER = (rs, rowNum) -> new ParameterDetail(
             rs.getLong("id"),
@@ -105,10 +111,24 @@ public class EndpointRepository {
 
     public List<EndpointDetail> listEndpoints(Long groupId) {
         return jdbcTemplate.query("""
-                select id, group_id, name, http_method, path, description, mock_enabled
-                from api_endpoint
-                where group_id = ?
-                order by sort_order, id
+                select endpoint.id,
+                       endpoint.group_id,
+                       endpoint.name,
+                       endpoint.http_method,
+                       endpoint.path,
+                       endpoint.description,
+                       endpoint.mock_enabled,
+                       endpoint.status,
+                       endpoint.released_version_id,
+                       case
+                           when released_version.id is null then null
+                           else coalesce(released_version.version_label, concat('r', released_version.revision_no))
+                       end as released_version_label,
+                       endpoint.released_at
+                from api_endpoint endpoint
+                left join api_version released_version on released_version.id = endpoint.released_version_id
+                where endpoint.group_id = ?
+                order by endpoint.sort_order, endpoint.id
                 """, ENDPOINT_ROW_MAPPER, groupId);
     }
 
@@ -155,9 +175,23 @@ public class EndpointRepository {
 
     public Optional<EndpointDetail> findEndpoint(Long endpointId) {
         return jdbcTemplate.query("""
-                select id, group_id, name, http_method, path, description, mock_enabled
-                from api_endpoint
-                where id = ?
+                select endpoint.id,
+                       endpoint.group_id,
+                       endpoint.name,
+                       endpoint.http_method,
+                       endpoint.path,
+                       endpoint.description,
+                       endpoint.mock_enabled,
+                       endpoint.status,
+                       endpoint.released_version_id,
+                       case
+                           when released_version.id is null then null
+                           else coalesce(released_version.version_label, concat('r', released_version.revision_no))
+                       end as released_version_label,
+                       endpoint.released_at
+                from api_endpoint endpoint
+                left join api_version released_version on released_version.id = endpoint.released_version_id
+                where endpoint.id = ?
                 """, ENDPOINT_ROW_MAPPER, endpointId).stream().findFirst();
     }
 
@@ -239,10 +273,24 @@ public class EndpointRepository {
 
     public List<EndpointDetail> listMockEndpoints(Long projectId, String method) {
         return jdbcTemplate.query("""
-                select id, group_id, name, http_method, path, description, mock_enabled
-                from api_endpoint
-                where project_id = ? and http_method = ? and mock_enabled = true
-                order by path, id
+                select endpoint.id,
+                       endpoint.group_id,
+                       endpoint.name,
+                       endpoint.http_method,
+                       endpoint.path,
+                       endpoint.description,
+                       endpoint.mock_enabled,
+                       endpoint.status,
+                       endpoint.released_version_id,
+                       case
+                           when released_version.id is null then null
+                           else coalesce(released_version.version_label, concat('r', released_version.revision_no))
+                       end as released_version_label,
+                       endpoint.released_at
+                from api_endpoint endpoint
+                left join api_version released_version on released_version.id = endpoint.released_version_id
+                where endpoint.project_id = ? and endpoint.http_method = ? and endpoint.mock_enabled = true
+                order by endpoint.path, endpoint.id
                 """, ENDPOINT_ROW_MAPPER, projectId, method.toUpperCase());
     }
 
@@ -403,14 +451,17 @@ public class EndpointRepository {
 
     public List<VersionDetail> listVersions(Long endpointId) {
         return jdbcTemplate.query("""
-                select id,
-                       endpoint_id,
-                       coalesce(version_label, concat('r', revision_no)) as version_label,
-                       change_summary,
-                       snapshot_json
-                from api_version
-                where endpoint_id = ?
-                order by revision_no, id
+                select version.id,
+                       version.endpoint_id,
+                       coalesce(version.version_label, concat('r', version.revision_no)) as version_label,
+                       version.change_summary,
+                       version.snapshot_json,
+                       case when endpoint.released_version_id = version.id then true else false end as released,
+                       case when endpoint.released_version_id = version.id then endpoint.released_at else null end as released_at
+                from api_version version
+                join api_endpoint endpoint on endpoint.id = version.endpoint_id
+                where version.endpoint_id = ?
+                order by version.revision_no, version.id
                 """, VERSION_ROW_MAPPER, endpointId);
     }
 
@@ -443,14 +494,54 @@ public class EndpointRepository {
 
     public Optional<VersionDetail> findVersion(Long versionId) {
         return jdbcTemplate.query("""
-                select id,
-                       endpoint_id,
-                       coalesce(version_label, concat('r', revision_no)) as version_label,
-                       change_summary,
-                       snapshot_json
-                from api_version
-                where id = ?
+                select version.id,
+                       version.endpoint_id,
+                       coalesce(version.version_label, concat('r', version.revision_no)) as version_label,
+                       version.change_summary,
+                       version.snapshot_json,
+                       case when endpoint.released_version_id = version.id then true else false end as released,
+                       case when endpoint.released_version_id = version.id then endpoint.released_at else null end as released_at
+                from api_version version
+                join api_endpoint endpoint on endpoint.id = version.endpoint_id
+                where version.id = ?
                 """, VERSION_ROW_MAPPER, versionId).stream().findFirst();
+    }
+
+    public EndpointDetail releaseVersion(Long endpointId, Long versionId) {
+        return releaseVersion(DEFAULT_USER_ID, endpointId, versionId);
+    }
+
+    public EndpointDetail releaseVersion(Long userId, Long endpointId, Long versionId) {
+        jdbcTemplate.update("""
+                update api_endpoint
+                set status = 'released',
+                    released_version_id = ?,
+                    released_at = current_timestamp,
+                    updated_by = ?
+                where id = ?
+                """,
+                versionId,
+                userId,
+                endpointId);
+        return findEndpoint(endpointId).orElseThrow();
+    }
+
+    public EndpointDetail clearReleasedVersion(Long endpointId) {
+        return clearReleasedVersion(DEFAULT_USER_ID, endpointId);
+    }
+
+    public EndpointDetail clearReleasedVersion(Long userId, Long endpointId) {
+        jdbcTemplate.update("""
+                update api_endpoint
+                set status = 'draft',
+                    released_version_id = null,
+                    released_at = null,
+                    updated_by = ?
+                where id = ?
+                """,
+                userId,
+                endpointId);
+        return findEndpoint(endpointId).orElseThrow();
     }
 
     private Optional<MockReleaseDetail> findMockRelease(Long releaseId) {

@@ -17,16 +17,25 @@ type EndpointVersionPanelProps = {
   versions: VersionDetail[];
   compareVersion: VersionDetail | null;
   diffResult: VersionDiffResult | null;
+  endpointStatus: string;
+  releasedVersionId: number | null;
+  releasedVersionLabel: string | null;
+  releasedAt: string | null;
+  isManagingRelease: boolean;
   isRestoring: boolean;
   versionForm: {
     version: string;
     changeSummary: string;
   };
   latestSnapshot: string;
+  releaseError: string | null;
+  releaseMessage: string | null;
   restoreError: string | null;
   restoreMessage: string | null;
   versionMessage: string | null;
   onCompareVersionChange: (value: string) => void;
+  onReleaseVersion?: (version: VersionDetail) => void;
+  onClearReleasedVersion?: () => void;
   onRestoreVersion?: (version: VersionDetail) => void;
   onVersionFieldChange: (field: "version" | "changeSummary", value: string) => void;
   onSaveVersion?: () => void;
@@ -37,13 +46,22 @@ export function EndpointVersionPanel({
   versions,
   compareVersion,
   diffResult,
+  endpointStatus,
+  releasedVersionId,
+  releasedVersionLabel,
+  releasedAt,
+  isManagingRelease,
   isRestoring,
   versionForm,
   latestSnapshot,
+  releaseError,
+  releaseMessage,
   restoreError,
   restoreMessage,
   versionMessage,
   onCompareVersionChange,
+  onReleaseVersion,
+  onClearReleasedVersion,
   onRestoreVersion,
   onVersionFieldChange,
   onSaveVersion
@@ -79,24 +97,126 @@ export function EndpointVersionPanel({
     return diffResult.sections.filter((section) => section.id === activeSectionFilter);
   }, [activeSectionFilter, diffResult]);
 
+  const liveVersion = useMemo(
+    () =>
+      versions.find((version) => version.released) ??
+      versions.find((version) => version.id === releasedVersionId) ??
+      null,
+    [releasedVersionId, versions]
+  );
+  const liveVersionName = releasedVersionLabel ?? liveVersion?.version ?? null;
+  const hasLiveVersion = endpointStatus === "released" || liveVersionName !== null;
+  const selectedVersionIsLive = compareVersion !== null && compareVersion.id === releasedVersionId;
+
   return (
     <EditorPanel title="Versions">
       <div className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-          <Field label="Compare against version">
-            <select
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-              onChange={(event) => onCompareVersionChange(event.target.value)}
-              value={compareVersionId}
-            >
-              <option value="">Current draft only</option>
-              {versions.map((version) => (
-                <option key={version.id} value={String(version.id)}>
-                  {version.version}
-                </option>
-              ))}
-            </select>
-          </Field>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[1.9rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.16),_transparent_35%),linear-gradient(145deg,_rgba(255,255,255,0.98),_rgba(241,245,249,0.94))] p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    {hasLiveVersion ? "Released" : "Draft lane"}
+                  </p>
+                  <h3 className="mt-3 text-xl font-semibold text-slate-950">Live version</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {hasLiveVersion
+                      ? `Runtime currently serves ${liveVersionName}. Select another snapshot to replace it, or return the endpoint to the draft lane.`
+                      : "No released snapshot yet. Keep shaping the draft, then promote a selected snapshot when the contract is ready."}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+                    hasLiveVersion ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {hasLiveVersion ? "Released" : "Draft lane"}
+                </span>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {liveVersionName ? `Live: ${liveVersionName}` : "Live: none"}
+                </span>
+                {releasedAt ? (
+                  <span className="rounded-full border border-slate-200/80 bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                    {formatReleaseMoment(releasedAt)}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[1.35rem] border border-slate-200/80 bg-white/80 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Selected snapshot</p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                    {compareVersion ? compareVersion.version : "Current draft only"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {compareVersion
+                      ? compareVersion.changeSummary || "Ready to promote the selected snapshot."
+                      : "Choose a saved snapshot below to compare it against the current draft and promote it live."}
+                  </p>
+                </div>
+                <div className="rounded-[1.35rem] border border-slate-900/80 bg-slate-950 p-4 text-white">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Promotion target</p>
+                  <p className="mt-3 text-lg font-semibold">{liveVersionName ?? "Draft lane"}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {hasLiveVersion
+                      ? "Release a selected snapshot to replace the currently served contract."
+                      : "The endpoint is still draft-only. Releasing a snapshot will make it the live version."}
+                  </p>
+                </div>
+              </div>
+
+              {(onReleaseVersion || onClearReleasedVersion) && versions.length > 0 ? (
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  {onReleaseVersion ? (
+                    <button
+                      className="rounded-full border border-sky-300/80 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 shadow-sm transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!compareVersion || isManagingRelease || selectedVersionIsLive}
+                      onClick={() => {
+                        if (compareVersion) {
+                          onReleaseVersion(compareVersion);
+                        }
+                      }}
+                      type="button"
+                    >
+                      {isManagingRelease && !selectedVersionIsLive ? "Releasing..." : "Release selected snapshot"}
+                    </button>
+                  ) : null}
+                  {onClearReleasedVersion && hasLiveVersion ? (
+                    <button
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isManagingRelease}
+                      onClick={onClearReleasedVersion}
+                      type="button"
+                    >
+                      {isManagingRelease ? "Returning..." : "Return to draft lane"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {releaseMessage ? <p className="mt-4 text-sm text-emerald-600">{releaseMessage}</p> : null}
+              {releaseError ? <p className="mt-4 text-sm text-rose-600">{releaseError}</p> : null}
+            </div>
+
+            <Field label="Compare against version">
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                onChange={(event) => onCompareVersionChange(event.target.value)}
+                value={compareVersionId}
+              >
+                <option value="">Current draft only</option>
+                {versions.map((version) => (
+                  <option key={version.id} value={String(version.id)}>
+                    {version.version}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
 
           <div className="overflow-hidden rounded-[1.9rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(145deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.92))] p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -315,6 +435,11 @@ export function EndpointVersionPanel({
                     <p className="mt-1 text-sm text-slate-500">{version.changeSummary || "No change summary."}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {version.released ? (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        Live version
+                      </span>
+                    ) : null}
                     <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">v#{version.id}</span>
                     <button
                       aria-label={`Compare snapshot ${version.version}`}
@@ -473,4 +598,21 @@ function formatDiffKind(kind: VersionDiffKind) {
   }
 
   return "Changed";
+}
+
+function formatReleaseMoment(value: string) {
+  const releaseDate = new Date(value);
+
+  if (Number.isNaN(releaseDate.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric"
+  }).format(releaseDate);
 }

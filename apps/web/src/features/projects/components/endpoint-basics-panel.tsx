@@ -12,6 +12,11 @@ type EndpointBasicsPanelProps = {
     mockEnabled?: boolean;
   };
   mockUrl: string;
+  releaseState: {
+    status: string;
+    releasedVersionLabel: string | null;
+    releasedAt: string | null;
+  };
   isSaving: boolean;
   saveMessage: string | null;
   canSave: boolean;
@@ -28,6 +33,7 @@ export function EndpointBasicsPanel({
   endpointId,
   formState,
   mockUrl,
+  releaseState,
   isSaving,
   saveMessage,
   canSave,
@@ -43,6 +49,22 @@ export function EndpointBasicsPanel({
           <div>
             <h3 className="text-2xl font-semibold text-slate-950">Endpoint basics</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">Edit the current endpoint and persist the changes to the backend workspace.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+                  releaseState.status === "released"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+              >
+                {releaseState.status === "released" ? "Released" : "Draft lane"}
+              </span>
+              {releaseState.releasedVersionLabel ? (
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                  {`Live: ${releaseState.releasedVersionLabel}`}
+                </span>
+              ) : null}
+            </div>
           </div>
           <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">#{endpointId}</span>
         </div>

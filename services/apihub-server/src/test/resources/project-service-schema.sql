@@ -92,6 +92,8 @@ CREATE TABLE api_endpoint (
   path VARCHAR(512) NOT NULL,
   mock_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  released_version_id BIGINT NULL,
+  released_at TIMESTAMP NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_by BIGINT NOT NULL,
   updated_by BIGINT NOT NULL

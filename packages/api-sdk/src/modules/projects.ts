@@ -72,6 +72,10 @@ export type EndpointDetail = {
   path: string;
   description: string | null;
   mockEnabled: boolean;
+  status?: "draft" | "review" | "released" | "deprecated" | "archived";
+  releasedVersionId?: number | null;
+  releasedVersionLabel?: string | null;
+  releasedAt?: string | null;
 };
 
 export type VersionDetail = {
@@ -80,6 +84,8 @@ export type VersionDetail = {
   version: string;
   changeSummary: string | null;
   snapshotJson: string | null;
+  released?: boolean;
+  releasedAt?: string | null;
 };
 
 export type ModuleDetail = {
@@ -554,6 +560,18 @@ export function createVersion(endpointId: number, payload: CreateVersionPayload)
   return apiFetch<VersionDetail>(`/api/v1/endpoints/${endpointId}/versions`, {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export function releaseEndpointVersion(endpointId: number, versionId: number) {
+  return apiFetch<EndpointDetail>(`/api/v1/endpoints/${endpointId}/versions/${versionId}/release`, {
+    method: "POST"
+  });
+}
+
+export function clearEndpointRelease(endpointId: number) {
+  return apiFetch<EndpointDetail>(`/api/v1/endpoints/${endpointId}/release`, {
+    method: "DELETE"
   });
 }
 

@@ -1003,6 +1003,64 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("No published release yet.")).toBeInTheDocument();
   });
 
+  it("surfaces the version release lane and wires release plus draft reset actions", async () => {
+    const onReleaseVersion = vi.fn().mockResolvedValue(undefined);
+    const onClearReleasedVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: false,
+          status: "released",
+          releasedVersionId: 2,
+          releasedVersionLabel: "v2",
+          releasedAt: "2026-04-11T09:00:00Z"
+        }}
+        projectId={1}
+        onClearReleasedVersion={onClearReleasedVersion}
+        onReleaseVersion={onReleaseVersion}
+        versions={[
+          {
+            id: 2,
+            endpointId: 7,
+            version: "v2",
+            changeSummary: "Live",
+            snapshotJson: "{}",
+            released: true,
+            releasedAt: "2026-04-11T09:00:00Z"
+          },
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Candidate",
+            snapshotJson: "{}",
+            released: false,
+            releasedAt: null
+          }
+        ]}
+      />
+    );
+
+    expect(screen.getAllByText("Live: v2").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Return to draft lane" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Return to draft lane" }));
+
+    await waitFor(() => expect(onClearReleasedVersion).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Compare snapshot v1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Release selected snapshot" }));
+
+    await waitFor(() => expect(onReleaseVersion).toHaveBeenCalledWith(expect.objectContaining({ id: 1, version: "v1" })));
+  });
+
   it("shows mock rule match summary and formatted rule response preview", () => {
     render(
       <EndpointEditor
