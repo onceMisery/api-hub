@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
+import java.net.InetAddress;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +38,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class DebugServiceTest {
@@ -233,6 +235,117 @@ class DebugServiceTest {
                 .isInstanceOf(DebugSecurityException.class)
                 .extracting(error -> ((DebugSecurityException) error).getErrorCode())
                 .isEqualTo("DEBUG_PRIVATE_TARGET_NOT_ALLOWED");
+    }
+
+    @Test
+    void shouldRejectAllowlistedHostnameWhenResolvedAddressIsPrivate() throws Exception {
+        DebugSecurityProperties debugSecurityProperties = new DebugSecurityProperties();
+        debugSecurityProperties.setGlobalAllowlist(List.of());
+        debugService = new DebugService(
+                projectRepository,
+                endpointRepository,
+                debugHttpExecutor,
+                debugHistoryRepository,
+                new DebugTargetPolicyResolver(),
+                new DebugTargetMatcher(),
+                debugSecurityProperties,
+                host -> List.of(InetAddress.getByAddress(host, new byte[]{10, 0, 0, 8})));
+
+        lenient().when(projectRepository.canAccessProject(1L, 1L)).thenReturn(true);
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of(new DebugTargetRuleEntry("partner.example.com", false)))));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "https://partner.example.com", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+
+        assertThatThrownBy(() -> debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), "")))
+                .isInstanceOf(DebugSecurityException.class)
+                .extracting(error -> ((DebugSecurityException) error).getErrorCode())
+                .isEqualTo("DEBUG_PRIVATE_TARGET_NOT_ALLOWED");
+    }
+
+    @Test
+    void shouldRejectRedirectTargetOutsideAllowlist() {
+        DebugSecurityProperties debugSecurityProperties = new DebugSecurityProperties();
+        debugSecurityProperties.setGlobalAllowlist(List.of());
+        debugService = new DebugService(
+                projectRepository,
+                endpointRepository,
+                debugHttpExecutor,
+                debugHistoryRepository,
+                new DebugTargetPolicyResolver(),
+                new DebugTargetMatcher(),
+                debugSecurityProperties,
+                host -> List.of(InetAddress.getByAddress(host, new byte[]{93, (byte) 184, (byte) 216, 34})));
+
+        lenient().when(projectRepository.canAccessProject(1L, 1L)).thenReturn(true);
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of(new DebugTargetRuleEntry("gateway.example.com", false)))));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "https://gateway.example.com", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+        given(debugHttpExecutor.execute(any())).willReturn(
+                new DebugHttpResult(302, List.of(new DebugHeader("location", "https://blocked.example.com/users/31")), "", 15));
+
+        assertThatThrownBy(() -> debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), "")))
+                .isInstanceOf(DebugSecurityException.class)
+                .extracting(error -> ((DebugSecurityException) error).getErrorCode())
+                .isEqualTo("DEBUG_TARGET_NOT_ALLOWED");
+    }
+
+    @Test
+    void shouldFollowRedirectTargetInsideAllowlistAndRecordFinalUrl() {
+        DebugSecurityProperties debugSecurityProperties = new DebugSecurityProperties();
+        debugSecurityProperties.setGlobalAllowlist(List.of());
+        debugService = new DebugService(
+                projectRepository,
+                endpointRepository,
+                debugHttpExecutor,
+                debugHistoryRepository,
+                new DebugTargetPolicyResolver(),
+                new DebugTargetMatcher(),
+                debugSecurityProperties,
+                host -> List.of(InetAddress.getByAddress(host, new byte[]{93, (byte) 184, (byte) 216, 34})));
+
+        lenient().when(projectRepository.canAccessProject(1L, 1L)).thenReturn(true);
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of(new DebugTargetRuleEntry("gateway.example.com", false)))));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "https://gateway.example.com", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+        given(debugHttpExecutor.execute(any()))
+                .willReturn(new DebugHttpResult(302, List.of(new DebugHeader("location", "https://gateway.example.com/final/users/31")), "", 15))
+                .willReturn(new DebugHttpResult(200, List.of(new DebugHeader("content-type", "application/json")), "{\"ok\":true}", 28));
+
+        ExecuteDebugResponse response = debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), ""));
+
+        assertThat(response.finalUrl()).isEqualTo("https://gateway.example.com/final/users/31");
+        assertThat(response.statusCode()).isEqualTo(200);
+        verify(debugHttpExecutor, times(2)).execute(any());
+        verify(debugHistoryRepository).saveHistory(
+                1L,
+                41L,
+                31L,
+                "GET",
+                "https://gateway.example.com/final/users/31",
+                List.of(),
+                "",
+                200,
+                List.of(new DebugHeader("content-type", "application/json")),
+                "{\"ok\":true}",
+                28);
     }
 
     @Test

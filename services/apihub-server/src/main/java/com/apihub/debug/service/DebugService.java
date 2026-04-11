@@ -17,10 +17,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,7 @@ public class DebugService {
     private final DebugTargetPolicyResolver debugTargetPolicyResolver;
     private final DebugTargetMatcher debugTargetMatcher;
     private final DebugSecurityProperties debugSecurityProperties;
+    private final DebugHostResolver debugHostResolver;
 
     public DebugService(ProjectRepository projectRepository,
                         EndpointRepository endpointRepository,
@@ -47,6 +51,24 @@ public class DebugService {
                         DebugTargetPolicyResolver debugTargetPolicyResolver,
                         DebugTargetMatcher debugTargetMatcher,
                         DebugSecurityProperties debugSecurityProperties) {
+        this(projectRepository,
+                endpointRepository,
+                debugHttpExecutor,
+                debugHistoryRepository,
+                debugTargetPolicyResolver,
+                debugTargetMatcher,
+                debugSecurityProperties,
+                host -> Arrays.asList(InetAddress.getAllByName(host)));
+    }
+
+    public DebugService(ProjectRepository projectRepository,
+                        EndpointRepository endpointRepository,
+                        DebugHttpExecutor debugHttpExecutor,
+                        DebugHistoryRepository debugHistoryRepository,
+                        DebugTargetPolicyResolver debugTargetPolicyResolver,
+                        DebugTargetMatcher debugTargetMatcher,
+                        DebugSecurityProperties debugSecurityProperties,
+                        DebugHostResolver debugHostResolver) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.debugHttpExecutor = debugHttpExecutor;
@@ -54,6 +76,7 @@ public class DebugService {
         this.debugTargetPolicyResolver = debugTargetPolicyResolver;
         this.debugTargetMatcher = debugTargetMatcher;
         this.debugSecurityProperties = debugSecurityProperties;
+        this.debugHostResolver = debugHostResolver;
     }
 
     public ExecuteDebugResponse execute(ExecuteDebugRequest request) {
@@ -88,18 +111,16 @@ public class DebugService {
         String requestBody = substituteVariables(request.body(), variables);
         requireRequestBodyWithinLimit(requestBody);
 
-        DebugHttpResult result = debugHttpExecutor.execute(new DebugHttpRequest(
-                endpoint.method(),
-                targetUri,
-                headers,
-                requestBody));
+        DebugExchange exchange = executeWithRedirects(project, environment, endpoint.method(), targetUri, headers, requestBody);
+        DebugHttpResult result = exchange.result();
+        URI finalUri = exchange.finalUri();
 
         debugHistoryRepository.saveHistory(
                 environment.projectId(),
                 environment.id(),
                 endpoint.id(),
                 endpoint.method(),
-                targetUri.toString(),
+                finalUri.toString(),
                 headers,
                 requestBody,
                 result.statusCode(),
@@ -109,7 +130,7 @@ public class DebugService {
 
         return new ExecuteDebugResponse(
                 endpoint.method(),
-                targetUri.toString(),
+                finalUri.toString(),
                 result.statusCode(),
                 result.headers(),
                 result.responseBody(),
@@ -211,6 +232,14 @@ public class DebugService {
                 .replaceQuery(normalizedQuery.isBlank() ? null : normalizedQuery)
                 .build(true)
                 .toUri();
+        return validateTargetUri(targetUri);
+    }
+
+    private URI validateTargetUri(URI targetUri) {
+        String scheme = targetUri.getScheme();
+        if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+            throw DebugSecurityException.badRequest("DEBUG_TARGET_URL_INVALID", "Target URL must use http or https");
+        }
         if (targetUri.getHost() == null || targetUri.getHost().isBlank()) {
             throw DebugSecurityException.badRequest("DEBUG_TARGET_URL_INVALID", "Target URL host is invalid");
         }
@@ -234,13 +263,71 @@ public class DebugService {
                     targetUri.getHost(),
                     List.of());
         }
-        if (matchResult.privateTarget() && !matchResult.allowPrivate()) {
+        DebugTargetMatcher.ResolvedTarget resolvedTarget = resolveTarget(targetUri.getHost());
+        if ((matchResult.privateTarget() || resolvedTarget.privateAddress()) && !matchResult.allowPrivate()) {
             throw DebugSecurityException.forbidden(
                     "DEBUG_PRIVATE_TARGET_NOT_ALLOWED",
                     "目标主机 " + targetUri.getHost() + " 命中私网限制，需显式允许私网访问",
                     targetUri.getHost(),
                     matchResult.matchedPatterns());
         }
+    }
+
+    private DebugTargetMatcher.ResolvedTarget resolveTarget(String host) {
+        try {
+            List<InetAddress> addresses = debugHostResolver.resolve(host);
+            if (addresses == null || addresses.isEmpty()) {
+                throw DebugSecurityException.badRequest("DEBUG_TARGET_RESOLUTION_FAILED", "Target URL host could not be resolved");
+            }
+            return debugTargetMatcher.inspectResolvedAddresses(addresses);
+        } catch (DebugSecurityException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw DebugSecurityException.badRequest("DEBUG_TARGET_RESOLUTION_FAILED", "Target URL host could not be resolved");
+        }
+    }
+
+    private DebugExchange executeWithRedirects(ProjectDetail project,
+                                               EnvironmentDetail environment,
+                                               String method,
+                                               URI targetUri,
+                                               List<DebugHeader> headers,
+                                               String requestBody) {
+        URI currentUri = targetUri;
+        DebugHttpResult result = debugHttpExecutor.execute(new DebugHttpRequest(method, currentUri, headers, requestBody));
+        int redirects = 0;
+
+        while (isRedirect(result.statusCode())) {
+            if (redirects >= debugSecurityProperties.getMaxRedirects()) {
+                throw DebugSecurityException.badRequest("DEBUG_REDIRECT_LIMIT_EXCEEDED", "Debug redirect limit exceeded");
+            }
+
+            currentUri = resolveRedirectUri(currentUri, result.headers());
+            enforceTargetPolicy(project, environment, currentUri);
+            result = debugHttpExecutor.execute(new DebugHttpRequest(method, currentUri, headers, requestBody));
+            redirects++;
+        }
+
+        return new DebugExchange(currentUri, result);
+    }
+
+    private URI resolveRedirectUri(URI currentUri, List<DebugHeader> headers) {
+        String location = headers.stream()
+                .filter(header -> header.name() != null && "location".equalsIgnoreCase(header.name()))
+                .map(DebugHeader::value)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Debug redirect missing Location header"));
+
+        try {
+            return validateTargetUri(currentUri.resolve(new URI(location.trim())));
+        } catch (URISyntaxException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Debug redirect location is invalid", exception);
+        }
+    }
+
+    private boolean isRedirect(int statusCode) {
+        return statusCode == 301 || statusCode == 302 || statusCode == 303 || statusCode == 307 || statusCode == 308;
     }
 
     private List<DebugHeader> mergeHeaders(List<EnvironmentEntry> defaultHeaders,
@@ -356,5 +443,8 @@ public class DebugService {
         }
         matcher.appendTail(builder);
         return builder.toString();
+    }
+
+    private record DebugExchange(URI finalUri, DebugHttpResult result) {
     }
 }

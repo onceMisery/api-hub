@@ -2,6 +2,7 @@ package com.apihub.debug.service;
 
 import com.apihub.debug.config.DebugSecurityProperties;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -11,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayInputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
@@ -80,5 +83,40 @@ class JdkDebugHttpExecutorTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_GATEWAY);
+    }
+
+    @Test
+    void shouldNotFollowRedirectResponsesAutomatically() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/redirect", exchange -> {
+            exchange.getResponseHeaders().add("Location", "/final");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        server.createContext("/final", exchange -> {
+            byte[] body = "{\"ok\":true}".getBytes();
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(body);
+            }
+        });
+        server.start();
+
+        try {
+            DebugSecurityProperties properties = new DebugSecurityProperties();
+            properties.setReadTimeoutMs(1000);
+            properties.setMaxResponseBodyBytes(1024);
+            JdkDebugHttpExecutor executor = new JdkDebugHttpExecutor(properties);
+
+            DebugHttpResult result = executor.execute(new DebugHttpRequest(
+                    "GET",
+                    URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/redirect"),
+                    List.of(),
+                    ""));
+
+            assertThat(result.statusCode()).isEqualTo(302);
+        } finally {
+            server.stop(0);
+        }
     }
 }

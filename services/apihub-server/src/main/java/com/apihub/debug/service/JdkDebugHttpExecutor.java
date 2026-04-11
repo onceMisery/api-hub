@@ -26,7 +26,7 @@ public class JdkDebugHttpExecutor implements DebugHttpExecutor {
     public JdkDebugHttpExecutor(DebugSecurityProperties debugSecurityProperties) {
         this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(debugSecurityProperties.getConnectTimeoutMs()))
-                .followRedirects(HttpClient.Redirect.NORMAL)
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build(),
                 debugSecurityProperties);
     }

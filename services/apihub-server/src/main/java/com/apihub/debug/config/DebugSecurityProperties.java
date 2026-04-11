@@ -13,6 +13,7 @@ public class DebugSecurityProperties {
     private long readTimeoutMs = 10000;
     private int maxRequestBodyBytes = 65536;
     private int maxResponseBodyBytes = 262144;
+    private int maxRedirects = 5;
     private List<AllowRule> globalAllowlist = List.of();
 
     public long getConnectTimeoutMs() {
@@ -45,6 +46,14 @@ public class DebugSecurityProperties {
 
     public void setMaxResponseBodyBytes(int maxResponseBodyBytes) {
         this.maxResponseBodyBytes = maxResponseBodyBytes;
+    }
+
+    public int getMaxRedirects() {
+        return maxRedirects;
+    }
+
+    public void setMaxRedirects(int maxRedirects) {
+        this.maxRedirects = maxRedirects;
     }
 
     public List<AllowRule> getGlobalAllowlist() {

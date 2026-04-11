@@ -32,29 +32,19 @@ public class DebugTargetMatcher {
             return true;
         }
         try {
-            InetAddress address = InetAddress.getByName(normalizedHost);
-            if (address instanceof Inet4Address ipv4) {
-                byte[] octets = ipv4.getAddress();
-                int first = Byte.toUnsignedInt(octets[0]);
-                int second = Byte.toUnsignedInt(octets[1]);
-                return first == 10
-                        || first == 127
-                        || (first == 169 && second == 254)
-                        || (first == 172 && second >= 16 && second <= 31)
-                        || (first == 192 && second == 168);
-            }
-            if (address instanceof Inet6Address ipv6) {
-                byte[] bytes = ipv6.getAddress();
-                int first = Byte.toUnsignedInt(bytes[0]);
-                int second = Byte.toUnsignedInt(bytes[1]);
-                return ipv6.isLoopbackAddress()
-                        || (first & 0xfe) == 0xfc
-                        || (first == 0xfe && (second & 0xc0) == 0x80);
-            }
+            return isPrivateAddress(InetAddress.getByName(normalizedHost));
         } catch (Exception ignored) {
             return false;
         }
-        return false;
+    }
+
+    public ResolvedTarget inspectResolvedAddresses(List<InetAddress> addresses) {
+        List<InetAddress> safeAddresses = addresses == null ? List.of() : List.copyOf(addresses);
+        List<String> resolvedAddresses = safeAddresses.stream()
+                .map(InetAddress::getHostAddress)
+                .toList();
+        boolean privateAddress = safeAddresses.stream().anyMatch(this::isPrivateAddress);
+        return new ResolvedTarget(privateAddress, resolvedAddresses);
     }
 
     private boolean matches(String host, String pattern) {
@@ -82,6 +72,31 @@ public class DebugTargetMatcher {
         return normalized;
     }
 
+    private boolean isPrivateAddress(InetAddress address) {
+        if (address instanceof Inet4Address ipv4) {
+            byte[] octets = ipv4.getAddress();
+            int first = Byte.toUnsignedInt(octets[0]);
+            int second = Byte.toUnsignedInt(octets[1]);
+            return first == 10
+                    || first == 127
+                    || (first == 169 && second == 254)
+                    || (first == 172 && second >= 16 && second <= 31)
+                    || (first == 192 && second == 168);
+        }
+        if (address instanceof Inet6Address ipv6) {
+            byte[] bytes = ipv6.getAddress();
+            int first = Byte.toUnsignedInt(bytes[0]);
+            int second = Byte.toUnsignedInt(bytes[1]);
+            return ipv6.isLoopbackAddress()
+                    || (first & 0xfe) == 0xfc
+                    || (first == 0xfe && (second & 0xc0) == 0x80);
+        }
+        return false;
+    }
+
     public record MatchResult(boolean matched, boolean privateTarget, boolean allowPrivate, List<String> matchedPatterns) {
+    }
+
+    public record ResolvedTarget(boolean privateAddress, List<String> resolvedAddresses) {
     }
 }
