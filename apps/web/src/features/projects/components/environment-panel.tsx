@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { DebugTargetRuleEditor } from "./debug-target-rule-editor";
 
 type EnvironmentPanelProps = {
+  canWrite: boolean;
   environments: EnvironmentDetail[];
   projectDebugAllowedHosts: DebugTargetRule[];
   onCreateEnvironment: (payload: CreateEnvironmentPayload) => Promise<void>;
@@ -17,6 +18,7 @@ type EnvironmentPanelProps = {
 };
 
 export function EnvironmentPanel({
+  canWrite,
   environments,
   projectDebugAllowedHosts,
   onCreateEnvironment,
@@ -63,7 +65,8 @@ export function EnvironmentPanel({
         </div>
         <DebugTargetRuleEditor labelPrefix="Project" onChange={setProjectDebugRules} rules={projectDebugRules} />
         <button
-          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          disabled={!canWrite}
           onClick={() => void onUpdateProjectDebugPolicy(sanitizeDebugRules(projectDebugRules))}
           type="button"
         >
@@ -75,7 +78,7 @@ export function EnvironmentPanel({
         className="space-y-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!createForm.name.trim() || !createForm.baseUrl.trim()) {
+          if (!canWrite || !createForm.name.trim() || !createForm.baseUrl.trim()) {
             return;
           }
 
@@ -115,6 +118,7 @@ export function EnvironmentPanel({
           <input
             aria-label="New environment name"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateForm((current) => ({ ...current, name: event.target.value }))}
             placeholder="Staging"
             value={createForm.name}
@@ -124,6 +128,7 @@ export function EnvironmentPanel({
           <input
             aria-label="New environment base URL"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateForm((current) => ({ ...current, baseUrl: event.target.value }))}
             placeholder="https://staging.example.com"
             value={createForm.baseUrl}
@@ -133,6 +138,7 @@ export function EnvironmentPanel({
           <textarea
             aria-label="New environment variables"
             className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateVariablesText(event.target.value)}
             placeholder={"token=dev-token\nuserId=31"}
             value={createVariablesText}
@@ -142,6 +148,7 @@ export function EnvironmentPanel({
           <textarea
             aria-label="New environment headers"
             className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateHeadersText(event.target.value)}
             placeholder={"Authorization: Bearer {{token}}\nX-App: ApiHub"}
             value={createHeadersText}
@@ -151,6 +158,7 @@ export function EnvironmentPanel({
           <textarea
             aria-label="New environment query"
             className="min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateQueryText(event.target.value)}
             placeholder={"locale=zh-CN\nregion=cn"}
             value={createQueryText}
@@ -160,6 +168,7 @@ export function EnvironmentPanel({
           <select
             aria-label="New environment auth mode"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateForm((current) => ({ ...current, authMode: event.target.value as CreateEnvironmentPayload["authMode"] }))}
             value={createForm.authMode}
           >
@@ -172,6 +181,7 @@ export function EnvironmentPanel({
           <input
             aria-label="New environment auth key"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateForm((current) => ({ ...current, authKey: event.target.value }))}
             placeholder="Authorization"
             value={createForm.authKey}
@@ -181,6 +191,7 @@ export function EnvironmentPanel({
           <input
             aria-label="New environment auth value"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) => setCreateForm((current) => ({ ...current, authValue: event.target.value }))}
             placeholder="dev-token"
             value={createForm.authValue}
@@ -190,6 +201,7 @@ export function EnvironmentPanel({
           <select
             aria-label="New environment debug host mode"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            disabled={!canWrite}
             onChange={(event) =>
               setCreateForm((current) => ({
                 ...current,
@@ -213,12 +225,13 @@ export function EnvironmentPanel({
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
           <input
             checked={createForm.isDefault}
+            disabled={!canWrite}
             onChange={(event) => setCreateForm((current) => ({ ...current, isDefault: event.target.checked }))}
             type="checkbox"
           />
           Default environment
         </label>
-        <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800" type="submit">
+        <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400" disabled={!canWrite} type="submit">
           Add environment
         </button>
       </form>
@@ -234,6 +247,7 @@ export function EnvironmentPanel({
               environment={environment}
               isSelected={environment.id === selectedEnvironmentId}
               key={environment.id}
+              canWrite={canWrite}
               onDeleteEnvironment={onDeleteEnvironment}
               onSelectEnvironment={onSelectEnvironment}
               onUpdateEnvironment={onUpdateEnvironment}
@@ -246,12 +260,14 @@ export function EnvironmentPanel({
 }
 
 function EnvironmentCard({
+  canWrite,
   environment,
   isSelected,
   onDeleteEnvironment,
   onSelectEnvironment,
   onUpdateEnvironment
 }: {
+  canWrite: boolean;
   environment: EnvironmentDetail;
   isSelected: boolean;
   onDeleteEnvironment: (environmentId: number) => Promise<void>;
@@ -321,6 +337,7 @@ function EnvironmentCard({
           <input
             aria-label={`Environment ${environment.id} name`}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
             value={draft.name}
           />
@@ -329,6 +346,7 @@ function EnvironmentCard({
           <input
             aria-label={`Environment ${environment.id} base URL`}
             className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => setDraft((current) => ({ ...current, baseUrl: event.target.value }))}
             value={draft.baseUrl}
           />
@@ -337,6 +355,7 @@ function EnvironmentCard({
           <textarea
             aria-label={`Environment ${environment.id} variables`}
             className={`min-h-24 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => {
               setVariablesText(event.target.value);
               setDraft((current) => ({ ...current, variables: parseEntries(event.target.value, "=") }));
@@ -348,6 +367,7 @@ function EnvironmentCard({
           <textarea
             aria-label={`Environment ${environment.id} headers`}
             className={`min-h-24 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => {
               setHeadersText(event.target.value);
               setDraft((current) => ({ ...current, defaultHeaders: parseEntries(event.target.value, ":") }));
@@ -359,6 +379,7 @@ function EnvironmentCard({
           <textarea
             aria-label={`Environment ${environment.id} query`}
             className={`min-h-20 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => {
               setQueryText(event.target.value);
               setDraft((current) => ({ ...current, defaultQuery: parseEntries(event.target.value, "=") }));
@@ -370,6 +391,7 @@ function EnvironmentCard({
           <select
             aria-label={`Environment ${environment.id} auth mode`}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => setDraft((current) => ({ ...current, authMode: event.target.value as UpdateEnvironmentPayload["authMode"] }))}
             value={draft.authMode}
           >
@@ -382,6 +404,7 @@ function EnvironmentCard({
           <input
             aria-label={`Environment ${environment.id} auth key`}
             className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => setDraft((current) => ({ ...current, authKey: event.target.value }))}
             value={draft.authKey}
           />
@@ -390,6 +413,7 @@ function EnvironmentCard({
           <input
             aria-label={`Environment ${environment.id} auth value`}
             className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) => setDraft((current) => ({ ...current, authValue: event.target.value }))}
             value={draft.authValue}
           />
@@ -398,6 +422,7 @@ function EnvironmentCard({
           <select
             aria-label={`Environment ${environment.id} debug host mode`}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
+            disabled={!canWrite}
             onChange={(event) =>
               setDraft((current) => ({
                 ...current,
@@ -423,6 +448,7 @@ function EnvironmentCard({
           <input
             aria-label={`Environment ${environment.id} default`}
             checked={draft.isDefault}
+            disabled={!canWrite}
             onChange={(event) => setDraft((current) => ({ ...current, isDefault: event.target.checked }))}
             type="checkbox"
           />
@@ -434,6 +460,7 @@ function EnvironmentCard({
         <button
           aria-label={`Save environment ${environment.id}`}
           className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${isSelected ? "border-white/15 bg-white/10 text-white hover:bg-white/15" : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"}`}
+          disabled={!canWrite}
           onClick={() =>
             void onUpdateEnvironment(environment.id, {
               baseUrl: draft.baseUrl.trim(),
@@ -456,6 +483,7 @@ function EnvironmentCard({
         <button
           aria-label={`Delete environment ${environment.id}`}
           className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${isSelected ? "border-rose-300/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20" : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
+          disabled={!canWrite}
           onClick={() => void onDeleteEnvironment(environment.id)}
           type="button"
         >

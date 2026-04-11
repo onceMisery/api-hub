@@ -51,6 +51,7 @@ export function EndpointBasicsPanel({
           <Field label="Endpoint name">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+              disabled={!canSave}
               onChange={(event) => onFieldChange("name", event.target.value)}
               value={formState.name}
             />
@@ -58,6 +59,7 @@ export function EndpointBasicsPanel({
           <Field label="Method">
             <select
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+              disabled={!canSave}
               onChange={(event) => onFieldChange("method", event.target.value)}
               value={formState.method}
             >
@@ -73,6 +75,7 @@ export function EndpointBasicsPanel({
         <Field label="Path">
           <input
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            disabled={!canSave}
             onChange={(event) => onFieldChange("path", event.target.value)}
             value={formState.path}
           />
@@ -81,6 +84,7 @@ export function EndpointBasicsPanel({
         <Field label="Description">
           <textarea
             className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            disabled={!canSave}
             onChange={(event) => onFieldChange("description", event.target.value)}
             value={formState.description}
           />
@@ -94,6 +98,7 @@ export function EndpointBasicsPanel({
             <input
               aria-label="Enable mock"
               checked={Boolean(formState.mockEnabled)}
+              disabled={!canSave}
               onChange={(event) => onFieldChange("mockEnabled", event.target.checked)}
               type="checkbox"
             />

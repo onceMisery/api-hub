@@ -18,6 +18,7 @@ type DebugHistoryFiltersState = {
 };
 
 type DebugConsoleProps = {
+  canClearHistory?: boolean;
   endpoint: EndpointDetail | null;
   environment: EnvironmentDetail | null;
   environmentOptions: EnvironmentDetail[];
@@ -39,6 +40,7 @@ type DebugConsoleProps = {
 };
 
 export function DebugConsole({
+  canClearHistory = true,
   endpoint,
   environment,
   environmentOptions,
@@ -341,6 +343,7 @@ export function DebugConsole({
           />
           <button
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            disabled={!canClearHistory}
             onClick={() => void onClearHistory()}
             type="button"
           >

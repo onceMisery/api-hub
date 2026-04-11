@@ -71,6 +71,7 @@ class DebugServiceTest {
                 new DebugTargetMatcher(),
                 debugSecurityProperties);
         lenient().when(projectRepository.canAccessProject(1L, 1L)).thenReturn(true);
+        lenient().when(projectRepository.canWriteProject(1L, 1L)).thenReturn(true);
     }
 
     @Test
@@ -349,5 +350,21 @@ class DebugServiceTest {
 
         assertThat(deletedCount).isEqualTo(3);
         verify(debugHistoryRepository).deleteHistory(1L, 31L, 41L, 500, from, to);
+    }
+
+    @Test
+    void shouldRejectHistoryCleanupWhenUserLacksWriteAccess() {
+        Instant from = Instant.parse("2026-04-09T00:00:00Z");
+        Instant to = Instant.parse("2026-04-10T00:00:00Z");
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(projectRepository.canAccessProject(2L, 1L)).willReturn(true);
+        given(projectRepository.canWriteProject(2L, 1L)).willReturn(false);
+
+        assertThatThrownBy(() -> debugService.clearHistory(2L, 1L, 31L, 41L, 500, from, to))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(debugHistoryRepository, never()).deleteHistory(anyLong(), any(), any(), any(), any(), any());
     }
 }

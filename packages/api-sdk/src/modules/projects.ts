@@ -18,6 +18,8 @@ export type ProjectDetail = {
   projectKey: string;
   description: string | null;
   debugAllowedHosts: DebugTargetRule[];
+  currentUserRole: string | null;
+  canWrite: boolean;
 };
 
 export type EndpointTreeItem = {

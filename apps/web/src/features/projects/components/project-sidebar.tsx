@@ -4,6 +4,7 @@ import type { ModuleTreeItem } from "@api-hub/api-sdk";
 import { useState } from "react";
 
 type ProjectSidebarProps = {
+  canWrite: boolean;
   emptyStateMessage?: string | null;
   modules: ModuleTreeItem[];
   selectedEndpointId: number | null;
@@ -20,6 +21,7 @@ type ProjectSidebarProps = {
 };
 
 export function ProjectSidebar({
+  canWrite,
   emptyStateMessage = null,
   modules,
   onCreateEndpoint,
@@ -47,7 +49,7 @@ export function ProjectSidebar({
         className="mb-5 space-y-2 rounded-[1.6rem] border border-slate-200 bg-white/90 p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!moduleName.trim()) {
+          if (!canWrite || !moduleName.trim()) {
             return;
           }
 
@@ -59,13 +61,14 @@ export function ProjectSidebar({
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-700">New module name</span>
           <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={!canWrite}
             onChange={(event) => setModuleName(event.target.value)}
             placeholder="Core"
             value={moduleName}
           />
         </label>
-        <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800" type="submit">
+        <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400" disabled={!canWrite} type="submit">
           Add module
         </button>
       </form>
@@ -78,6 +81,7 @@ export function ProjectSidebar({
         ) : (
           modules.map((module) => (
             <ModuleSection
+              canWrite={canWrite}
               key={module.id}
               module={module}
               onCreateEndpoint={onCreateEndpoint}
@@ -99,6 +103,7 @@ export function ProjectSidebar({
 }
 
 function ModuleSection({
+  canWrite,
   module,
   onCreateEndpoint,
   onCreateGroup,
@@ -111,6 +116,7 @@ function ModuleSection({
   onSelectEndpoint,
   selectedEndpointId
 }: {
+  canWrite: boolean;
   module: ModuleTreeItem;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
@@ -141,14 +147,16 @@ function ModuleSection({
             <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Module {module.id} name</span>
             <input
               aria-label={`Module ${module.id} name`}
-              className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-300/70 focus:border-white/30"
+              className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-300/70 focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!canWrite}
               onChange={(event) => setModuleDraftName(event.target.value)}
               value={moduleDraftName}
             />
           </label>
           <button
             aria-label={`Rename module ${module.id}`}
-            className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+            className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canWrite}
             onClick={() => void onRenameModule(module.id, { name: moduleDraftName.trim() || module.name })}
             type="button"
           >
@@ -156,7 +164,8 @@ function ModuleSection({
           </button>
           <button
             aria-label={`Delete module ${module.id}`}
-            className="rounded-2xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20"
+            className="rounded-2xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canWrite}
             onClick={() => void onDeleteModule(module.id)}
             type="button"
           >
@@ -169,7 +178,7 @@ function ModuleSection({
         className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!groupName.trim()) {
+          if (!canWrite || !groupName.trim()) {
             return;
           }
 
@@ -181,13 +190,14 @@ function ModuleSection({
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-700">New group name</span>
           <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={!canWrite}
             onChange={(event) => setGroupName(event.target.value)}
             placeholder="Users"
             value={groupName}
           />
         </label>
-        <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white" type="submit">
+        <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
           Add group
         </button>
       </form>
@@ -197,8 +207,9 @@ function ModuleSection({
       ) : (
         module.groups.map((group) => (
           <GroupSection
-            key={group.id}
+            canWrite={canWrite}
             group={group}
+            key={group.id}
             onCreateEndpoint={onCreateEndpoint}
             onDeleteEndpoint={onDeleteEndpoint}
             onDeleteGroup={onDeleteGroup}
@@ -214,6 +225,7 @@ function ModuleSection({
 }
 
 function GroupSection({
+  canWrite,
   group,
   onCreateEndpoint,
   onDeleteEndpoint,
@@ -223,6 +235,7 @@ function GroupSection({
   onSelectEndpoint,
   selectedEndpointId
 }: {
+  canWrite: boolean;
   group: ModuleTreeItem["groups"][number];
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onDeleteEndpoint: (endpointId: number) => Promise<void>;
@@ -244,14 +257,16 @@ function GroupSection({
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Group {group.id} name</span>
           <input
             aria-label={`Group ${group.id} name`}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={!canWrite}
             onChange={(event) => setGroupDraftName(event.target.value)}
             value={groupDraftName}
           />
         </label>
         <button
           aria-label={`Rename group ${group.id}`}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300"
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!canWrite}
           onClick={() => void onRenameGroup(group.id, { name: groupDraftName.trim() || group.name })}
           type="button"
         >
@@ -259,7 +274,8 @@ function GroupSection({
         </button>
         <button
           aria-label={`Delete group ${group.id}`}
-          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!canWrite}
           onClick={() => void onDeleteGroup(group.id)}
           type="button"
         >
@@ -271,7 +287,7 @@ function GroupSection({
         className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!endpointName.trim() || !endpointPath.trim()) {
+          if (!canWrite || !endpointName.trim() || !endpointPath.trim()) {
             return;
           }
 
@@ -290,7 +306,8 @@ function GroupSection({
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-700">New endpoint name</span>
           <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={!canWrite}
             onChange={(event) => setEndpointName(event.target.value)}
             placeholder="Create User"
             value={endpointName}
@@ -300,7 +317,8 @@ function GroupSection({
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-700">New endpoint method</span>
           <select
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={!canWrite}
             onChange={(event) => setEndpointMethod(event.target.value)}
             value={endpointMethod}
           >
@@ -315,14 +333,15 @@ function GroupSection({
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-700">New endpoint path</span>
           <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={!canWrite}
             onChange={(event) => setEndpointPath(event.target.value)}
             placeholder="/users"
             value={endpointPath}
           />
         </label>
 
-        <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white" type="submit">
+        <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
           Add endpoint
         </button>
       </form>
@@ -333,6 +352,7 @@ function GroupSection({
 
           return (
             <EndpointNode
+              canWrite={canWrite}
               endpoint={endpoint}
               isActive={isActive}
               key={endpoint.id}
@@ -348,12 +368,14 @@ function GroupSection({
 }
 
 function EndpointNode({
+  canWrite,
   endpoint,
   isActive,
   onDeleteEndpoint,
   onRenameEndpoint,
   onSelectEndpoint
 }: {
+  canWrite: boolean;
   endpoint: ModuleTreeItem["groups"][number]["endpoints"][number];
   isActive: boolean;
   onDeleteEndpoint: (endpointId: number) => Promise<void>;
@@ -396,7 +418,8 @@ function EndpointNode({
               isActive
                 ? "border-white/15 bg-white/10 text-white placeholder:text-slate-300/70 focus:border-white/30"
                 : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+            disabled={!canWrite}
             onChange={(event) => setEndpointDraftName(event.target.value)}
             value={endpointDraftName}
           />
@@ -411,7 +434,8 @@ function EndpointNode({
               isActive
                 ? "border-white/15 bg-white/10 text-white placeholder:text-slate-300/70 focus:border-white/30"
                 : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+            disabled={!canWrite}
             onChange={(event) => setEndpointDraftPath(event.target.value)}
             value={endpointDraftPath}
           />
@@ -425,7 +449,8 @@ function EndpointNode({
             isActive
               ? "border-white/15 bg-white/10 text-white hover:bg-white/15"
               : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"
-          }`}
+          } disabled:cursor-not-allowed disabled:opacity-60`}
+          disabled={!canWrite}
           onClick={() =>
             void onRenameEndpoint(endpoint.id, {
               description: "",
@@ -444,7 +469,8 @@ function EndpointNode({
             isActive
               ? "border-rose-300/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
               : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-          }`}
+          } disabled:cursor-not-allowed disabled:opacity-60`}
+          disabled={!canWrite}
           onClick={() => void onDeleteEndpoint(endpoint.id)}
           type="button"
         >

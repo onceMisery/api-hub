@@ -42,6 +42,7 @@ export function EndpointMockRulesPanel({
           <p className="text-sm text-slate-500">Match exact query, header, or body JSONPath values before falling back to the default mock preview.</p>
           <button
             className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
+            disabled={!canSave}
             onClick={onAddRule}
             type="button"
           >
@@ -61,6 +62,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} name`}>
                     <input
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "ruleName", event.target.value)}
                       value={rule.ruleName}
                     />
@@ -68,6 +70,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} priority`}>
                     <input
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "priority", Number(event.target.value) || 0)}
                       value={rule.priority}
                     />
@@ -75,6 +78,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} response status`}>
                     <input
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "statusCode", Number(event.target.value) || 200)}
                       value={rule.statusCode}
                     />
@@ -82,6 +86,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} media type`}>
                     <input
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "mediaType", event.target.value)}
                       value={rule.mediaType}
                     />
@@ -92,6 +97,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} query conditions`}>
                     <textarea
                       className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "queryConditionsText", event.target.value)}
                       placeholder="mode=strict"
                       value={rule.queryConditionsText}
@@ -100,6 +106,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} header conditions`}>
                     <textarea
                       className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "headerConditionsText", event.target.value)}
                       placeholder="x-scenario=unauthorized"
                       value={rule.headerConditionsText}
@@ -111,6 +118,7 @@ export function EndpointMockRulesPanel({
                   <textarea
                     aria-label={`Mock rule ${index + 1} body conditions`}
                     className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRule(index, "bodyConditionsText", event.target.value)}
                     placeholder="$.user.id=31"
                     value={rule.bodyConditionsText}
@@ -121,6 +129,7 @@ export function EndpointMockRulesPanel({
                   <Field label={`Mock rule ${index + 1} body`}>
                     <textarea
                       className="min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                      disabled={!canSave}
                       onChange={(event) => onUpdateRule(index, "body", event.target.value)}
                       value={rule.body}
                     />
@@ -129,6 +138,7 @@ export function EndpointMockRulesPanel({
                     <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                       <input
                         checked={rule.enabled}
+                        disabled={!canSave}
                         onChange={(event) => onUpdateRule(index, "enabled", event.target.checked)}
                         type="checkbox"
                       />
@@ -136,6 +146,7 @@ export function EndpointMockRulesPanel({
                     </label>
                     <button
                       className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                      disabled={!canSave}
                       onClick={() => onRemoveRule(index)}
                       type="button"
                     >

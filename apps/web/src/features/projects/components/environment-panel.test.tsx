@@ -9,6 +9,7 @@ describe("EnvironmentPanel", () => {
 
     render(
       <EnvironmentPanel
+        canWrite
         environments={[
           {
             id: 41,
@@ -50,5 +51,43 @@ describe("EnvironmentPanel", () => {
         })
       )
     );
+  });
+
+  it("disables environment mutations for read-only members", () => {
+    render(
+      <EnvironmentPanel
+        canWrite={false}
+        environments={[
+          {
+            id: 41,
+            projectId: 1,
+            name: "Local",
+            baseUrl: "https://local.dev",
+            isDefault: true,
+            variables: [],
+            defaultHeaders: [],
+            defaultQuery: [],
+            authMode: "none",
+            authKey: "",
+            authValue: "",
+            debugHostMode: "inherit",
+            debugAllowedHosts: []
+          }
+        ]}
+        projectDebugAllowedHosts={[]}
+        onCreateEnvironment={vi.fn().mockResolvedValue(undefined)}
+        onDeleteEnvironment={vi.fn().mockResolvedValue(undefined)}
+        onSelectEnvironment={vi.fn()}
+        onUpdateEnvironment={vi.fn().mockResolvedValue(undefined)}
+        onUpdateProjectDebugPolicy={vi.fn().mockResolvedValue(undefined)}
+        selectedEnvironmentId={41}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Save project debug policy" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add environment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save environment 41" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete environment 41" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Use environment 41" })).not.toBeDisabled();
   });
 });

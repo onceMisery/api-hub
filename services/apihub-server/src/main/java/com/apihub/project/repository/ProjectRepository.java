@@ -40,6 +40,15 @@ public class ProjectRepository {
             rs.getString("description"),
             deserializeDebugRules(rs.getString("debug_allowed_hosts_json")));
 
+    private static final RowMapper<ProjectDetail> PROJECT_ACCESS_ROW_MAPPER = (rs, rowNum) -> new ProjectDetail(
+            rs.getLong("id"),
+            rs.getString("name"),
+            rs.getString("project_key"),
+            rs.getString("description"),
+            deserializeDebugRules(rs.getString("debug_allowed_hosts_json")),
+            rs.getString("current_user_role"),
+            rs.getBoolean("can_write"));
+
     private static final RowMapper<ModuleDetail> MODULE_ROW_MAPPER = (rs, rowNum) -> new ModuleDetail(
             rs.getLong("id"),
             rs.getLong("project_id"),
@@ -80,7 +89,16 @@ public class ProjectRepository {
                                 project.name,
                                 project.project_key,
                                 project.description,
-                                project.debug_allowed_hosts_json
+                                project.debug_allowed_hosts_json,
+                                case
+                                    when project.owner_id = ? then 'project_admin'
+                                    else project_member.role_code
+                                end as current_user_role,
+                                case
+                                    when project.owner_id = ? then true
+                                    when project_member.role_code in ('project_admin', 'editor') then true
+                                    else false
+                                end as can_write
                 from project
                 left join project_member
                   on project_member.project_id = project.id
@@ -89,7 +107,33 @@ public class ProjectRepository {
                 where project.owner_id = ?
                    or project_member.id is not null
                 order by project.id
-                """, PROJECT_ROW_MAPPER, userId, userId);
+                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, userId);
+    }
+
+    public Optional<ProjectDetail> findProject(Long userId, Long projectId) {
+        return jdbcTemplate.query("""
+                select project.id,
+                       project.name,
+                       project.project_key,
+                       project.description,
+                       project.debug_allowed_hosts_json,
+                       case
+                           when project.owner_id = ? then 'project_admin'
+                           else project_member.role_code
+                       end as current_user_role,
+                       case
+                           when project.owner_id = ? then true
+                           when project_member.role_code in ('project_admin', 'editor') then true
+                           else false
+                       end as can_write
+                from project
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.id = ?
+                  and (project.owner_id = ? or project_member.id is not null)
+                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, projectId, userId).stream().findFirst();
     }
 
     public Optional<ProjectDetail> findProject(Long projectId) {
@@ -110,6 +154,23 @@ public class ProjectRepository {
                  and project_member.member_status = 'active'
                 where project.id = ?
                   and (project.owner_id = ? or project_member.id is not null)
+                """, Integer.class, userId, projectId, userId);
+        return matched != null && matched > 0;
+    }
+
+    public boolean canWriteProject(Long userId, Long projectId) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from project
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.id = ?
+                  and (
+                        project.owner_id = ?
+                     or project_member.role_code in ('project_admin', 'editor')
+                  )
                 """, Integer.class, userId, projectId, userId);
         return matched != null && matched > 0;
     }
@@ -138,16 +199,20 @@ public class ProjectRepository {
                 insert into project_member (project_id, user_id, role_code, member_status)
                 values (?, ?, 'project_admin', 'active')
                 """, projectId, userId);
-        return findProject(projectId).orElseThrow();
+        return findProject(userId, projectId).orElseThrow();
     }
 
     public ProjectDetail updateProject(Long projectId, String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
+        return updateProject(DEFAULT_USER_ID, projectId, name, description, debugAllowedHosts);
+    }
+
+    public ProjectDetail updateProject(Long userId, Long projectId, String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
         jdbcTemplate.update("""
                 update project
                 set name = ?, description = ?, debug_allowed_hosts_json = ?
                 where id = ?
                 """, name, description, serializeDebugRules(debugAllowedHosts), projectId);
-        return findProject(projectId).orElseThrow();
+        return findProject(userId, projectId).orElseThrow();
     }
 
     public List<ModuleDetail> listModules(Long projectId) {

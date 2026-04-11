@@ -16,6 +16,7 @@ describe("ProjectSidebar", () => {
 
     render(
       <ProjectSidebar
+        canWrite
         modules={[
           {
             id: 11,
@@ -72,6 +73,7 @@ describe("ProjectSidebar", () => {
 
     render(
       <ProjectSidebar
+        canWrite
         modules={[
           {
             id: 11,
@@ -114,5 +116,45 @@ describe("ProjectSidebar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Delete endpoint 31" }));
     await waitFor(() => expect(onDeleteEndpoint).toHaveBeenCalledWith(31));
+  });
+
+  it("disables write actions for read-only members", () => {
+    render(
+      <ProjectSidebar
+        canWrite={false}
+        modules={[
+          {
+            id: 11,
+            name: "Core",
+            groups: [
+              {
+                id: 21,
+                name: "Users",
+                endpoints: [{ id: 31, name: "Get User", method: "GET", path: "/users/{id}" }]
+              }
+            ]
+          }
+        ]}
+        onCreateEndpoint={vi.fn().mockResolvedValue(undefined)}
+        onCreateGroup={vi.fn().mockResolvedValue(undefined)}
+        onCreateModule={vi.fn().mockResolvedValue(undefined)}
+        onDeleteEndpoint={vi.fn().mockResolvedValue(undefined)}
+        onDeleteGroup={vi.fn().mockResolvedValue(undefined)}
+        onDeleteModule={vi.fn().mockResolvedValue(undefined)}
+        onRenameEndpoint={vi.fn().mockResolvedValue(undefined)}
+        onRenameGroup={vi.fn().mockResolvedValue(undefined)}
+        onRenameModule={vi.fn().mockResolvedValue(undefined)}
+        onSelectEndpoint={vi.fn()}
+        selectedEndpointId={31}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Add module" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Rename module 11" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add group" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Rename group 21" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add endpoint" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Rename endpoint 31" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete endpoint 31" })).toBeDisabled();
   });
 });

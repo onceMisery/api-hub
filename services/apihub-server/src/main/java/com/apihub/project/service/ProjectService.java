@@ -92,7 +92,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectDetail getProject(Long userId, Long projectId) {
-        return requireProject(userId, projectId);
+        return requireProjectReadAccess(userId, projectId);
     }
 
     public ProjectDetail updateProject(Long projectId, UpdateProjectRequest request) {
@@ -100,12 +100,13 @@ public class ProjectService {
     }
 
     public ProjectDetail updateProject(Long userId, Long projectId, UpdateProjectRequest request) {
-        ProjectDetail current = requireProject(userId, projectId);
+        ProjectDetail current = requireProjectWriteAccess(userId, projectId);
         List<DebugTargetRuleEntry> debugAllowedHosts = request.debugAllowedHosts() != null
                 ? request.debugAllowedHosts()
                 : current.debugAllowedHosts();
         debugTargetRuleValidator.validateRules(debugAllowedHosts);
         return projectRepository.updateProject(
+                userId,
                 projectId,
                 request.name() != null ? request.name() : current.name(),
                 request.description() != null ? request.description() : current.description(),
@@ -119,7 +120,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectTreeResponse getProjectTree(Long userId, Long projectId) {
-        requireProject(userId, projectId);
+        requireProjectReadAccess(userId, projectId);
         return new ProjectTreeResponse(listModules(userId, projectId).stream()
                 .map(module -> new ModuleTreeItem(
                         module.id(),
@@ -146,7 +147,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ModuleDetail> listModules(Long userId, Long projectId) {
-        requireProject(userId, projectId);
+        requireProjectReadAccess(userId, projectId);
         return projectRepository.listModules(projectId);
     }
 
@@ -155,7 +156,7 @@ public class ProjectService {
     }
 
     public ModuleDetail createModule(Long userId, Long projectId, CreateModuleRequest request) {
-        requireProject(userId, projectId);
+        requireProjectWriteAccess(userId, projectId);
         return projectRepository.createModule(userId, projectId, request);
     }
 
@@ -164,7 +165,7 @@ public class ProjectService {
     }
 
     public ModuleDetail updateModule(Long userId, Long moduleId, UpdateModuleRequest request) {
-        requireModule(userId, moduleId);
+        requireModuleWriteAccess(userId, moduleId);
         return projectRepository.updateModule(moduleId, request);
     }
 
@@ -173,7 +174,7 @@ public class ProjectService {
     }
 
     public void deleteModule(Long userId, Long moduleId) {
-        requireModule(userId, moduleId);
+        requireModuleWriteAccess(userId, moduleId);
         projectRepository.deleteModule(moduleId);
     }
 
@@ -184,7 +185,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<GroupDetail> listGroups(Long userId, Long moduleId) {
-        requireModule(userId, moduleId);
+        requireModuleReadAccess(userId, moduleId);
         return projectRepository.listGroups(moduleId);
     }
 
@@ -193,7 +194,7 @@ public class ProjectService {
     }
 
     public GroupDetail createGroup(Long userId, Long moduleId, CreateGroupRequest request) {
-        requireModule(userId, moduleId);
+        requireModuleWriteAccess(userId, moduleId);
         return projectRepository.createGroup(userId, moduleId, request);
     }
 
@@ -202,7 +203,7 @@ public class ProjectService {
     }
 
     public GroupDetail updateGroup(Long userId, Long groupId, UpdateGroupRequest request) {
-        requireGroup(userId, groupId);
+        requireGroupWriteAccess(userId, groupId);
         return projectRepository.updateGroup(groupId, request);
     }
 
@@ -211,7 +212,7 @@ public class ProjectService {
     }
 
     public void deleteGroup(Long userId, Long groupId) {
-        requireGroup(userId, groupId);
+        requireGroupWriteAccess(userId, groupId);
         projectRepository.deleteGroup(groupId);
     }
 
@@ -222,7 +223,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<EnvironmentDetail> listEnvironments(Long userId, Long projectId) {
-        requireProject(userId, projectId);
+        requireProjectReadAccess(userId, projectId);
         return projectRepository.listEnvironments(projectId);
     }
 
@@ -231,7 +232,7 @@ public class ProjectService {
     }
 
     public EnvironmentDetail createEnvironment(Long userId, Long projectId, CreateEnvironmentRequest request) {
-        requireProject(userId, projectId);
+        requireProjectWriteAccess(userId, projectId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode());
         return projectRepository.createEnvironment(userId, projectId, request);
@@ -242,7 +243,7 @@ public class ProjectService {
     }
 
     public EnvironmentDetail updateEnvironment(Long userId, Long environmentId, UpdateEnvironmentRequest request) {
-        EnvironmentDetail current = requireEnvironment(userId, environmentId);
+        EnvironmentDetail current = requireEnvironmentWriteAccess(userId, environmentId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode() != null ? request.debugHostMode() : current.debugHostMode());
         return projectRepository.updateEnvironment(environmentId, request);
@@ -253,7 +254,7 @@ public class ProjectService {
     }
 
     public void deleteEnvironment(Long userId, Long environmentId) {
-        requireEnvironment(userId, environmentId);
+        requireEnvironmentWriteAccess(userId, environmentId);
         projectRepository.deleteEnvironment(environmentId);
     }
 
@@ -264,7 +265,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<EndpointDetail> listEndpoints(Long userId, Long groupId) {
-        requireGroup(userId, groupId);
+        requireGroupReadAccess(userId, groupId);
         return endpointRepository.listEndpoints(groupId);
     }
 
@@ -273,7 +274,7 @@ public class ProjectService {
     }
 
     public EndpointDetail createEndpoint(Long userId, Long groupId, CreateEndpointRequest request) {
-        return endpointRepository.createEndpoint(userId, requireGroup(userId, groupId), request);
+        return endpointRepository.createEndpoint(userId, requireGroupWriteAccess(userId, groupId), request);
     }
 
     @Transactional(readOnly = true)
@@ -283,7 +284,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public EndpointDetail getEndpoint(Long userId, Long endpointId) {
-        return requireEndpoint(userId, endpointId);
+        return requireEndpointReadAccess(userId, endpointId);
     }
 
     public EndpointDetail updateEndpoint(Long endpointId, UpdateEndpointRequest request) {
@@ -291,7 +292,7 @@ public class ProjectService {
     }
 
     public EndpointDetail updateEndpoint(Long userId, Long endpointId, UpdateEndpointRequest request) {
-        EndpointDetail current = requireEndpoint(userId, endpointId);
+        EndpointDetail current = requireEndpointWriteAccess(userId, endpointId);
         return endpointRepository.updateEndpoint(userId, endpointId, new UpdateEndpointRequest(
                 request.name() != null ? request.name() : current.name(),
                 request.method() != null ? request.method() : current.method(),
@@ -305,7 +306,7 @@ public class ProjectService {
     }
 
     public void deleteEndpoint(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.deleteEndpoint(endpointId);
     }
 
@@ -316,7 +317,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ParameterDetail> listParameters(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointReadAccess(userId, endpointId);
         return endpointRepository.listParameters(endpointId);
     }
 
@@ -325,7 +326,7 @@ public class ProjectService {
     }
 
     public void replaceParameters(Long userId, Long endpointId, List<ParameterUpsertItem> items) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceParameters(endpointId, items);
     }
 
@@ -336,7 +337,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ResponseDetail> listResponses(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointReadAccess(userId, endpointId);
         return endpointRepository.listResponses(endpointId);
     }
 
@@ -345,7 +346,7 @@ public class ProjectService {
     }
 
     public void replaceResponses(Long userId, Long endpointId, List<ResponseUpsertItem> items) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceResponses(endpointId, items);
     }
 
@@ -356,7 +357,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<MockRuleDetail> listMockRules(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointReadAccess(userId, endpointId);
         return endpointRepository.listMockRules(endpointId);
     }
 
@@ -365,7 +366,7 @@ public class ProjectService {
     }
 
     public void replaceMockRules(Long userId, Long endpointId, List<MockRuleUpsertItem> items) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceMockRules(userId, endpointId, items);
     }
 
@@ -376,7 +377,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<MockReleaseDetail> listMockReleases(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointReadAccess(userId, endpointId);
         return endpointRepository.listMockReleases(endpointId);
     }
 
@@ -385,7 +386,7 @@ public class ProjectService {
     }
 
     public MockReleaseDetail publishMockRelease(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointWriteAccess(userId, endpointId);
 
         String responseSnapshotJson = writeJson(endpointRepository.listResponses(endpointId).stream()
                 .map(response -> new MockSimulationResponseItem(
@@ -419,7 +420,7 @@ public class ProjectService {
     }
 
     public MockSimulationResult simulateMock(Long userId, Long endpointId, MockSimulationRequest request) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointReadAccess(userId, endpointId);
         return mockRuntimeResolver.resolveDraft(request);
     }
 
@@ -430,7 +431,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<VersionDetail> listVersions(Long userId, Long endpointId) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointReadAccess(userId, endpointId);
         return endpointRepository.listVersions(endpointId);
     }
 
@@ -439,45 +440,76 @@ public class ProjectService {
     }
 
     public VersionDetail createVersion(Long userId, Long endpointId, CreateVersionRequest request) {
-        requireEndpoint(userId, endpointId);
+        requireEndpointWriteAccess(userId, endpointId);
         return endpointRepository.createVersion(userId, endpointId, request);
     }
 
-    private ProjectDetail requireProject(Long userId, Long projectId) {
-        ProjectDetail project = projectRepository.findProject(projectId)
+    private ProjectDetail requireProjectReadAccess(Long userId, Long projectId) {
+        ProjectDetail project = projectRepository.findProject(userId, projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
-        if (!projectRepository.canAccessProject(userId, projectId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        return project;
+    }
+
+    private ProjectDetail requireProjectWriteAccess(Long userId, Long projectId) {
+        ProjectDetail project = requireProjectReadAccess(userId, projectId);
+        if (!project.canWrite()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project write access denied");
         }
         return project;
     }
 
-    private ProjectRepository.ModuleReference requireModule(Long userId, Long moduleId) {
+    private ProjectRepository.ModuleReference requireModuleReadAccess(Long userId, Long moduleId) {
         ProjectRepository.ModuleReference module = projectRepository.findModuleReference(moduleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Module not found"));
-        requireProject(userId, module.projectId());
+        requireProjectReadAccess(userId, module.projectId());
         return module;
     }
 
-    private ProjectRepository.GroupReference requireGroup(Long userId, Long groupId) {
+    private ProjectRepository.ModuleReference requireModuleWriteAccess(Long userId, Long moduleId) {
+        ProjectRepository.ModuleReference module = requireModuleReadAccess(userId, moduleId);
+        requireProjectWriteAccess(userId, module.projectId());
+        return module;
+    }
+
+    private ProjectRepository.GroupReference requireGroupReadAccess(Long userId, Long groupId) {
         ProjectRepository.GroupReference group = projectRepository.findGroupReference(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
-        requireProject(userId, group.projectId());
+        requireProjectReadAccess(userId, group.projectId());
         return group;
     }
 
-    private EndpointDetail requireEndpoint(Long userId, Long endpointId) {
+    private ProjectRepository.GroupReference requireGroupWriteAccess(Long userId, Long groupId) {
+        ProjectRepository.GroupReference group = requireGroupReadAccess(userId, groupId);
+        requireProjectWriteAccess(userId, group.projectId());
+        return group;
+    }
+
+    private EndpointDetail requireEndpointReadAccess(Long userId, Long endpointId) {
         EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
-        requireProject(userId, endpointReference.projectId());
+        requireProjectReadAccess(userId, endpointReference.projectId());
         return endpointRepository.findEndpoint(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
     }
 
-    private EnvironmentDetail requireEnvironment(Long userId, Long environmentId) {
+    private EndpointDetail requireEndpointWriteAccess(Long userId, Long endpointId) {
+        EndpointDetail endpoint = requireEndpointReadAccess(userId, endpointId);
+        EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
+        requireProjectWriteAccess(userId, endpointReference.projectId());
+        return endpoint;
+    }
+
+    private EnvironmentDetail requireEnvironmentReadAccess(Long userId, Long environmentId) {
         EnvironmentDetail environment = projectRepository.findEnvironment(environmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
-        requireProject(userId, environment.projectId());
+        requireProjectReadAccess(userId, environment.projectId());
+        return environment;
+    }
+
+    private EnvironmentDetail requireEnvironmentWriteAccess(Long userId, Long environmentId) {
+        EnvironmentDetail environment = requireEnvironmentReadAccess(userId, environmentId);
+        requireProjectWriteAccess(userId, environment.projectId());
         return environment;
     }
 

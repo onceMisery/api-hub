@@ -231,6 +231,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     };
   }, [modules]);
   const filteredModules = useMemo(() => filterModules(modules, searchQuery), [modules, searchQuery]);
+  const canWrite = project?.canWrite ?? false;
+  const accessLabel = formatProjectAccess(project?.currentUserRole);
   const selectedEnvironment = useMemo(
     () => environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
     [environments, selectedEnvironmentId]
@@ -271,6 +273,18 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
               Card-based workspace for modules, grouped endpoints, and version snapshots backed by the phase 1 MySQL data model.
             </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                {accessLabel}
+              </span>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+                  canWrite ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                }`}
+              >
+                {canWrite ? "Writable" : "Read-only"}
+              </span>
+            </div>
             <label className="mt-5 block max-w-md space-y-2">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Search tree</span>
               <input
@@ -301,6 +315,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           </aside>
         ) : (
           <ProjectSidebar
+            canWrite={canWrite}
             emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
             modules={filteredModules}
             onCreateEndpoint={handleCreateEndpoint}
@@ -318,6 +333,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         )}
         <div className="space-y-6">
           <EnvironmentPanel
+            canWrite={canWrite}
             environments={environments}
             projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             onCreateEnvironment={handleCreateEnvironment}
@@ -328,6 +344,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             selectedEnvironmentId={selectedEnvironmentId}
           />
           <DebugConsole
+            canClearHistory={canWrite}
             endpoint={endpoint}
             environment={selectedEnvironment}
             environmentOptions={environments}
@@ -343,6 +360,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             replayDraft={replayDraft}
           />
           <EndpointEditor
+            canWrite={canWrite}
             endpoint={endpoint}
             isLoading={isLoadingEndpoint}
             onDelete={handleDeleteEndpoint}
@@ -896,6 +914,21 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
 
     return false;
+  }
+}
+
+function formatProjectAccess(role: string | null | undefined) {
+  switch (role) {
+    case "project_admin":
+      return "Project admin access";
+    case "editor":
+      return "Editor access";
+    case "tester":
+      return "Tester access";
+    case "viewer":
+      return "Viewer access";
+    default:
+      return "Project access";
   }
 }
 

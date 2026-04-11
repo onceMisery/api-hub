@@ -43,6 +43,7 @@ import { EndpointVersionPanel } from "./endpoint-version-panel";
 import { PublishedRuntimePanel } from "./published-runtime-panel";
 
 type EndpointEditorProps = {
+  canWrite?: boolean;
   endpoint: EndpointDetail | null;
   projectId: number;
   isLoading?: boolean;
@@ -69,6 +70,7 @@ const EMPTY_MOCK_RELEASES: MockReleaseDetail[] = [];
 export function EndpointEditor(props: EndpointEditorProps) {
   const {
     endpoint,
+    canWrite = true,
     projectId,
     isLoading = false,
     onDelete,
@@ -264,8 +266,8 @@ export function EndpointEditor(props: EndpointEditorProps) {
   return (
     <section className="space-y-6">
       <EndpointBasicsPanel
-        canDelete={Boolean(onDelete)}
-        canSave={Boolean(onSave)}
+        canDelete={canWrite && Boolean(onDelete)}
+        canSave={canWrite && Boolean(onSave)}
         endpointId={endpoint.id}
         formState={formState}
         isSaving={isSaving}
@@ -277,7 +279,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
       />
 
       <EndpointParametersPanel
-        canSave={Boolean(onSaveParameters)}
+        canSave={canWrite && Boolean(onSaveParameters)}
         onAddRow={() => setParameterRows((current) => [...current, createParameterDraft()])}
         onRemoveRow={(index) => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
         onSave={() => void handleSaveParameters()}
@@ -287,7 +289,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
       />
 
       <EndpointResponsesPanel
-        canSave={Boolean(onSaveResponses)}
+        canSave={canWrite && Boolean(onSaveResponses)}
         onAddRow={() => setResponseRows((current) => [...current, createResponseDraft()])}
         onRemoveRow={(index) => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
         onSave={() => void handleSaveResponses()}
@@ -298,7 +300,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
       <EndpointMockRulesPanel
         buildRuleSummary={buildRuleSummary}
-        canSave={Boolean(onSaveMockRules)}
+        canSave={canWrite && Boolean(onSaveMockRules)}
         formatRulePreviewBody={formatRulePreviewBody}
         mockRuleMessage={mockRuleMessage}
         mockRuleRows={mockRuleRows}
@@ -331,7 +333,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
         mockUrl={buildMockUrl(projectId, formState.path)}
         mockReleases={mockReleases}
         onInspectedReleaseChange={setInspectedReleaseId}
-        onPublish={onPublishMockRelease ? () => void handlePublishMock() : undefined}
+        onPublish={canWrite && onPublishMockRelease ? () => void handlePublishMock() : undefined}
         publishMessage={publishMessage}
         publishedResponseGroups={publishedResponseGroups}
         publishedRuleItems={publishedRuleItems}
@@ -345,7 +347,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
         diffItems={diffItems}
         latestSnapshot={latestSnapshot}
         onCompareVersionChange={setCompareVersionId}
-        onSaveVersion={onSaveVersion ? () => void handleSaveVersion() : undefined}
+        onSaveVersion={canWrite && onSaveVersion ? () => void handleSaveVersion() : undefined}
         onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
         versionForm={versionForm}
         versionMessage={versionMessage}

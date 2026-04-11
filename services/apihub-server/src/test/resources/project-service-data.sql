@@ -1,6 +1,15 @@
 INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
 VALUES (1, 'admin', 'Administrator', 'admin@local.dev', 'hash', 0, 'active');
 
+INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
+VALUES (2, 'viewer', 'Viewer User', 'viewer@local.dev', 'hash', 0, 'active');
+
+INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
+VALUES (3, 'editor', 'Editor User', 'editor@local.dev', 'hash', 0, 'active');
+
+INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
+VALUES (4, 'tester', 'Tester User', 'tester@local.dev', 'hash', 0, 'active');
+
 INSERT INTO space (id, name, space_key, owner_id, status)
 VALUES (1, 'Default Space', 'default', 1, 'active');
 
@@ -13,9 +22,18 @@ VALUES (1, 1, 'Default Project', 'default', 'Seed project', '[]', 1, 'active');
 INSERT INTO project_member (id, project_id, user_id, role_code, member_status)
 VALUES (1, 1, 1, 'project_admin', 'active');
 
+INSERT INTO project_member (id, project_id, user_id, role_code, member_status)
+VALUES (2, 1, 2, 'viewer', 'active');
+
+INSERT INTO project_member (id, project_id, user_id, role_code, member_status)
+VALUES (3, 1, 3, 'editor', 'active');
+
+INSERT INTO project_member (id, project_id, user_id, role_code, member_status)
+VALUES (4, 1, 4, 'tester', 'active');
+
 ALTER TABLE project ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE space_member ALTER COLUMN id RESTART WITH 2;
-ALTER TABLE project_member ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE project_member ALTER COLUMN id RESTART WITH 5;
 
 INSERT INTO environment (id, project_id, name, base_url, is_default, variables_json, default_headers_json, default_query_json, auth_mode, auth_key, auth_value, debug_host_mode, debug_allowed_hosts_json, created_by)
 VALUES (1, 1, 'Local', 'https://local.dev', TRUE, '[]', '[]', '[]', 'none', '', '', 'inherit', '[]', 1);

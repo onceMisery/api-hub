@@ -63,10 +63,10 @@ public class DebugService {
     public ExecuteDebugResponse execute(Long userId, ExecuteDebugRequest request) {
         EnvironmentDetail environment = projectRepository.findEnvironment(request.environmentId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Environment not found"));
-        requireProjectAccess(userId, environment.projectId());
+        requireProjectReadAccess(userId, environment.projectId());
         EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(request.endpointId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
-        requireProjectAccess(userId, endpointReference.projectId());
+        requireProjectReadAccess(userId, endpointReference.projectId());
         if (!environment.projectId().equals(endpointReference.projectId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Endpoint and environment do not belong to the same project");
         }
@@ -134,7 +134,7 @@ public class DebugService {
                                               Instant createdFrom,
                                               Instant createdTo,
                                               int limit) {
-        requireProjectAccess(userId, projectId);
+        requireProjectReadAccess(userId, projectId);
         return debugHistoryRepository.listHistory(
                 projectId,
                 endpointId,
@@ -161,15 +161,22 @@ public class DebugService {
                             Integer statusCode,
                             Instant createdFrom,
                             Instant createdTo) {
-        requireProjectAccess(userId, projectId);
+        requireProjectWriteAccess(userId, projectId);
         return debugHistoryRepository.deleteHistory(projectId, endpointId, environmentId, statusCode, createdFrom, createdTo);
     }
 
-    private void requireProjectAccess(Long userId, Long projectId) {
+    private void requireProjectReadAccess(Long userId, Long projectId) {
         projectRepository.findProject(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
         if (!projectRepository.canAccessProject(userId, projectId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
+    }
+
+    private void requireProjectWriteAccess(Long userId, Long projectId) {
+        requireProjectReadAccess(userId, projectId);
+        if (!projectRepository.canWriteProject(userId, projectId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project write access denied");
         }
     }
 

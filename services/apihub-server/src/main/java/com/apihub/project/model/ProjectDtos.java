@@ -18,7 +18,18 @@ public final class ProjectDtos {
     public record UpdateProjectRequest(String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
     }
 
-    public record ProjectDetail(Long id, String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
+    public record ProjectDetail(
+            Long id,
+            String name,
+            String projectKey,
+            String description,
+            List<DebugTargetRuleEntry> debugAllowedHosts,
+            String currentUserRole,
+            boolean canWrite
+    ) {
+        public ProjectDetail(Long id, String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
+            this(id, name, projectKey, description, debugAllowedHosts, null, false);
+        }
     }
 
     public record ProjectTreeResponse(List<ModuleTreeItem> modules) {

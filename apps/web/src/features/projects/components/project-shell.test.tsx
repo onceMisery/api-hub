@@ -139,7 +139,9 @@ describe("ProjectShell", () => {
         name: "Default Project",
         projectKey: "default",
         description: "Seed project",
-        debugAllowedHosts: [{ pattern: "*.corp.example.com", allowPrivate: false }]
+        debugAllowedHosts: [{ pattern: "*.corp.example.com", allowPrivate: false }],
+        currentUserRole: "project_admin",
+        canWrite: true
       }
     });
 
@@ -238,7 +240,9 @@ describe("ProjectShell", () => {
         name: "Default Project",
         projectKey: "default",
         description: "Seed project",
-        debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }]
+        debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }],
+        currentUserRole: "project_admin",
+        canWrite: true
       }
     });
     updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
@@ -550,6 +554,29 @@ describe("ProjectShell", () => {
         debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }]
       })
     );
+  });
+
+  it("shows a read-only workbench for viewer members", async () => {
+    fetchProject.mockResolvedValueOnce({
+      data: {
+        id: 1,
+        name: "Default Project",
+        projectKey: "default",
+        description: "Seed project",
+        debugAllowedHosts: [],
+        currentUserRole: "viewer",
+        canWrite: false
+      }
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("Viewer access")).toBeInTheDocument();
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add module" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save project debug policy" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save endpoint" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Clear debug history" })).toBeDisabled();
   });
 
   it("refetches and clears debug history with active filters", async () => {

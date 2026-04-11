@@ -71,6 +71,52 @@ class ProjectServiceTest {
     }
 
     @Test
+    void shouldAllowViewerAndTesterToReadProjectResources() {
+        assertThat(projectService.getProject(2L, 1L).projectKey()).isEqualTo("default");
+        assertThat(projectService.getProject(2L, 1L).currentUserRole()).isEqualTo("viewer");
+        assertThat(projectService.getProject(2L, 1L).canWrite()).isFalse();
+        assertThat(projectService.getProject(3L, 1L).currentUserRole()).isEqualTo("editor");
+        assertThat(projectService.getProject(3L, 1L).canWrite()).isTrue();
+        assertThat(projectService.getProject(4L, 1L).currentUserRole()).isEqualTo("tester");
+        assertThat(projectService.getProject(4L, 1L).canWrite()).isFalse();
+        assertThat(projectService.getProjectTree(2L, 1L).modules()).hasSize(1);
+        assertThat(projectService.listModules(4L, 1L)).extracting("name").containsExactly("Core");
+        assertThat(projectService.listEnvironments(4L, 1L)).extracting("name").containsExactly("Local");
+    }
+
+    @Test
+    void shouldRejectViewerAndTesterWhenWritingProjectResources() {
+        assertThatThrownBy(() -> projectService.createModule(2L, 1L, new CreateModuleRequest("Forbidden")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        assertThatThrownBy(() -> projectService.createEnvironment(4L, 1L, new CreateEnvironmentRequest(
+                "Blocked",
+                "https://blocked.dev",
+                false,
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                "none",
+                "",
+                "",
+                "inherit",
+                java.util.List.of())))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void shouldAllowEditorToWriteProjectResources() {
+        var module = projectService.createModule(3L, 1L, new CreateModuleRequest("Editor Module"));
+
+        assertThat(module.name()).isEqualTo("Editor Module");
+        assertThat(projectService.listModules(3L, 1L)).extracting("name").contains("Editor Module");
+    }
+
+    @Test
     void shouldCreateProjectForCurrentUserAndScopeVisibility() {
         var project = projectService.createProject(7L, new CreateProjectRequest("Owned", "owned", "by user", java.util.List.of()));
 

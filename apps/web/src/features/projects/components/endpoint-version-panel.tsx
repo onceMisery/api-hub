@@ -80,6 +80,7 @@ export function EndpointVersionPanel({
           <Field label="Version label">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+              disabled={!onSaveVersion}
               onChange={(event) => onVersionFieldChange("version", event.target.value)}
               value={versionForm.version}
             />
@@ -87,6 +88,7 @@ export function EndpointVersionPanel({
           <Field label="Version summary">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+              disabled={!onSaveVersion}
               onChange={(event) => onVersionFieldChange("changeSummary", event.target.value)}
               value={versionForm.changeSummary}
             />

@@ -35,6 +35,7 @@ export function EndpointParametersPanel({
           <p className="text-sm text-slate-500">Flat rows for query, path, header, or body fields.</p>
           <button
             className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
+            disabled={!canSave}
             onClick={onAddRow}
             type="button"
           >
@@ -53,6 +54,7 @@ export function EndpointParametersPanel({
                 <Field label={`Parameter ${index + 1} name`}>
                   <input
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRow(index, "name", event.target.value)}
                     value={parameter.name}
                   />
@@ -60,6 +62,7 @@ export function EndpointParametersPanel({
                 <Field label={`Parameter ${index + 1} type`}>
                   <input
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRow(index, "dataType", event.target.value)}
                     value={parameter.dataType}
                   />
@@ -67,6 +70,7 @@ export function EndpointParametersPanel({
                 <Field label={`Parameter ${index + 1} section`}>
                   <select
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRow(index, "sectionType", event.target.value)}
                     value={parameter.sectionType}
                   >
@@ -80,6 +84,7 @@ export function EndpointParametersPanel({
                 <Field label={`Parameter ${index + 1} example`}>
                   <input
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRow(index, "exampleValue", event.target.value)}
                     value={parameter.exampleValue}
                   />
@@ -87,6 +92,7 @@ export function EndpointParametersPanel({
                 <Field label={`Parameter ${index + 1} description`}>
                   <input
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRow(index, "description", event.target.value)}
                     value={parameter.description}
                   />
@@ -94,6 +100,7 @@ export function EndpointParametersPanel({
                 <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                   <input
                     checked={parameter.required}
+                    disabled={!canSave}
                     onChange={(event) => onUpdateRow(index, "required", event.target.checked)}
                     type="checkbox"
                   />
@@ -102,6 +109,7 @@ export function EndpointParametersPanel({
                 <div className="flex items-end">
                   <button
                     className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                    disabled={!canSave}
                     onClick={() => onRemoveRow(index)}
                     type="button"
                   >
