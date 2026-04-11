@@ -21,6 +21,52 @@ const environment = {
 } as const;
 
 describe("DebugConsole", () => {
+  it("shows the selected environment policy summary", () => {
+    render(
+      <DebugConsole
+        endpoint={endpoint}
+        environment={{
+          ...environment,
+          debugHostMode: "append",
+          debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }]
+        }}
+        environmentOptions={[environment]}
+        history={[]}
+        historyFilters={{
+          environmentId: null,
+          statusCode: null,
+          createdFrom: "",
+          createdTo: ""
+        }}
+        isLoadingHistory={false}
+        onChangeHistoryFilters={vi.fn()}
+        onClearHistory={vi.fn().mockResolvedValue(undefined)}
+        onExecute={vi.fn().mockResolvedValue({
+          method: "GET",
+          finalUrl: "https://local.dev/users/31",
+          statusCode: 200,
+          responseHeaders: [],
+          responseBody: "{\"ok\":true}",
+          durationMs: 20
+        })}
+        onReplayHistory={vi.fn()}
+        onRunHistory={vi.fn()}
+        projectDebugAllowedHosts={[
+          { pattern: "*.corp.example.com", allowPrivate: false },
+          { pattern: "api.partner.dev", allowPrivate: false }
+        ]}
+        replayDraft={null}
+      />
+    );
+
+    expect(screen.getByText("Debug target policy")).toBeInTheDocument();
+    expect(screen.getByText("Project rules")).toBeInTheDocument();
+    expect(screen.getByText("Environment mode")).toBeInTheDocument();
+    expect(screen.getByText("append")).toBeInTheDocument();
+    expect(screen.getByText("Environment rules")).toBeInTheDocument();
+    expect(screen.getByText("Effective policy uses global + project rules, then appends environment rules.")).toBeInTheDocument();
+  });
+
   it("shows policy blocked alert with message and errorCode", async () => {
     const blockedError = Object.assign(new Error("Target host blocked.example.com is not allowed"), {
       status: 403,
@@ -48,6 +94,7 @@ describe("DebugConsole", () => {
         onExecute={onExecute}
         onReplayHistory={vi.fn()}
         onRunHistory={vi.fn()}
+        projectDebugAllowedHosts={[]}
         replayDraft={null}
       />
     );
@@ -56,6 +103,48 @@ describe("DebugConsole", () => {
 
     expect(await screen.findByText("DEBUG_TARGET_NOT_ALLOWED")).toBeInTheDocument();
     expect(screen.getByText("Target host blocked.example.com is not allowed")).toBeInTheDocument();
+  });
+
+  it("shows blocked host and matched patterns when a debug request is denied", async () => {
+    const blockedError = Object.assign(new Error("Target host 10.10.1.8 hit private network restrictions"), {
+      status: 403,
+      errorCode: "DEBUG_PRIVATE_TARGET_NOT_ALLOWED",
+      data: {
+        errorCode: "DEBUG_PRIVATE_TARGET_NOT_ALLOWED",
+        host: "10.10.1.8",
+        matchedPatterns: ["10.10.1.8"]
+      }
+    });
+
+    render(
+      <DebugConsole
+        endpoint={endpoint}
+        environment={environment}
+        environmentOptions={[environment]}
+        history={[]}
+        historyFilters={{
+          environmentId: null,
+          statusCode: null,
+          createdFrom: "",
+          createdTo: ""
+        }}
+        isLoadingHistory={false}
+        onChangeHistoryFilters={vi.fn()}
+        onClearHistory={vi.fn().mockResolvedValue(undefined)}
+        onExecute={vi.fn().mockRejectedValue(blockedError)}
+        onReplayHistory={vi.fn()}
+        onRunHistory={vi.fn()}
+        projectDebugAllowedHosts={[]}
+        replayDraft={null}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send request" }));
+
+    expect(await screen.findByText("DEBUG_PRIVATE_TARGET_NOT_ALLOWED")).toBeInTheDocument();
+    expect(screen.getByText("Blocked host")).toBeInTheDocument();
+    expect(screen.getAllByText("10.10.1.8").length).toBeGreaterThan(0);
+    expect(screen.getByText("Matched rules")).toBeInTheDocument();
   });
 
   it("submits debug history filters and clear action", async () => {
@@ -111,6 +200,7 @@ describe("DebugConsole", () => {
         })}
         onReplayHistory={vi.fn()}
         onRunHistory={vi.fn()}
+        projectDebugAllowedHosts={[]}
         replayDraft={null}
       />
     );

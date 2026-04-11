@@ -1,6 +1,13 @@
 "use client";
 
-import type { DebugExecutionResult, DebugHistoryItem, EndpointDetail, EnvironmentDetail, ExecuteDebugPayload } from "@api-hub/api-sdk";
+import type {
+  DebugExecutionResult,
+  DebugHistoryItem,
+  DebugTargetRule,
+  EndpointDetail,
+  EnvironmentDetail,
+  ExecuteDebugPayload
+} from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
 
 type DebugHistoryFiltersState = {
@@ -14,6 +21,7 @@ type DebugConsoleProps = {
   endpoint: EndpointDetail | null;
   environment: EnvironmentDetail | null;
   environmentOptions: EnvironmentDetail[];
+  projectDebugAllowedHosts: DebugTargetRule[];
   history: DebugHistoryItem[];
   historyFilters: DebugHistoryFiltersState;
   isLoadingHistory: boolean;
@@ -34,6 +42,7 @@ export function DebugConsole({
   endpoint,
   environment,
   environmentOptions,
+  projectDebugAllowedHosts,
   history,
   historyFilters,
   isLoadingHistory,
@@ -49,7 +58,12 @@ export function DebugConsole({
   const [body, setBody] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [policyError, setPolicyError] = useState<{ errorCode: string; message: string } | null>(null);
+  const [policyError, setPolicyError] = useState<{
+    errorCode: string;
+    message: string;
+    host: string | null;
+    matchedPatterns: string[];
+  } | null>(null);
   const [result, setResult] = useState<DebugExecutionResult | null>(null);
 
   useEffect(() => {
@@ -78,6 +92,18 @@ export function DebugConsole({
     () => buildPreviewUrl(environment?.baseUrl, endpoint?.path, environment?.defaultQuery ?? [], queryString),
     [environment?.baseUrl, environment?.defaultQuery, endpoint?.path, queryString]
   );
+  const policySummary = useMemo(() => {
+    if (!environment) {
+      return null;
+    }
+
+    return {
+      projectRuleCount: projectDebugAllowedHosts.length,
+      environmentMode: environment.debugHostMode,
+      environmentRuleCount: (environment.debugAllowedHosts ?? []).length,
+      effectiveSummary: describeDebugPolicyMode(environment.debugHostMode)
+    };
+  }, [environment, projectDebugAllowedHosts]);
   const canExecute = Boolean(endpoint && environment);
 
   return (
@@ -178,10 +204,37 @@ export function DebugConsole({
             <p className="mt-2 font-mono text-sm text-slate-700">{previewUrl ?? "Invalid target"}</p>
           </div>
 
+          {policySummary ? (
+            <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Debug target policy</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <PolicyMetric label="Project rules" value={String(policySummary.projectRuleCount)} />
+                <PolicyMetric label="Environment mode" value={policySummary.environmentMode} />
+                <PolicyMetric label="Environment rules" value={String(policySummary.environmentRuleCount)} />
+              </div>
+              <p className="mt-3 text-sm text-slate-600">{policySummary.effectiveSummary}</p>
+            </div>
+          ) : null}
+
           {policyError ? (
             <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <p className="font-semibold">Request blocked by debug policy</p>
               <p className="mt-1">{policyError.message}</p>
+              {policyError.host ? (
+                <p className="mt-2">
+                  <span className="font-semibold">Blocked host</span>: {policyError.host}
+                </p>
+              ) : null}
+              {policyError.matchedPatterns.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  <p className="font-semibold">Matched rules</p>
+                  {policyError.matchedPatterns.map((pattern) => (
+                    <p className="font-mono text-xs" key={pattern}>
+                      {pattern}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               <p className="mt-2 font-mono text-xs">{policyError.errorCode}</p>
             </div>
           ) : null}
@@ -420,7 +473,7 @@ function extractPolicyError(error: unknown) {
   const maybeError = error as {
     message?: unknown;
     errorCode?: unknown;
-    data?: { errorCode?: unknown } | null;
+    data?: { errorCode?: unknown; host?: unknown; matchedPatterns?: unknown } | null;
   };
   const errorCode =
     typeof maybeError.errorCode === "string"
@@ -435,8 +488,33 @@ function extractPolicyError(error: unknown) {
 
   return {
     errorCode,
-    message: typeof maybeError.message === "string" ? maybeError.message : "Request blocked by debug policy"
+    message: typeof maybeError.message === "string" ? maybeError.message : "Request blocked by debug policy",
+    host: typeof maybeError.data?.host === "string" ? maybeError.data.host : null,
+    matchedPatterns: Array.isArray(maybeError.data?.matchedPatterns)
+      ? maybeError.data.matchedPatterns.filter((pattern): pattern is string => typeof pattern === "string")
+      : []
   };
+}
+
+function describeDebugPolicyMode(mode: EnvironmentDetail["debugHostMode"]) {
+  switch (mode) {
+    case "append":
+      return "Effective policy uses global + project rules, then appends environment rules.";
+    case "override":
+      return "Effective policy uses global rules plus environment rules, overriding project rules.";
+    case "inherit":
+    default:
+      return "Effective policy uses global + project rules.";
+  }
+}
+
+function PolicyMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-sm text-slate-700">{value}</p>
+    </div>
+  );
 }
 
 function Field({ children, label }: { children: React.ReactNode; label: string }) {

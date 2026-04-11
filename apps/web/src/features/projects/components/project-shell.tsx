@@ -337,6 +337,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onExecute={handleExecuteDebug}
             onReplayHistory={handleReplayHistory}
             onRunHistory={handleRunHistory}
+            projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             replayDraft={replayDraft}
           />
           <EndpointEditor
