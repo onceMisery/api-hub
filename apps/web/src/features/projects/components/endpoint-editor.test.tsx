@@ -330,6 +330,68 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("200 application/json userId: u_1001 -> u_2002")).toBeInTheDocument();
   });
 
+  it("shows grouped version diff sections in the editor compare panel", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User Detail",
+          method: "POST",
+          path: "/users/{id}",
+          description: "Profile",
+          mockEnabled: false
+        }}
+        projectId={1}
+        parameters={[
+          {
+            id: 1,
+            sectionType: "query",
+            name: "expand",
+            dataType: "string",
+            required: false,
+            description: "",
+            exampleValue: "team",
+            sortOrder: 0
+          }
+        ]}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "uuid",
+            required: true,
+            description: "",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial",
+            snapshotJson: JSON.stringify({
+              endpoint: { name: "Get User", method: "GET", path: "/users", description: "Load" },
+              parameters: [],
+              responses: []
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Compare against version"), { target: { value: "1" } });
+
+    expect((await screen.findAllByText("5 total changes")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Endpoint basics").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Request parameters").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Responses").length).toBeGreaterThan(0);
+  });
+
   it("restores a selected version snapshot through the restore callback", async () => {
     const onRestoreVersion = vi.fn().mockResolvedValue(undefined);
 

@@ -227,9 +227,9 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => versions.find((version) => String(version.id) === compareVersionId) ?? null,
     [compareVersionId, versions]
   );
-  const diffItems = useMemo(() => {
+  const diffResult = useMemo(() => {
     if (!compareVersion) {
-      return [];
+      return null;
     }
 
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
@@ -352,7 +352,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
       <EndpointVersionPanel
         compareVersion={compareVersion}
         compareVersionId={compareVersionId}
-        diffItems={diffItems}
+        diffResult={diffResult}
         isRestoring={isRestoring}
         latestSnapshot={latestSnapshot}
         onCompareVersionChange={setCompareVersionId}
