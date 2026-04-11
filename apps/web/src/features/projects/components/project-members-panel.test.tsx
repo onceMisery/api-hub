@@ -45,8 +45,42 @@ describe("ProjectMembersPanel", () => {
 
     await waitFor(() => expect(onSaveMember).toHaveBeenCalledWith({ username: "viewer", roleCode: "editor" }));
 
+    expect(screen.getByRole("button", { name: "Delete member 1" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Delete member 2" }));
     await waitFor(() => expect(onDeleteMember).toHaveBeenCalledWith(2));
+  });
+
+  it("disables saving when the last project admin is being demoted", () => {
+    render(
+      <ProjectMembersPanel
+        canManageMembers
+        members={[
+          {
+            userId: 1,
+            username: "admin",
+            displayName: "Administrator",
+            email: "admin@local.dev",
+            roleCode: "project_admin",
+            owner: true
+          },
+          {
+            userId: 2,
+            username: "viewer",
+            displayName: "Viewer User",
+            email: "viewer@local.dev",
+            roleCode: "viewer",
+            owner: false
+          }
+        ]}
+        onDeleteMember={vi.fn()}
+        onSaveMember={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Member 1 role"), { target: { value: "viewer" } });
+
+    expect(screen.getByRole("button", { name: "Save member 1" })).toBeDisabled();
+    expect(screen.getByText("Keep at least one project admin assigned before changing this role.")).toBeInTheDocument();
   });
 
   it("renders read-only state for non-admin members", () => {
@@ -68,6 +102,7 @@ describe("ProjectMembersPanel", () => {
       />
     );
 
+    expect(screen.getByText("You can review project access, but only project admins can change membership.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add project member" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save member 1" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Delete member 1" })).toBeDisabled();

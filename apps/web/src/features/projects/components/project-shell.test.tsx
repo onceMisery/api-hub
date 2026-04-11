@@ -577,6 +577,18 @@ describe("ProjectShell", () => {
     );
   });
 
+  it("opens the access drawer from the summary card and hides inline member controls by default", async () => {
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("Access & Roles")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add project member" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
+
+    expect(await screen.findByRole("dialog", { name: "Project access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add project member" })).toBeInTheDocument();
+  });
+
   it("shows a read-only workbench for viewer members", async () => {
     fetchProject.mockResolvedValueOnce({
       data: {
@@ -593,11 +605,16 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
-    expect(await screen.findByText("Viewer access")).toBeInTheDocument();
+    expect((await screen.findAllByText("Viewer access")).length).toBeGreaterThan(0);
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add module" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save project debug policy" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Clear debug history" })).toBeDisabled();
+
+    expect(screen.queryByRole("button", { name: "Add project member" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
+
+    expect(await screen.findByText("You can review project access, but only project admins can change membership.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add project member" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save member 1" })).toBeDisabled();
   });

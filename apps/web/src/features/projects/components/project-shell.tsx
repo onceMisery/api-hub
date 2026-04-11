@@ -63,10 +63,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { SessionBar } from "../../auth/components/session-bar";
+import { ProjectAccessDrawer } from "./project-access-drawer";
+import { ProjectAccessSummaryCard } from "./project-access-summary-card";
 import { EndpointEditor } from "./endpoint-editor";
 import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
-import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectSidebar } from "./project-sidebar";
 
 type ProjectShellProps = {
@@ -109,6 +110,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [isLoadingTree, setIsLoadingTree] = useState(true);
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isAccessDrawerOpen, setIsAccessDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -125,6 +127,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   useEffect(() => {
     void reloadProjectMembers();
+  }, [projectId]);
+
+  useEffect(() => {
+    setIsAccessDrawerOpen(false);
   }, [projectId]);
 
   useEffect(() => {
@@ -245,6 +251,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const canWrite = project?.canWrite ?? false;
   const canManageMembers = project?.canManageMembers ?? false;
   const accessLabel = formatProjectAccess(project?.currentUserRole);
+  const projectAdminCount = useMemo(
+    () => projectMembers.filter((member) => member.owner || member.roleCode === "project_admin").length,
+    [projectMembers]
+  );
   const selectedEnvironment = useMemo(
     () => environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
     [environments, selectedEnvironmentId]
@@ -308,10 +318,20 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
               />
             </label>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatCard label="Modules" value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
-            <StatCard label="Groups" value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
-            <StatCard label="Endpoints" value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount} />
+          <div className="grid gap-3 lg:w-[460px]">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatCard label="Modules" value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
+              <StatCard label="Groups" value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
+              <StatCard label="Endpoints" value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount} />
+            </div>
+            <ProjectAccessSummaryCard
+              canManageMembers={canManageMembers}
+              canWrite={canWrite}
+              currentUserRole={project?.currentUserRole ?? null}
+              memberCount={projectMembers.length}
+              onOpen={() => setIsAccessDrawerOpen(true)}
+              projectAdminCount={projectAdminCount}
+            />
           </div>
         </div>
       </section>
@@ -355,12 +375,6 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onUpdateEnvironment={handleUpdateEnvironment}
             selectedEnvironmentId={selectedEnvironmentId}
           />
-          <ProjectMembersPanel
-            canManageMembers={canManageMembers}
-            members={projectMembers}
-            onDeleteMember={handleDeleteProjectMember}
-            onSaveMember={handleSaveProjectMember}
-          />
           <DebugConsole
             canClearHistory={canWrite}
             endpoint={endpoint}
@@ -398,6 +412,18 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           />
         </div>
       </section>
+      <ProjectAccessDrawer
+        canManageMembers={canManageMembers}
+        canWrite={canWrite}
+        currentUserRole={project?.currentUserRole ?? null}
+        isOpen={isAccessDrawerOpen}
+        memberCount={projectMembers.length}
+        members={projectMembers}
+        onClose={() => setIsAccessDrawerOpen(false)}
+        onDeleteMember={handleDeleteProjectMember}
+        onSaveMember={handleSaveProjectMember}
+        projectAdminCount={projectAdminCount}
+      />
     </main>
   );
 
