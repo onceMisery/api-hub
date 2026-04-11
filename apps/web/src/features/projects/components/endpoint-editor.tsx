@@ -18,6 +18,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { EditorPanel, Field, PreviewMetric } from "./endpoint-editor-shared";
 import { EndpointMockRulesPanel } from "./endpoint-mock-rules-panel";
 import { EndpointMockSimulatorPanel } from "./endpoint-mock-simulator-panel";
+import { EndpointParametersPanel } from "./endpoint-parameters-panel";
+import { EndpointResponsesPanel } from "./endpoint-responses-panel";
 import { EndpointVersionPanel } from "./endpoint-version-panel";
 import { PublishedRuntimePanel } from "./published-runtime-panel";
 
@@ -389,202 +391,25 @@ export function EndpointEditor(props: EndpointEditorProps) {
         </form>
       </EditorPanel>
 
-      <EditorPanel title="Request Parameters">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Flat rows for query, path, header, or body fields.</p>
-            <button
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              onClick={() => setParameterRows((current) => [...current, createParameterDraft()])}
-              type="button"
-            >
-              Add parameter row
-            </button>
-          </div>
+      <EndpointParametersPanel
+        canSave={Boolean(onSaveParameters)}
+        onAddRow={() => setParameterRows((current) => [...current, createParameterDraft()])}
+        onRemoveRow={(index) => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        onSave={() => void handleSaveParameters()}
+        onUpdateRow={updateParameterRow}
+        parameterMessage={parameterMessage}
+        parameterRows={parameterRows}
+      />
 
-          <div className="space-y-3">
-            {parameterRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
-                No request parameters yet.
-              </p>
-            ) : (
-              parameterRows.map((parameter, index) => (
-                <div key={`parameter-${index}`} className="grid gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Field label={`Parameter ${index + 1} name`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "name", event.target.value)}
-                      value={parameter.name}
-                    />
-                  </Field>
-                  <Field label={`Parameter ${index + 1} type`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "dataType", event.target.value)}
-                      value={parameter.dataType}
-                    />
-                  </Field>
-                  <Field label={`Parameter ${index + 1} section`}>
-                    <select
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "sectionType", event.target.value)}
-                      value={parameter.sectionType}
-                    >
-                      {["query", "path", "header", "body"].map((sectionType) => (
-                        <option key={sectionType} value={sectionType}>
-                          {sectionType}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label={`Parameter ${index + 1} example`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "exampleValue", event.target.value)}
-                      value={parameter.exampleValue}
-                    />
-                  </Field>
-                  <Field label={`Parameter ${index + 1} description`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateParameterRow(index, "description", event.target.value)}
-                      value={parameter.description}
-                    />
-                  </Field>
-                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    <input
-                      checked={parameter.required}
-                      onChange={(event) => updateParameterRow(index, "required", event.target.checked)}
-                      type="checkbox"
-                    />
-                    Required
-                  </label>
-                  <div className="flex items-end">
-                    <button
-                      className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                      onClick={() => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-                      type="button"
-                    >
-                      Remove parameter row {index + 1}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveParameters}
-              onClick={() => void handleSaveParameters()}
-              type="button"
-            >
-              Save parameters
-            </button>
-            {parameterMessage ? <p className="text-sm text-emerald-600">{parameterMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Response Structure">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Flat response fields with status code and media type.</p>
-            <button
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              onClick={() => setResponseRows((current) => [...current, createResponseDraft()])}
-              type="button"
-            >
-              Add response row
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {responseRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
-                No response fields yet.
-              </p>
-            ) : (
-              responseRows.map((response, index) => (
-                <div key={`response-${index}`} className="grid gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Field label={`Response ${index + 1} name`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "name", event.target.value)}
-                      value={response.name}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} type`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "dataType", event.target.value)}
-                      value={response.dataType}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} status`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "httpStatusCode", Number(event.target.value) || 200)}
-                      value={response.httpStatusCode}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} media type`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "mediaType", event.target.value)}
-                      value={response.mediaType}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} description`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "description", event.target.value)}
-                      value={response.description}
-                    />
-                  </Field>
-                  <Field label={`Response ${index + 1} example`}>
-                    <input
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                      onChange={(event) => updateResponseRow(index, "exampleValue", event.target.value)}
-                      value={response.exampleValue}
-                    />
-                  </Field>
-                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    <input
-                      checked={response.required}
-                      onChange={(event) => updateResponseRow(index, "required", event.target.checked)}
-                      type="checkbox"
-                    />
-                    Required
-                  </label>
-                  <div className="flex items-end">
-                    <button
-                      className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                      onClick={() => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-                      type="button"
-                    >
-                      Remove response row {index + 1}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveResponses}
-              onClick={() => void handleSaveResponses()}
-              type="button"
-            >
-              Save responses
-            </button>
-            {responseMessage ? <p className="text-sm text-emerald-600">{responseMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
+      <EndpointResponsesPanel
+        canSave={Boolean(onSaveResponses)}
+        onAddRow={() => setResponseRows((current) => [...current, createResponseDraft()])}
+        onRemoveRow={(index) => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        onSave={() => void handleSaveResponses()}
+        onUpdateRow={updateResponseRow}
+        responseMessage={responseMessage}
+        responseRows={responseRows}
+      />
 
       <EndpointMockRulesPanel
         buildRuleSummary={buildRuleSummary}
