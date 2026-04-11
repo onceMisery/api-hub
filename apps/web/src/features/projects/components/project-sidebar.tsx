@@ -1,12 +1,23 @@
 "use client";
 
 import type { ModuleTreeItem } from "@api-hub/api-sdk";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import {
+  readProjectSidebarQuickAccess,
+  recordRecentEndpoint,
+  sanitizeProjectSidebarQuickAccess,
+  togglePinnedEndpoint,
+  writeProjectSidebarQuickAccess,
+  type ProjectSidebarQuickAccessState
+} from "./project-sidebar-quick-access";
 
 type ProjectSidebarProps = {
+  allModules?: ModuleTreeItem[];
   canWrite: boolean;
   emptyStateMessage?: string | null;
   modules: ModuleTreeItem[];
+  projectId: number;
   selectedEndpointId: number | null;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
@@ -21,9 +32,11 @@ type ProjectSidebarProps = {
 };
 
 export function ProjectSidebar({
+  allModules,
   canWrite,
   emptyStateMessage = null,
   modules,
+  projectId,
   onCreateEndpoint,
   onCreateGroup,
   onCreateModule,
@@ -37,6 +50,62 @@ export function ProjectSidebar({
   selectedEndpointId
 }: ProjectSidebarProps) {
   const [moduleName, setModuleName] = useState("");
+  const [quickAccessState, setQuickAccessState] = useState<ProjectSidebarQuickAccessState>({
+    pinnedEndpointIds: [],
+    recentEndpointIds: []
+  });
+  const quickAccessModules = allModules ?? modules;
+  const endpointLookup = useMemo(() => buildQuickAccessEntryLookup(quickAccessModules), [quickAccessModules]);
+  const availableEndpointIds = useMemo(() => Array.from(endpointLookup.keys()), [endpointLookup]);
+  const pinnedEntries = useMemo(
+    () => resolveQuickAccessEntries(quickAccessState.pinnedEndpointIds, endpointLookup),
+    [endpointLookup, quickAccessState.pinnedEndpointIds]
+  );
+  const recentEntries = useMemo(
+    () =>
+      resolveQuickAccessEntries(
+        quickAccessState.recentEndpointIds.filter((endpointId) => !quickAccessState.pinnedEndpointIds.includes(endpointId)),
+        endpointLookup
+      ),
+    [endpointLookup, quickAccessState.pinnedEndpointIds, quickAccessState.recentEndpointIds]
+  );
+
+  useEffect(() => {
+    const nextState = sanitizeProjectSidebarQuickAccess(readProjectSidebarQuickAccess(projectId), availableEndpointIds);
+    setQuickAccessState(nextState);
+    writeProjectSidebarQuickAccess(projectId, nextState);
+  }, [availableEndpointIds, projectId]);
+
+  useEffect(() => {
+    if (!selectedEndpointId || !endpointLookup.has(selectedEndpointId)) {
+      return;
+    }
+
+    setQuickAccessState((currentState) => {
+      const nextState = recordRecentEndpoint(
+        sanitizeProjectSidebarQuickAccess(currentState, availableEndpointIds),
+        selectedEndpointId
+      );
+
+      if (areQuickAccessStatesEqual(currentState, nextState)) {
+        return currentState;
+      }
+
+      writeProjectSidebarQuickAccess(projectId, nextState);
+      return nextState;
+    });
+  }, [availableEndpointIds, endpointLookup, projectId, selectedEndpointId]);
+
+  function handleTogglePin(endpointId: number) {
+    setQuickAccessState((currentState) => {
+      const nextState = togglePinnedEndpoint(
+        sanitizeProjectSidebarQuickAccess(currentState, availableEndpointIds),
+        endpointId
+      );
+      writeProjectSidebarQuickAccess(projectId, nextState);
+      return nextState;
+    });
+  }
 
   return (
     <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -44,6 +113,8 @@ export function ProjectSidebar({
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Project Tree</p>
         <h2 className="mt-2 text-lg font-semibold text-slate-950">Modules and endpoints</h2>
       </div>
+
+      <QuickAccessPanel pinnedEntries={pinnedEntries} recentEntries={recentEntries} onSelectEndpoint={onSelectEndpoint} />
 
       <form
         className="mb-5 space-y-2 rounded-[1.6rem] border border-slate-200 bg-white/90 p-4"
@@ -92,13 +163,101 @@ export function ProjectSidebar({
               onRenameEndpoint={onRenameEndpoint}
               onRenameGroup={onRenameGroup}
               onRenameModule={onRenameModule}
+              onTogglePin={handleTogglePin}
               onSelectEndpoint={onSelectEndpoint}
+              pinnedEndpointIds={quickAccessState.pinnedEndpointIds}
               selectedEndpointId={selectedEndpointId}
             />
           ))
         )}
       </div>
     </aside>
+  );
+}
+
+type QuickAccessEntry = {
+  endpointId: number;
+  groupName: string;
+  method: string;
+  moduleName: string;
+  name: string;
+  path: string;
+};
+
+function QuickAccessPanel({
+  pinnedEntries,
+  recentEntries,
+  onSelectEndpoint
+}: {
+  pinnedEntries: QuickAccessEntry[];
+  recentEntries: QuickAccessEntry[];
+  onSelectEndpoint: (endpointId: number) => void;
+}) {
+  return (
+    <section className="mb-5 rounded-[1.8rem] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(245,241,232,0.92)_46%,_rgba(226,232,240,0.82)_100%)] p-4 shadow-[0_20px_52px_rgba(15,23,42,0.07)]">
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Quick access</p>
+        <h3 className="text-base font-semibold tracking-tight text-slate-950">Pinned routes and recent focus lanes.</h3>
+        <p className="text-sm leading-6 text-slate-600">Personal shortcuts stay local to this browser and help you jump past large project trees.</p>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <ShortcutLane emptyCopy="Pin important endpoints from the tree below." entries={pinnedEntries} label="Pinned" onSelectEndpoint={onSelectEndpoint} />
+        <ShortcutLane emptyCopy="Recently opened endpoints will appear here." entries={recentEntries} label="Recent" onSelectEndpoint={onSelectEndpoint} />
+      </div>
+    </section>
+  );
+}
+
+function ShortcutLane({
+  emptyCopy,
+  entries,
+  label,
+  onSelectEndpoint
+}: {
+  emptyCopy: string;
+  entries: QuickAccessEntry[];
+  label: string;
+  onSelectEndpoint: (endpointId: number) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+        <span className="rounded-full border border-white/70 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          {entries.length}
+        </span>
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white/65 px-4 py-4 text-sm text-slate-500">
+          {emptyCopy}
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {entries.map((entry) => (
+            <button
+              aria-label={`Open quick access ${entry.name}`}
+              className="rounded-[1.3rem] border border-white/70 bg-white/82 px-4 py-4 text-left shadow-[0_12px_32px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300"
+              key={`${label}-${entry.endpointId}`}
+              onClick={() => onSelectEndpoint(entry.endpointId)}
+              type="button"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950">{entry.name}</p>
+                  <p className="mt-2 truncate font-mono text-xs text-slate-500">{entry.path}</p>
+                </div>
+                <span className={getMethodBadgeClasses(entry.method, false)}>{entry.method}</span>
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                {entry.moduleName} / {entry.groupName}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -113,7 +272,9 @@ function ModuleSection({
   onRenameEndpoint,
   onRenameGroup,
   onRenameModule,
+  onTogglePin,
   onSelectEndpoint,
+  pinnedEndpointIds,
   selectedEndpointId
 }: {
   canWrite: boolean;
@@ -126,7 +287,9 @@ function ModuleSection({
   onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
   onRenameModule: (moduleId: number, payload: { name: string }) => Promise<void>;
+  onTogglePin: (endpointId: number) => void;
   onSelectEndpoint: (endpointId: number) => void;
+  pinnedEndpointIds: number[];
   selectedEndpointId: number | null;
 }) {
   const [groupName, setGroupName] = useState("");
@@ -215,7 +378,9 @@ function ModuleSection({
             onDeleteGroup={onDeleteGroup}
             onRenameEndpoint={onRenameEndpoint}
             onRenameGroup={onRenameGroup}
+            onTogglePin={onTogglePin}
             onSelectEndpoint={onSelectEndpoint}
+            pinnedEndpointIds={pinnedEndpointIds}
             selectedEndpointId={selectedEndpointId}
           />
         ))
@@ -232,7 +397,9 @@ function GroupSection({
   onDeleteGroup,
   onRenameEndpoint,
   onRenameGroup,
+  onTogglePin,
   onSelectEndpoint,
+  pinnedEndpointIds,
   selectedEndpointId
 }: {
   canWrite: boolean;
@@ -242,7 +409,9 @@ function GroupSection({
   onDeleteGroup: (groupId: number) => Promise<void>;
   onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
+  onTogglePin: (endpointId: number) => void;
   onSelectEndpoint: (endpointId: number) => void;
+  pinnedEndpointIds: number[];
   selectedEndpointId: number | null;
 }) {
   const [endpointName, setEndpointName] = useState("");
@@ -354,10 +523,12 @@ function GroupSection({
             <EndpointNode
               canWrite={canWrite}
               endpoint={endpoint}
+              isPinned={pinnedEndpointIds.includes(endpoint.id)}
               isActive={isActive}
               key={endpoint.id}
               onDeleteEndpoint={onDeleteEndpoint}
               onRenameEndpoint={onRenameEndpoint}
+              onTogglePin={onTogglePin}
               onSelectEndpoint={onSelectEndpoint}
             />
           );
@@ -371,15 +542,19 @@ function EndpointNode({
   canWrite,
   endpoint,
   isActive,
+  isPinned,
   onDeleteEndpoint,
   onRenameEndpoint,
+  onTogglePin,
   onSelectEndpoint
 }: {
   canWrite: boolean;
   endpoint: ModuleTreeItem["groups"][number]["endpoints"][number];
   isActive: boolean;
+  isPinned: boolean;
   onDeleteEndpoint: (endpointId: number) => Promise<void>;
   onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
+  onTogglePin: (endpointId: number) => void;
   onSelectEndpoint: (endpointId: number) => void;
 }) {
   const [endpointDraftName, setEndpointDraftName] = useState(endpoint.name);
@@ -393,19 +568,29 @@ function EndpointNode({
           : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
       }`}
     >
-      <button className="w-full text-left" onClick={() => onSelectEndpoint(endpoint.id)} type="button">
-        <div className="flex items-center justify-between gap-3">
-          <span className="truncate text-sm font-medium">{endpoint.name}</span>
-          <span
-            className={`rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
-              isActive ? "bg-white/15 text-white" : "bg-slate-200 text-slate-700"
-            }`}
-          >
-            {endpoint.method}
-          </span>
-        </div>
-        <p className={`mt-2 truncate text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>{endpoint.path}</p>
-      </button>
+      <div className="flex items-start gap-2">
+        <button className="flex-1 text-left" onClick={() => onSelectEndpoint(endpoint.id)} type="button">
+          <div className="flex items-center justify-between gap-3">
+            <span className="truncate text-sm font-medium">{endpoint.name}</span>
+            <span className={getMethodBadgeClasses(endpoint.method, isActive)}>{endpoint.method}</span>
+          </div>
+          <p className={`mt-2 truncate text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>{endpoint.path}</p>
+        </button>
+        <button
+          aria-label={`${isPinned ? "Unpin" : "Pin"} endpoint ${endpoint.id}`}
+          className={`rounded-2xl border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
+            isActive
+              ? "border-white/15 bg-white/10 text-white hover:bg-white/15"
+              : isPinned
+                ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
+          }`}
+          onClick={() => onTogglePin(endpoint.id)}
+          type="button"
+        >
+          {isPinned ? "Pinned" : "Pin"}
+        </button>
+      </div>
 
       <div className="grid gap-2">
         <label className="space-y-2">
@@ -479,4 +664,65 @@ function EndpointNode({
       </div>
     </div>
   );
+}
+
+function buildQuickAccessEntryLookup(modules: ModuleTreeItem[]) {
+  const lookup = new Map<number, QuickAccessEntry>();
+
+  for (const module of modules) {
+    for (const group of module.groups) {
+      for (const endpoint of group.endpoints) {
+        lookup.set(endpoint.id, {
+          endpointId: endpoint.id,
+          groupName: group.name,
+          method: endpoint.method,
+          moduleName: module.name,
+          name: endpoint.name,
+          path: endpoint.path
+        });
+      }
+    }
+  }
+
+  return lookup;
+}
+
+function resolveQuickAccessEntries(endpointIds: number[], lookup: Map<number, QuickAccessEntry>) {
+  return endpointIds
+    .map((endpointId) => lookup.get(endpointId))
+    .filter((entry): entry is QuickAccessEntry => entry !== undefined);
+}
+
+function areQuickAccessStatesEqual(
+  left: ProjectSidebarQuickAccessState,
+  right: ProjectSidebarQuickAccessState
+) {
+  return (
+    left.pinnedEndpointIds.length === right.pinnedEndpointIds.length &&
+    left.recentEndpointIds.length === right.recentEndpointIds.length &&
+    left.pinnedEndpointIds.every((endpointId, index) => endpointId === right.pinnedEndpointIds[index]) &&
+    left.recentEndpointIds.every((endpointId, index) => endpointId === right.recentEndpointIds[index])
+  );
+}
+
+function getMethodBadgeClasses(method: string, isActive: boolean) {
+  const palette = isActive
+    ? {
+        DELETE: "bg-rose-400/20 text-rose-100",
+        GET: "bg-emerald-400/20 text-emerald-100",
+        PATCH: "bg-violet-400/20 text-violet-100",
+        POST: "bg-sky-400/20 text-sky-100",
+        PUT: "bg-amber-300/20 text-amber-100",
+        fallback: "bg-white/15 text-white"
+      }
+    : {
+        DELETE: "bg-rose-50 text-rose-700",
+        GET: "bg-emerald-50 text-emerald-700",
+        PATCH: "bg-violet-50 text-violet-700",
+        POST: "bg-sky-50 text-sky-700",
+        PUT: "bg-amber-50 text-amber-700",
+        fallback: "bg-slate-200 text-slate-700"
+      };
+
+  return `rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${palette[method as keyof typeof palette] ?? palette.fallback}`;
 }

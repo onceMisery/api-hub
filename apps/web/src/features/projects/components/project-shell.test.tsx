@@ -141,6 +141,7 @@ import { ProjectShell } from "./project-shell";
 describe("ProjectShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
 
     fetchProject.mockResolvedValue({
       data: {
@@ -353,7 +354,7 @@ describe("ProjectShell", () => {
     );
 
     await waitFor(() => expect(fetchProjectTree).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText("Create User")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Create User POST /users" })).toBeInTheDocument();
     await waitFor(() => expect(fetchEndpoint).toHaveBeenLastCalledWith(99));
   });
 
@@ -443,7 +444,7 @@ describe("ProjectShell", () => {
     );
 
     await waitFor(() => expect(fetchProjectTree).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText("Get User Detail")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Get User Detail GET /users/{userId}" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete endpoint 31" }));
 
@@ -561,7 +562,7 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Restore snapshot v1" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Restore snapshot v1" }))[0]);
 
     await waitFor(() =>
       expect(updateEndpoint).toHaveBeenCalledWith(31, {
@@ -644,13 +645,13 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
-    expect(await screen.findByText("Get User")).toBeInTheDocument();
-    expect(screen.getByText("Billing Overview")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Get User GET /users/{id}" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Billing Overview GET /billing/overview" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Search tree"), { target: { value: "billing" } });
 
-    expect(await screen.findByText("Billing Overview")).toBeInTheDocument();
-    expect(screen.queryByText("Get User")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Billing Overview GET /billing/overview" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Get User GET /users/{id}" })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Search tree"), { target: { value: "missing" } });
 

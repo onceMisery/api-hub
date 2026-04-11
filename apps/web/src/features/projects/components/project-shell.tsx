@@ -372,6 +372,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           </aside>
         ) : (
           <ProjectSidebar
+            allModules={modules}
             canWrite={canWrite}
             emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
             modules={filteredModules}
@@ -385,6 +386,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onRenameGroup={handleRenameGroup}
             onRenameModule={handleRenameModule}
             onSelectEndpoint={setSelectedEndpointId}
+            projectId={projectId}
             selectedEndpointId={selectedEndpointId}
           />
         )}
