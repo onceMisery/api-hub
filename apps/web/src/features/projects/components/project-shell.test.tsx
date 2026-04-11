@@ -75,6 +75,10 @@ vi.mock("next/navigation", () => ({
   })
 }));
 
+vi.mock("../../auth/components/session-bar", () => ({
+  SessionBar: () => <div>Session Bar</div>
+}));
+
 vi.mock("@api-hub/api-sdk", () => ({
   fetchProject,
   updateProject,

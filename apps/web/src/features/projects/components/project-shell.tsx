@@ -57,6 +57,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { SessionBar } from "../../auth/components/session-bar";
 import { EndpointEditor } from "./endpoint-editor";
 import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
@@ -261,6 +262,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6 text-slate-900">
+      <SessionBar />
       <section className="rounded-[2.4rem] border border-white/60 bg-white/65 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
