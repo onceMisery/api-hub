@@ -360,61 +360,69 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   }, [filteredModules, searchQuery, selectedEndpointId]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6 text-slate-900">
+    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-6 p-6 text-slate-100">
       <WorkbenchNotificationCenter notifications={notifications} onDismiss={dismissNotification} />
       <SessionBar backHref="/console/projects" />
-      <section className="rounded-[2.4rem] border border-white/60 bg-white/65 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur">
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Project Workbench</p>
-              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
-                {project?.name ?? `Project #${projectId}`}
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                Compact lanes for documentation, runtime debugging, environments, and collaborator control.
+      <section className="relative overflow-hidden rounded-[2.75rem] border border-white/10 bg-gradient-to-b from-[#0d111b] via-[#05060c] to-black p-6 shadow-[0_40px_140px_rgba(2,6,23,0.8)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-10 top-[-20%] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.4),transparent 70%)] blur-[120px]" />
+          <div className="absolute right-[-8%] top-16 h-60 w-60 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.25),transparent 70%)] blur-[100px]" />
+          <div className="absolute inset-x-8 bottom-0 h-48 rounded-[40%] bg-[radial-gradient(circle,rgba(14,165,233,0.08),transparent 90%)] blur-[80px]" />
+        </div>
+        <div className="relative flex flex-col gap-8">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.6fr)]">
+            <div className="space-y-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-400">
+                {t("workbench.heroEyebrow")}
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+              <div className="space-y-2">
+                <h1 className="text-4xl font-bold tracking-tight lg:text-5xl">{project?.name ?? `Project #${projectId}`}</h1>
+                <p className="text-sm leading-6 text-slate-200">{t("workbench.heroSubtitle")}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
                   {accessLabel}
                 </span>
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
-                    canWrite ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                    canWrite ? "bg-emerald-100/90 text-emerald-900" : "bg-amber-100/90 text-amber-900"
                   }`}
                 >
-                  {canWrite ? "Writable" : "Read-only"}
+                  {canWrite ? t("workbench.badge.writable") : t("workbench.badge.readOnly")}
                 </span>
-                <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-xs font-medium text-slate-500">
+                <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
                   {project?.projectKey ?? `project-${projectId}`}
                 </span>
               </div>
-              <div className="mt-5 flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Link
-                  className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  className="rounded-full bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:opacity-90"
                   href={`/console/projects/${projectId}/browse`}
                 >
-                  Browse docs
+                  {t("workbench.action.browseDocs")}
                 </Link>
                 <Link
-                  className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
                   href={`/console/projects/${projectId}/share`}
                 >
-                  Share docs
+                  {t("workbench.action.shareDocs")}
                 </Link>
                 <Link
-                  className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
                   href={`/console/projects/${projectId}/mock-center`}
                 >
-                  Mock center
+                  {t("workbench.action.mockCenter")}
                 </Link>
               </div>
             </div>
-            <div className="grid gap-3 lg:w-[460px]">
+            <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-3">
-                <StatCard label="Modules" value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
-                <StatCard label="Groups" value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
-                <StatCard label="Endpoints" value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount} />
+                <StatCard label={t("workbench.stats.modules")} value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
+                <StatCard label={t("workbench.stats.groups")} value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
+                <StatCard
+                  label={t("workbench.stats.endpoints")}
+                  value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount}
+                />
               </div>
               <ProjectAccessSummaryCard
                 canManageMembers={canManageMembers}
@@ -426,10 +434,12 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
               />
             </div>
           </div>
-
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="app-shell-card-strong rounded-[2rem] bg-slate-950/95 px-4 py-4 text-white xl:min-w-[420px]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workbench Lanes</p>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="app-shell-card-subtle rounded-[2rem] border border-white/10 bg-slate-950/60 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("workbench.lanesTitle")}</p>
+                <span className="text-xs text-slate-400">{t("workbench.tab.overview")}</span>
+              </div>
               <div className="app-tablist mt-4" role="tablist" aria-label="Project workbench tabs">
                 {workbenchTabs.map((tab) => (
                   <button
@@ -448,15 +458,14 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
                 ))}
               </div>
             </div>
-
             {(activeTab === "documentation" || activeTab === "mock") && !isLoadingTree ? (
-              <label className="block min-w-0 flex-1 space-y-2 xl:max-w-md">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Search tree</span>
+              <label className="block min-w-0 space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("workbench.searchTree")}</span>
                 <input
-                  aria-label="Search tree"
-                  className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                  aria-label={t("workbench.searchTree")}
+                  className="app-input w-full rounded-[1.6rem] px-4 py-3 text-sm outline-none transition focus:border-slate-200"
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search modules, groups, endpoints, or paths"
+                  placeholder={t("workbench.searchTreePlaceholder")}
                   value={searchQuery}
                 />
               </label>
@@ -476,52 +485,67 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           id="workbench-panel-overview"
           role="tabpanel"
         >
-          <section className="app-shell-card rounded-[2rem] p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Focus</p>
-            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Project rhythm at a glance</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              Use documentation for contract editing, mock for runtime shaping, debug for live requests, and members for project governance.
-            </p>
+          <section className="app-shell-card-strong rounded-[2rem] p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("workbench.overview.eyebrow")}</p>
+            <h2 className="mt-3 text-3xl font-semibold text-white">{t("workbench.overview.title")}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{t("workbench.overview.detail")}</p>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <WorkbenchOverviewCard
-                eyebrow="Documentation"
-                title={`${treeStats.moduleCount} modules across ${treeStats.groupCount} groups`}
-                detail="Keep endpoint structure compact and searchable instead of scrolling through every panel at once."
+                eyebrow={t("workbench.overview.card.documentation.eyebrow")}
+                title={t("workbench.overview.card.documentation.title", {
+                  moduleCount: searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount,
+                  groupCount: searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount
+                })}
+                detail={t("workbench.overview.card.documentation.detail")}
               />
               <WorkbenchOverviewCard
-                eyebrow="Runtime"
-                title={`${environments.length} environments and ${debugHistory.length} recent debug records`}
-                detail="Separate runtime validation from contract editing so each lane stays focused."
+                eyebrow={t("workbench.overview.card.runtime.eyebrow")}
+                title={t("workbench.overview.card.runtime.title", {
+                  environmentCount: environments.length,
+                  debugCount: debugHistory.length
+                })}
+                detail={t("workbench.overview.card.runtime.detail")}
               />
               <WorkbenchOverviewCard
-                eyebrow="Members"
-                title={`${projectMembers.length} collaborators, ${projectAdminCount} admin seats`}
-                detail="Open the members lane when you need to rebalance roles or review ownership."
+                eyebrow={t("workbench.overview.card.members.eyebrow")}
+                title={t("workbench.overview.card.members.title", {
+                  memberCount: projectMembers.length,
+                  adminCount: projectAdminCount
+                })}
+                detail={t("workbench.overview.card.members.detail")}
               />
               <WorkbenchOverviewCard
-                eyebrow="Mock"
-                title={`${mockReleases.length} published mock releases`}
-                detail="Pin mock work into its own lane so draft rules and published runtime stay easy to compare."
+                eyebrow={t("workbench.overview.card.mock.eyebrow")}
+                title={t("workbench.overview.card.mock.title", {
+                  mockCount: mockReleases.length
+                })}
+                detail={t("workbench.overview.card.mock.detail")}
               />
             </div>
           </section>
           <section className="space-y-6">
-            <ProjectAccessSummaryCard
-              canManageMembers={canManageMembers}
-              canWrite={canWrite}
-              currentUserRole={project?.currentUserRole ?? null}
-              memberCount={projectMembers.length}
-              onOpen={() => {
-                setActiveTab("members");
-                setIsAccessDrawerOpen(true);
-              }}
-              projectAdminCount={projectAdminCount}
-            />
-            <div className="app-shell-card rounded-[2rem] p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Active Endpoint</p>
-              <h3 className="mt-3 text-xl font-semibold text-slate-950">{endpoint?.name ?? "No endpoint selected"}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {endpoint ? `${endpoint.method} ${endpoint.path}` : "Open the documentation lane to select an endpoint."}
+            <div className="app-shell-card-subtle rounded-[2rem] border border-white/10 bg-slate-950/60 p-4">
+              <ProjectAccessSummaryCard
+                canManageMembers={canManageMembers}
+                canWrite={canWrite}
+                currentUserRole={project?.currentUserRole ?? null}
+                memberCount={projectMembers.length}
+                onOpen={() => {
+                  setActiveTab("members");
+                  setIsAccessDrawerOpen(true);
+                }}
+                projectAdminCount={projectAdminCount}
+              />
+            </div>
+            <div className="app-shell-card-subtle rounded-[2rem] border border-white/10 bg-slate-950/60 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                {t("workbench.overview.activeEndpoint.eyebrow")}
+              </p>
+              <h3 className="mt-3 text-xl font-semibold text-white">
+                {endpoint?.name ?? t("workbench.overview.activeEndpoint.emptyTitle")}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {endpoint ? `${endpoint.method} ${endpoint.path}` : t("workbench.overview.activeEndpoint.emptyDetail")}
               </p>
             </div>
           </section>
@@ -537,13 +561,13 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         >
           {isLoadingTree ? (
             <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 text-sm text-slate-500 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-              Loading project tree...
+              {t("workbench.documentation.loadingTree")}
             </aside>
           ) : (
             <ProjectSidebar
               allModules={modules}
               canWrite={canWrite}
-              emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
+              emptyStateMessage={searchQuery.trim() ? t("workbench.documentation.emptySearch") : null}
               modules={filteredModules}
               onCreateEndpoint={handleCreateEndpoint}
               onCreateGroup={handleCreateGroup}
@@ -1768,8 +1792,8 @@ function findExistingEndpointId(modules: ModuleTreeItem[], endpointId?: number |
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/60 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.20)]">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{label}</p>
+    <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.85),rgba(2,6,23,0.9))] px-5 py-4 text-white shadow-[0_24px_60px_rgba(2,6,23,0.55)]">
+      <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );
@@ -1785,10 +1809,10 @@ function WorkbenchOverviewCard({
   title: string;
 }) {
   return (
-    <article className="rounded-[1.6rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_14px_32px_rgba(15,23,42,0.06)]">
+    <article className="rounded-[1.8rem] border border-white/10 bg-[rgba(2,6,23,0.65)] p-4 shadow-[0_18px_50px_rgba(2,6,23,0.6)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{eyebrow}</p>
-      <h3 className="mt-3 text-lg font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+      <h3 className="mt-3 text-lg font-semibold text-white">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
     </article>
   );
 }

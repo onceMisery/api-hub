@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { SessionBar } from "../../auth/components/session-bar";
+import { useI18n } from "../../../lib/ui-preferences";
 import { formatProjectAccess } from "./project-catalog-utils";
 import {
   countTreeNodes,
@@ -30,8 +31,6 @@ import {
   findFirstEndpointId,
   findLatestMockRelease,
   findLiveVersion,
-  formatEndpointStatus,
-  formatTimestamp,
   groupParameters,
   groupResponses
 } from "./project-docs-browser-utils";
@@ -42,6 +41,7 @@ type ProjectDocsBrowserProps = {
 
 export function ProjectDocsBrowser({ projectId }: ProjectDocsBrowserProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
   const [selectedEndpointId, setSelectedEndpointId] = useState<number | null>(null);
@@ -176,51 +176,51 @@ export function ProjectDocsBrowser({ projectId }: ProjectDocsBrowserProps) {
     };
   }, [selectedEndpointId]);
 
-  const accessLabel = formatProjectAccess(project?.currentUserRole);
+  const accessLabel = formatProjectAccessLabel(project?.currentUserRole, t);
   const activeCounts = searchQuery.trim() ? filteredCounts : treeCounts;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1480px] flex-col gap-6 p-6 text-slate-900">
       <SessionBar />
-      <section className="overflow-hidden rounded-[2.4rem] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(15,23,42,0.05),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.14),_transparent_32%),linear-gradient(145deg,_rgba(255,255,255,0.96),_rgba(241,245,249,0.9))] p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur">
+      <section className="overflow-hidden rounded-[2.4rem] border border-slate-900/80 bg-[linear-gradient(180deg,#1d2028_0%,#0b0d11_100%)] p-6 text-white shadow-[0_30px_90px_rgba(15,23,42,0.20)] backdrop-blur">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">Project Documentation</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">{t("docs.page.eyebrow")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-950">{project?.name ?? `Project #${projectId}`}</h1>
+              <h1 className="text-4xl font-semibold tracking-tight text-white">{project?.name ?? `Project #${projectId}`}</h1>
               {project?.projectKey ? (
-                <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                   {project.projectKey}
                 </span>
               ) : null}
             </div>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-              {project?.description || "Browse endpoint contracts, release posture, and mock publication history without stepping into editing mode."}
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+              {project?.description || t("docs.page.description")}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
               <Badge label={accessLabel} tone="slate" />
-              <Badge label="Read-only" tone="amber" />
-              <Badge label="Browse mode" tone="sky" />
+              <Badge label={t("docs.badge.readOnly")} tone="amber" />
+              <Badge label={t("docs.badge.browseMode")} tone="sky" />
             </div>
           </div>
 
           <div className="grid gap-3 xl:w-[440px]">
             <div className="grid gap-3 sm:grid-cols-3">
-              <StatCard label="Modules" value={activeCounts.moduleCount} />
-              <StatCard label="Groups" value={activeCounts.groupCount} />
-              <StatCard label="Endpoints" value={activeCounts.endpointCount} />
+              <StatCard label={t("docs.stats.modules")} value={activeCounts.moduleCount} />
+              <StatCard label={t("docs.stats.groups")} value={activeCounts.groupCount} />
+              <StatCard label={t("docs.stats.endpoints")} value={activeCounts.endpointCount} />
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-full border border-white/12 bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
                 href={`/console/projects/${projectId}`}
               >
-                Open workbench
+                {t("docs.openWorkbench")}
               </Link>
-              <div className="rounded-full border border-slate-200 bg-white/85 px-4 py-3 text-sm text-slate-500">
+              <div className="rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm text-slate-300">
                 {searchQuery.trim()
-                  ? `Filtered to ${filteredCounts.endpointCount} endpoints`
-                  : "All documentation is loaded from authenticated project APIs"}
+                  ? t("docs.filteredEndpoints", { count: filteredCounts.endpointCount })
+                  : t("docs.authenticatedData")}
               </div>
             </div>
           </div>
@@ -233,7 +233,7 @@ export function ProjectDocsBrowser({ projectId }: ProjectDocsBrowserProps) {
 
       {isLoadingShell ? (
         <section className="rounded-[2rem] border border-white/60 bg-white/80 px-6 py-12 text-sm text-slate-500 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-          Loading documentation surface...
+          {t("docs.loadingShell")}
         </section>
       ) : (
         <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -248,16 +248,16 @@ export function ProjectDocsBrowser({ projectId }: ProjectDocsBrowserProps) {
           <div className="space-y-6">
             {!selectedEndpointId ? (
               <section className="rounded-[2rem] border border-dashed border-slate-200 bg-white/78 px-6 py-12 text-center shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-                <p className="text-lg font-semibold text-slate-950">No endpoint selected</p>
+                <p className="text-lg font-semibold text-slate-950">{t("docs.empty.title")}</p>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
                   {modules.length === 0
-                    ? "This project does not contain any documented endpoints yet."
-                    : "Choose an endpoint from the tree to inspect its read-only contract surface."}
+                    ? t("docs.empty.noEndpoints")
+                    : t("docs.empty.select")}
                 </p>
               </section>
             ) : isLoadingEndpoint ? (
               <section className="rounded-[2rem] border border-white/60 bg-white/80 px-6 py-12 text-sm text-slate-500 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-                Loading endpoint details...
+                {t("docs.loadingEndpoint")}
               </section>
             ) : detailError ? (
               <section className="rounded-[2rem] border border-rose-200 bg-rose-50 px-6 py-5 text-sm text-rose-700">
@@ -312,35 +312,37 @@ function NavigationRail({
   onSearchChange: (value: string) => void;
   onSelectEndpoint: (endpointId: number | null) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <aside className="rounded-[2rem] border border-white/60 bg-white/78 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Navigation</p>
-        <h2 className="text-lg font-semibold text-slate-950">Search and browse endpoints</h2>
-        <p className="text-sm leading-6 text-slate-600">Narrow the tree by endpoint name, method, path, module, or group label.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("docs.navigation.eyebrow")}</p>
+        <h2 className="text-lg font-semibold text-slate-950">{t("docs.navigation.title")}</h2>
+        <p className="text-sm leading-6 text-slate-600">{t("docs.navigation.detail")}</p>
       </div>
 
       <label className="mt-5 block space-y-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Search docs</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("docs.navigation.search")}</span>
         <input
-          aria-label="Search docs"
+          aria-label={t("docs.navigation.search")}
           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search names, methods, paths, modules, groups"
+          placeholder={t("docs.navigation.searchPlaceholder")}
           value={searchQuery}
         />
       </label>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-        <MiniStatCard label="Modules" value={stats.moduleCount} />
-        <MiniStatCard label="Groups" value={stats.groupCount} />
-        <MiniStatCard label="Endpoints" value={stats.endpointCount} />
+        <MiniStatCard label={t("docs.stats.modules")} value={stats.moduleCount} />
+        <MiniStatCard label={t("docs.stats.groups")} value={stats.groupCount} />
+        <MiniStatCard label={t("docs.stats.endpoints")} value={stats.endpointCount} />
       </div>
 
       <div className="mt-5 space-y-4">
         {filteredModules.length === 0 ? (
           <div className="rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-            No endpoints match the current documentation search.
+            {t("docs.emptySearch")}
           </div>
         ) : (
           filteredModules.map((module) => (
@@ -454,6 +456,8 @@ function EndpointHero({
   versionCount: number;
   mockReleaseCount: number;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="overflow-hidden rounded-[2rem] border border-white/60 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.16),_transparent_25%),radial-gradient(circle_at_bottom_left,_rgba(15,23,42,0.06),_transparent_28%),linear-gradient(145deg,_rgba(255,255,255,0.98),_rgba(241,245,249,0.92))] p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -461,7 +465,7 @@ function EndpointHero({
           <div className="flex flex-wrap items-center gap-3">
             <span className={getMethodBadgeClasses(endpoint.method)}>{endpoint.method}</span>
             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              {formatEndpointStatus(endpoint.status)}
+              {formatEndpointStatusLabel(endpoint.status, t)}
             </span>
             {endpoint.releasedVersionLabel ? <Badge label={endpoint.releasedVersionLabel} tone="slate" /> : null}
             {latestMockRelease ? <Badge label={`Mock #${latestMockRelease.releaseNo}`} tone="emerald" /> : null}
@@ -469,15 +473,15 @@ function EndpointHero({
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{endpoint.name}</h2>
           <p className="mt-3 rounded-[1.4rem] border border-slate-200/80 bg-white/85 px-4 py-3 font-mono text-sm text-slate-700">{endpoint.path}</p>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-            {endpoint.description || "No endpoint description was written for this contract."}
+            {endpoint.description || t("docs.hero.noDescription")}
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
-          <MetricCard label="Parameters" value={String(parameterCount)} />
-          <MetricCard label="Responses" value={String(responseCount)} />
-          <MetricCard label="Versions" value={String(versionCount)} />
-          <MetricCard label="Mock releases" value={String(mockReleaseCount)} />
+          <MetricCard label={t("docs.metric.parameters")} value={String(parameterCount)} />
+          <MetricCard label={t("docs.metric.responses")} value={String(responseCount)} />
+          <MetricCard label={t("docs.metric.versions")} value={String(versionCount)} />
+          <MetricCard label={t("docs.metric.mockReleases")} value={String(mockReleaseCount)} />
         </div>
       </div>
     </section>
@@ -489,19 +493,19 @@ function ParameterSurface({
 }: {
   sections: ReturnType<typeof groupParameters>;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Request Contract</p>
-        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">Parameters and request surface</h3>
-        <p className="text-sm leading-6 text-slate-600">
-          Inspect the request shape grouped by transport location so integration consumers can scan the contract quickly.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("contract.parametersEyebrow")}</p>
+        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">{t("contract.parametersTitle")}</h3>
+        <p className="text-sm leading-6 text-slate-600">{t("contract.parametersDetail")}</p>
       </div>
 
       {sections.length === 0 ? (
         <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-          No request parameters were documented for this endpoint.
+          {t("contract.parametersEmpty")}
         </div>
       ) : (
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -509,8 +513,8 @@ function ParameterSurface({
             <section className="rounded-[1.7rem] border border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.92))] p-5 shadow-[0_18px_42px_rgba(15,23,42,0.05)]" key={section.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-slate-950">{section.label}</p>
-                  <p className="mt-2 text-sm text-slate-500">{section.items.length} documented fields</p>
+                  <p className="text-lg font-semibold text-slate-950">{formatParameterSectionLabel(section.id, t)}</p>
+                  <p className="mt-2 text-sm text-slate-500">{t("contract.fields", { count: section.items.length })}</p>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   {section.items.length}
@@ -519,12 +523,12 @@ function ParameterSurface({
               <div className="mt-4 space-y-3">
                 {section.items.map((parameter) => (
                   <ContractItemCard
-                    detail={parameter.description || "No field description."}
+                    detail={parameter.description || t("contract.noDescription")}
                     key={`${section.id}-${parameter.id}`}
                     meta={[
                       parameter.dataType,
-                      parameter.required ? "Required" : "Optional",
-                      parameter.exampleValue ? `Example: ${parameter.exampleValue}` : null
+                      parameter.required ? t("contract.required") : t("contract.optional"),
+                      parameter.exampleValue ? t("contract.example", { value: parameter.exampleValue }) : null
                     ]}
                     title={parameter.name}
                   />
@@ -543,19 +547,19 @@ function ResponseSurface({
 }: {
   sections: ReturnType<typeof groupResponses>;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Response Contract</p>
-        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">Response envelopes and fields</h3>
-        <p className="text-sm leading-6 text-slate-600">
-          Review response bodies grouped by status code, with field-level metadata preserved from the editor.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("contract.responsesEyebrow")}</p>
+        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">{t("contract.responsesTitle")}</h3>
+        <p className="text-sm leading-6 text-slate-600">{t("contract.responsesDetail")}</p>
       </div>
 
       {sections.length === 0 ? (
         <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-          No response fields were documented for this endpoint.
+          {t("contract.responsesEmpty")}
         </div>
       ) : (
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -564,7 +568,7 @@ function ResponseSurface({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-lg font-semibold text-slate-950">{section.label}</p>
-                  <p className="mt-2 text-sm text-slate-500">{section.items.length} documented fields</p>
+                  <p className="mt-2 text-sm text-slate-500">{t("contract.fields", { count: section.items.length })}</p>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   {section.items.length}
@@ -573,15 +577,15 @@ function ResponseSurface({
               <div className="mt-4 space-y-3">
                 {section.items.map((response) => (
                   <ContractItemCard
-                    detail={response.description || "No field description."}
+                    detail={response.description || t("contract.noDescription")}
                     key={`${section.id}-${response.id}`}
                     meta={[
                       response.mediaType,
                       response.dataType,
-                      response.required ? "Required" : "Optional",
-                      response.exampleValue ? `Example: ${response.exampleValue}` : null
+                      response.required ? t("contract.required") : t("contract.optional"),
+                      response.exampleValue ? t("contract.example", { value: response.exampleValue }) : null
                     ]}
-                    title={response.name || "Unnamed field"}
+                    title={response.name || t("contract.unnamedField")}
                   />
                 ))}
               </div>
@@ -635,39 +639,41 @@ function VersionPosture({
   liveVersion: VersionDetail | null;
   versions: VersionDetail[];
 }) {
+  const { t } = useI18n();
+
   return (
     <section
-      aria-label="Version posture"
+      aria-label={t("docs.version.region")}
       className="overflow-hidden rounded-[2rem] border border-slate-900/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_28%),linear-gradient(145deg,_rgba(15,23,42,0.98),_rgba(30,41,59,0.94),_rgba(51,65,85,0.92))] p-6 text-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]"
       role="region"
     >
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">Version posture</p>
-        <h3 className="text-2xl font-semibold tracking-tight">Live version</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">{t("docs.version.region")}</p>
+        <h3 className="text-2xl font-semibold tracking-tight">{t("docs.version.title")}</h3>
         <p className="text-sm leading-6 text-slate-300">
           {liveVersion
-            ? "The documentation surface is highlighting the contract snapshot currently associated with runtime traffic."
-            : "This endpoint is still in the draft lane and does not have a released version yet."}
+            ? t("docs.version.detailLive")
+            : t("docs.version.detailDraft")}
         </p>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <GlassMetricCard label="Current lane" value={formatEndpointStatus(endpoint.status)} />
+        <GlassMetricCard label={t("docs.version.currentLane")} value={formatEndpointStatusLabel(endpoint.status, t)} />
         <GlassMetricCard
-          label="Live snapshot"
+          label={t("docs.version.liveSnapshot")}
           value={
             endpoint.releasedVersionLabel
-              ? `Live: ${endpoint.releasedVersionLabel}`
+              ? t("docs.version.livePrefix", { version: endpoint.releasedVersionLabel })
               : liveVersion?.version
-                ? `Live: ${liveVersion.version}`
-                : "Draft lane"
+                ? t("docs.version.livePrefix", { version: liveVersion.version })
+                : t("docs.version.draftLane")
           }
         />
       </div>
 
       {versions.length === 0 ? (
         <div className="mt-5 rounded-[1.6rem] border border-white/12 bg-white/5 px-4 py-5 text-sm text-slate-300">
-          No version snapshots were saved for this endpoint yet.
+          {t("docs.version.noVersions")}
         </div>
       ) : (
         <div className="mt-5 space-y-3">
@@ -675,16 +681,20 @@ function VersionPosture({
             <div className="rounded-[1.55rem] border border-white/12 bg-white/6 p-4 backdrop-blur-sm" key={version.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-white">{version.released ? `Version ${version.version}` : `Snapshot ${version.version}`}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{version.changeSummary || "No version summary was recorded."}</p>
+                  <p className="text-sm font-semibold text-white">
+                    {version.released
+                      ? t("docs.version.version", { version: version.version })
+                      : t("docs.version.snapshot", { version: version.version })}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{version.changeSummary || t("docs.version.noSummary")}</p>
                 </div>
                 {version.released ? (
                   <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-100">
-                    Released snapshot
+                    {t("docs.version.releasedBadge")}
                   </span>
                 ) : (
                   <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-200">
-                    Snapshot
+                    {t("docs.version.snapshotBadge")}
                   </span>
                 )}
               </div>
@@ -703,30 +713,34 @@ function MockReleasePosture({
   latestMockRelease: MockReleaseDetail | null;
   mockReleases: MockReleaseDetail[];
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Mock releases</p>
-        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">Published mock runtime snapshots</h3>
-        <p className="text-sm leading-6 text-slate-600">Inspect the latest mock publication and keep a short release trail for reviewers and testers.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("docs.mock.eyebrow")}</p>
+        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">{t("docs.mock.title")}</h3>
+        <p className="text-sm leading-6 text-slate-600">{t("docs.mock.detail")}</p>
       </div>
 
       {latestMockRelease ? (
         <div className="mt-5 rounded-[1.8rem] border border-emerald-200/80 bg-[linear-gradient(145deg,_rgba(236,253,245,0.96),_rgba(209,250,229,0.88))] p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Latest publication</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-950">{`Release #${latestMockRelease.releaseNo}`}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{formatTimestamp(latestMockRelease.createdAt) || "Timestamp unavailable"}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">{t("docs.mock.latestPublication")}</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-950">{t("docs.mock.release", { count: latestMockRelease.releaseNo })}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {formatTimestampLabel(latestMockRelease.createdAt) || t("docs.mock.timestampUnavailable")}
+              </p>
             </div>
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
-              Latest
+              {t("docs.mock.latest")}
             </span>
           </div>
         </div>
       ) : (
         <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-          No mock releases have been published for this endpoint.
+          {t("docs.mock.empty")}
         </div>
       )}
 
@@ -736,12 +750,12 @@ function MockReleasePosture({
             <div className="rounded-[1.55rem] border border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.92))] p-4" key={release.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-950">{`Published release #${release.releaseNo}`}</p>
-                  <p className="mt-2 text-sm text-slate-500">{formatTimestamp(release.createdAt) || "Timestamp unavailable"}</p>
+                  <p className="text-sm font-semibold text-slate-950">{t("docs.mock.publishedRelease", { count: release.releaseNo })}</p>
+                  <p className="mt-2 text-sm text-slate-500">{formatTimestampLabel(release.createdAt) || t("docs.mock.timestampUnavailable")}</p>
                 </div>
                 {release.id === latestMockRelease?.id ? (
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                    Active latest
+                    {t("docs.mock.activeLatest")}
                   </span>
                 ) : null}
               </div>
@@ -782,4 +796,69 @@ function getMethodBadgeClasses(method: string, isActive = false) {
       };
 
   return `rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${palette[method as keyof typeof palette] ?? palette.fallback}`;
+}
+
+function formatProjectAccessLabel(role: string | null | undefined, t: (key: string, values?: Record<string, string | number>) => string) {
+  switch (role) {
+    case "project_admin":
+      return t("project.access.admin");
+    case "editor":
+      return t("project.access.editor");
+    case "tester":
+      return t("project.access.tester");
+    case "viewer":
+      return t("project.access.viewer");
+    default:
+      return formatProjectAccess(role);
+  }
+}
+
+function formatParameterSectionLabel(sectionId: string, t: (key: string, values?: Record<string, string | number>) => string) {
+  switch (sectionId) {
+    case "body":
+      return "Body parameters";
+    case "cookie":
+      return "Cookie parameters";
+    case "header":
+      return "Header parameters";
+    case "path":
+      return "路径参数";
+    case "query":
+      return "查询参数";
+    default:
+      return sectionId;
+  }
+}
+
+function formatEndpointStatusLabel(status: string | null | undefined, t: (key: string, values?: Record<string, string | number>) => string) {
+  switch (status) {
+    case "released":
+      return t("docs.version.releasedBadge");
+    case "review":
+      return "审核中";
+    case "deprecated":
+      return "已废弃";
+    case "archived":
+      return "已归档";
+    default:
+      return t("docs.version.draftLane");
+  }
+}
+
+function formatTimestampLabel(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getUTCDate()}`.padStart(2, "0");
+  const hours = `${date.getUTCHours()}`.padStart(2, "0");
+  const minutes = `${date.getUTCMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
 }

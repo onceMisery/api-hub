@@ -9,6 +9,7 @@ import type {
   ExecuteDebugPayload
 } from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
+import { useI18n } from "../../../lib/ui-preferences";
 
 import {
   deleteDebugPreset,
@@ -65,6 +66,7 @@ export function DebugConsole({
   onRunHistory,
   replayDraft
 }: DebugConsoleProps) {
+  const { t } = useI18n();
   const [queryString, setQueryString] = useState("");
   const [headersText, setHeadersText] = useState("");
   const [body, setBody] = useState("");
@@ -138,9 +140,9 @@ export function DebugConsole({
       projectRuleCount: projectDebugAllowedHosts.length,
       environmentMode: environment.debugHostMode,
       environmentRuleCount: (environment.debugAllowedHosts ?? []).length,
-      effectiveSummary: describeDebugPolicyMode(environment.debugHostMode)
+      effectiveSummary: describeDebugPolicyMode(t, environment.debugHostMode)
     };
-  }, [environment, projectDebugAllowedHosts]);
+  }, [environment, projectDebugAllowedHosts, t]);
   const generatedCurl = useMemo(
     () =>
       generateDebugCurlCommand({
@@ -165,10 +167,10 @@ export function DebugConsole({
       setPresets(nextPresets);
       setPresetName("");
       setPresetError(null);
-      setPresetMessage(`Saved preset ${presetName.trim()}.`);
+      setPresetMessage(t("debug.presets.savedMessage", { name: presetName.trim() }));
     } catch (presetSaveError) {
       setPresetMessage(null);
-      setPresetError(presetSaveError instanceof Error ? presetSaveError.message : "Failed to save preset.");
+      setPresetError(presetSaveError instanceof Error ? presetSaveError.message : t("debug.presets.saveError"));
     }
   }
 
@@ -180,14 +182,14 @@ export function DebugConsole({
     setError(null);
     setPolicyError(null);
     setPresetError(null);
-    setPresetMessage(`Applied preset ${preset.name}.`);
+    setPresetMessage(t("debug.presets.appliedMessage", { name: preset.name }));
   }
 
   function handleDeletePreset(preset: DebugRequestPreset) {
     const nextPresets = deleteDebugPreset(environment?.projectId, endpoint?.id, preset.id);
     setPresets(nextPresets);
     setPresetError(null);
-    setPresetMessage(`Deleted preset ${preset.name}.`);
+    setPresetMessage(t("debug.presets.deletedMessage", { name: preset.name }));
 
     if (presetName.trim().toLowerCase() === preset.name.trim().toLowerCase()) {
       setPresetName("");
@@ -197,23 +199,23 @@ export function DebugConsole({
   async function handleCopyCurl() {
     if (!generatedCurl) {
       setCurlMessage(null);
-      setCurlError("No cURL command is available yet.");
+      setCurlError(t("debug.curl.empty"));
       return;
     }
 
     if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
       setCurlMessage(null);
-      setCurlError("Clipboard is unavailable in this browser.");
+      setCurlError(t("debug.curl.clipboardUnavailable"));
       return;
     }
 
     try {
       await navigator.clipboard.writeText(generatedCurl);
       setCurlError(null);
-      setCurlMessage("Copied cURL command.");
+      setCurlMessage(t("debug.curl.copied"));
     } catch {
       setCurlMessage(null);
-      setCurlError("Failed to copy cURL command.");
+      setCurlError(t("debug.curl.copyError"));
     }
   }
 
@@ -227,30 +229,33 @@ export function DebugConsole({
       setError(null);
       setPolicyError(null);
       setCurlError(null);
-      setCurlMessage("Imported cURL into the current draft.");
+      setCurlMessage(t("debug.curl.imported"));
       setCurlWarning(
         endpoint && parsedCommand.method.toUpperCase() !== endpoint.method.toUpperCase()
-          ? `Imported method ${parsedCommand.method.toUpperCase()} differs from endpoint ${endpoint.method}.`
+          ? t("debug.curl.methodMismatch", {
+              imported: parsedCommand.method.toUpperCase(),
+              endpoint: endpoint.method
+            })
           : null
       );
     } catch (curlImportError) {
       setCurlMessage(null);
       setCurlWarning(null);
-      setCurlError(curlImportError instanceof Error ? curlImportError.message : "Failed to import cURL command.");
+      setCurlError(curlImportError instanceof Error ? curlImportError.message : t("debug.curl.importError"));
     }
   }
 
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Debug</p>
-        <h3 className="mt-2 text-xl font-semibold text-slate-950">Live request console</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Run the selected endpoint against the active environment without leaving the workbench.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("debug.eyebrow")}</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">{t("debug.title")}</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{t("debug.detail")}</p>
       </div>
 
       {!canExecute ? (
         <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-          Select both an endpoint and an environment to enable debugging.
+          {t("debug.empty")}
         </div>
       ) : (
         <form
@@ -274,26 +279,26 @@ export function DebugConsole({
             })
               .then((response) => setResult(response))
               .catch((executionError) => {
-                const nextPolicyError = extractPolicyError(executionError);
+                const nextPolicyError = extractPolicyError(executionError, t);
                 if (nextPolicyError) {
                   setPolicyError(nextPolicyError);
                   setError(null);
                   return;
                 }
 
-                setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request");
+                setError(executionError instanceof Error ? executionError.message : t("debug.executeError"));
               })
               .finally(() => setIsExecuting(false));
           }}
         >
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <Field label="Target environment">
+            <Field label={t("debug.targetEnvironment")}>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <div className="font-medium text-slate-950">{environment?.name}</div>
                 <div className="mt-1 font-mono text-xs text-slate-500">{environment?.baseUrl}</div>
               </div>
             </Field>
-            <Field label="Endpoint route">
+            <Field label={t("debug.endpointRoute")}>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <div className="font-medium text-slate-950">
                   {endpoint?.method} {endpoint?.name}
@@ -307,22 +312,22 @@ export function DebugConsole({
             <div className="rounded-[1.8rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_rgba(244,239,228,0.92)_44%,_rgba(226,232,240,0.74)_100%)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
               <div className="flex flex-col gap-5">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Request presets</p>
-                  <p className="mt-3 text-base font-semibold text-slate-950">Keep your best debug drafts one click away.</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Saved locally in this browser and scoped to the current endpoint.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("debug.presets.eyebrow")}</p>
+                  <p className="mt-3 text-base font-semibold text-slate-950">{t("debug.presets.title")}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{t("debug.presets.detail")}</p>
                 </div>
 
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                  <Field label="Preset name">
+                  <Field label={t("debug.presets.name")}>
                     <input
-                      aria-label="Preset name"
+                      aria-label={t("debug.presets.name")}
                       className="w-full rounded-2xl border border-white/80 bg-white/88 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                       onChange={(event) => {
                         setPresetName(event.target.value);
                         setPresetError(null);
                         setPresetMessage(null);
                       }}
-                      placeholder="Strict user trace"
+                      placeholder={t("debug.presets.placeholder")}
                       value={presetName}
                     />
                   </Field>
@@ -331,7 +336,7 @@ export function DebugConsole({
                     onClick={() => handleSavePreset()}
                     type="button"
                   >
-                    Save preset
+                    {t("debug.presets.save")}
                   </button>
                 </div>
 
@@ -340,7 +345,7 @@ export function DebugConsole({
 
                 {presets.length === 0 ? (
                   <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white/70 px-4 py-5 text-sm text-slate-500">
-                    No presets yet. Save a draft you want to reuse across repeated debugging runs.
+                    {t("debug.presets.empty")}
                   </div>
                 ) : (
                   <div className="grid gap-3 md:grid-cols-2">
@@ -352,25 +357,25 @@ export function DebugConsole({
                             <p className="mt-2 text-xs leading-5 text-slate-500">{describeDebugPreset(preset)}</p>
                           </div>
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
-                            Saved
+                            {t("debug.presets.savedBadge")}
                           </span>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button
-                            aria-label={`Apply preset ${preset.name}`}
+                            aria-label={t("debug.presets.applyLabel", { name: preset.name })}
                             className="rounded-2xl bg-slate-950 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
                             onClick={() => handleApplyPreset(preset)}
                             type="button"
                           >
-                            Apply
+                            {t("debug.presets.apply")}
                           </button>
                           <button
-                            aria-label={`Delete preset ${preset.name}`}
+                            aria-label={t("debug.presets.deleteLabel", { name: preset.name })}
                             className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
                             onClick={() => handleDeletePreset(preset)}
                             type="button"
                           >
-                            Delete
+                            {t("debug.presets.delete")}
                           </button>
                         </div>
                       </div>
@@ -382,15 +387,15 @@ export function DebugConsole({
 
             <div className="rounded-[1.8rem] border border-slate-900/85 bg-[radial-gradient(circle_at_top_left,_rgba(226,232,240,0.16),_rgba(15,23,42,0.97)_58%)] p-5 text-white shadow-[0_22px_60px_rgba(15,23,42,0.24)]">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">cURL bridge</p>
-                <p className="mt-3 text-base font-semibold tracking-tight">Move the current draft in and out of terminal flows.</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Export the exact request you are about to run, or paste a cURL command back into this console.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">{t("debug.curl.eyebrow")}</p>
+                <p className="mt-3 text-base font-semibold tracking-tight">{t("debug.curl.title")}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{t("debug.curl.detail")}</p>
               </div>
 
               <div className="mt-5 space-y-4">
-                <DarkField label="Generated cURL">
+                <DarkField label={t("debug.curl.generated")}>
                   <textarea
-                    aria-label="Generated cURL"
+                    aria-label={t("debug.curl.generated")}
                     className="min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-3 font-mono text-sm text-slate-100 outline-none"
                     readOnly
                     value={generatedCurl}
@@ -403,19 +408,19 @@ export function DebugConsole({
                   onClick={() => void handleCopyCurl()}
                   type="button"
                 >
-                  Copy cURL
+                  {t("debug.curl.copy")}
                 </button>
 
-                <DarkField label="Import cURL">
+                <DarkField label={t("debug.curl.import")}>
                   <textarea
-                    aria-label="Import cURL"
+                    aria-label={t("debug.curl.import")}
                     className="min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-3 font-mono text-sm text-slate-100 outline-none transition focus:border-white/25"
                     onChange={(event) => {
                       setCurlImportText(event.target.value);
                       setCurlError(null);
                       setCurlMessage(null);
                     }}
-                    placeholder="curl 'https://local.dev/users/{id}?mode=compact' -H 'X-Trace: imported'"
+                    placeholder={t("debug.curl.importPlaceholder")}
                     value={curlImportText}
                   />
                 </DarkField>
@@ -429,15 +434,15 @@ export function DebugConsole({
                   onClick={() => handleImportCurl()}
                   type="button"
                 >
-                  Import cURL
+                  {t("debug.curl.importAction")}
                 </button>
               </div>
             </div>
           </div>
 
-          <Field label="Query string">
+          <Field label={t("debug.queryString")}>
             <input
-              aria-label="Query string"
+              aria-label={t("debug.queryString")}
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
               onChange={(event) => setQueryString(event.target.value)}
               placeholder="verbose=true&include=profile"
@@ -445,9 +450,9 @@ export function DebugConsole({
             />
           </Field>
 
-          <Field label="Headers">
+          <Field label={t("debug.headers")}>
             <textarea
-              aria-label="Headers"
+              aria-label={t("debug.headers")}
               className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
               onChange={(event) => setHeadersText(event.target.value)}
               placeholder={"Authorization: Bearer xxx\nX-Trace: abc"}
@@ -455,9 +460,9 @@ export function DebugConsole({
             />
           </Field>
 
-          <Field label="Body">
+          <Field label={t("debug.body")}>
             <textarea
-              aria-label="Body"
+              aria-label={t("debug.body")}
               className="min-h-40 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
               onChange={(event) => setBody(event.target.value)}
               placeholder='{"name":"Alice"}'
@@ -466,17 +471,17 @@ export function DebugConsole({
           </Field>
 
           <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Request preview</p>
-            <p className="mt-2 font-mono text-sm text-slate-700">{previewUrl ?? "Invalid target"}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("debug.preview")}</p>
+            <p className="mt-2 font-mono text-sm text-slate-700">{previewUrl ?? t("debug.previewInvalid")}</p>
           </div>
 
           {policySummary ? (
             <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Debug target policy</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("debug.policy.title")}</p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <PolicyMetric label="Project rules" value={String(policySummary.projectRuleCount)} />
-                <PolicyMetric label="Environment mode" value={policySummary.environmentMode} />
-                <PolicyMetric label="Environment rules" value={String(policySummary.environmentRuleCount)} />
+                <PolicyMetric label={t("debug.policy.projectRules")} value={String(policySummary.projectRuleCount)} />
+                <PolicyMetric label={t("debug.policy.environmentMode")} value={policySummary.environmentMode} />
+                <PolicyMetric label={t("debug.policy.environmentRules")} value={String(policySummary.environmentRuleCount)} />
               </div>
               <p className="mt-3 text-sm text-slate-600">{policySummary.effectiveSummary}</p>
             </div>
@@ -484,16 +489,16 @@ export function DebugConsole({
 
           {policyError ? (
             <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <p className="font-semibold">Request blocked by debug policy</p>
+              <p className="font-semibold">{t("debug.policy.blockedTitle")}</p>
               <p className="mt-1">{policyError.message}</p>
               {policyError.host ? (
                 <p className="mt-2">
-                  <span className="font-semibold">Blocked host</span>: {policyError.host}
+                  <span className="font-semibold">{t("debug.policy.blockedHost")}</span>: {policyError.host}
                 </p>
               ) : null}
               {policyError.matchedPatterns.length > 0 ? (
                 <div className="mt-2 space-y-1">
-                  <p className="font-semibold">Matched rules</p>
+                  <p className="font-semibold">{t("debug.policy.matchedRules")}</p>
                   {policyError.matchedPatterns.map((pattern) => (
                     <p className="font-mono text-xs" key={pattern}>
                       {pattern}
@@ -512,7 +517,7 @@ export function DebugConsole({
             disabled={!canExecute || isExecuting}
             type="submit"
           >
-            {isExecuting ? "Sending..." : "Send request"}
+            {isExecuting ? t("debug.sending") : t("debug.send")}
           </button>
         </form>
       )}
@@ -525,10 +530,10 @@ export function DebugConsole({
             <span className="font-mono text-xs text-slate-500">{result.finalUrl}</span>
           </div>
 
-          <Field label="Response headers">
+          <Field label={t("debug.responseHeaders")}>
             <div className="space-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
               {result.responseHeaders.length === 0 ? (
-                <p className="text-slate-500">No response headers.</p>
+                <p className="text-slate-500">{t("debug.responseHeadersEmpty")}</p>
               ) : (
                 result.responseHeaders.map((header, index) => (
                   <div className="font-mono text-xs text-slate-600" key={`${header.name}-${index}`}>
@@ -539,19 +544,19 @@ export function DebugConsole({
             </div>
           </Field>
 
-          <Field label="Response body">
+          <Field label={t("debug.responseBody")}>
             <pre className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 text-xs text-slate-100">
-              {result.responseBody || "<empty>"}
+              {result.responseBody || t("debug.responseBodyEmpty")}
             </pre>
           </Field>
         </div>
       ) : null}
 
       <div className="mt-5 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recent history</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("debug.history.eyebrow")}</p>
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto]">
           <select
-            aria-label="Debug history environment filter"
+            aria-label={t("debug.history.environmentFilter")}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
             onChange={(event) =>
               onChangeHistoryFilters({
@@ -561,7 +566,7 @@ export function DebugConsole({
             }
             value={historyFilters.environmentId ?? ""}
           >
-            <option value="">All environments</option>
+            <option value="">{t("debug.history.allEnvironments")}</option>
             {environmentOptions.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -569,7 +574,7 @@ export function DebugConsole({
             ))}
           </select>
           <input
-            aria-label="Debug history status filter"
+            aria-label={t("debug.history.statusFilter")}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
             onChange={(event) =>
               onChangeHistoryFilters({
@@ -577,12 +582,12 @@ export function DebugConsole({
                 statusCode: event.target.value ? Number(event.target.value) : null
               })
             }
-            placeholder="Status code"
+            placeholder={t("debug.history.statusCode")}
             type="number"
             value={historyFilters.statusCode ?? ""}
           />
           <input
-            aria-label="Debug history created from filter"
+            aria-label={t("debug.history.createdFrom")}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
             onChange={(event) =>
               onChangeHistoryFilters({
@@ -594,7 +599,7 @@ export function DebugConsole({
             value={historyFilters.createdFrom}
           />
           <input
-            aria-label="Debug history created to filter"
+            aria-label={t("debug.history.createdTo")}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
             onChange={(event) =>
               onChangeHistoryFilters({
@@ -611,14 +616,14 @@ export function DebugConsole({
             onClick={() => void onClearHistory()}
             type="button"
           >
-            Clear debug history
+            {t("debug.history.clear")}
           </button>
         </div>
         <div className="mt-3 space-y-3">
           {isLoadingHistory ? (
-            <p className="text-sm text-slate-500">Loading history...</p>
+            <p className="text-sm text-slate-500">{t("debug.history.loading")}</p>
           ) : history.length === 0 ? (
-            <p className="text-sm text-slate-500">No debug history yet.</p>
+            <p className="text-sm text-slate-500">{t("debug.history.empty")}</p>
           ) : (
             history.map((item) => (
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3" key={item.id}>
@@ -629,15 +634,15 @@ export function DebugConsole({
                     <span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</span>
                   </div>
                   <button
-                    aria-label={`Replay history ${item.id}`}
+                    aria-label={t("debug.history.replayLabel", { id: item.id })}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-white"
                     onClick={() => onReplayHistory(item)}
                     type="button"
                   >
-                    Replay
+                    {t("debug.history.replay")}
                   </button>
                   <button
-                    aria-label={`Run history ${item.id}`}
+                    aria-label={t("debug.history.runLabel", { id: item.id })}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-white"
                     onClick={() => {
                       setIsExecuting(true);
@@ -647,20 +652,20 @@ export function DebugConsole({
                       void onRunHistory(item)
                         .then((response) => setResult(response))
                         .catch((executionError) => {
-                          const nextPolicyError = extractPolicyError(executionError);
+                          const nextPolicyError = extractPolicyError(executionError, t);
                           if (nextPolicyError) {
                             setPolicyError(nextPolicyError);
                             setError(null);
                             return;
                           }
 
-                          setError(executionError instanceof Error ? executionError.message : "Failed to execute debug request");
+                          setError(executionError instanceof Error ? executionError.message : t("debug.executeError"));
                         })
                         .finally(() => setIsExecuting(false));
                     }}
                     type="button"
                   >
-                    Run again
+                    {t("debug.history.run")}
                   </button>
                 </div>
                 <p className="mt-2 font-mono text-xs text-slate-600">{item.finalUrl}</p>
@@ -773,7 +778,10 @@ function formatHeaderEntries(entries: { name: string; value: string }[]) {
   return entries.map((entry) => `${entry.name}: ${entry.value}`.trimEnd()).join("\n");
 }
 
-function extractPolicyError(error: unknown) {
+function extractPolicyError(
+  error: unknown,
+  t: (key: string, values?: Record<string, string | number>) => string
+) {
   if (!error || typeof error !== "object") {
     return null;
   }
@@ -796,7 +804,7 @@ function extractPolicyError(error: unknown) {
 
   return {
     errorCode,
-    message: typeof maybeError.message === "string" ? maybeError.message : "Request blocked by debug policy",
+    message: typeof maybeError.message === "string" ? maybeError.message : t("debug.policy.blockedTitle"),
     host: typeof maybeError.data?.host === "string" ? maybeError.data.host : null,
     matchedPatterns: Array.isArray(maybeError.data?.matchedPatterns)
       ? maybeError.data.matchedPatterns.filter((pattern): pattern is string => typeof pattern === "string")
@@ -804,15 +812,18 @@ function extractPolicyError(error: unknown) {
   };
 }
 
-function describeDebugPolicyMode(mode: EnvironmentDetail["debugHostMode"]) {
+function describeDebugPolicyMode(
+  t: (key: string, values?: Record<string, string | number>) => string,
+  mode: EnvironmentDetail["debugHostMode"]
+) {
   switch (mode) {
     case "append":
-      return "Effective policy uses global + project rules, then appends environment rules.";
+      return t("debug.policy.summary.append");
     case "override":
-      return "Effective policy uses global rules plus environment rules, overriding project rules.";
+      return t("debug.policy.summary.override");
     case "inherit":
     default:
-      return "Effective policy uses global + project rules.";
+      return t("debug.policy.summary.inherit");
   }
 }
 

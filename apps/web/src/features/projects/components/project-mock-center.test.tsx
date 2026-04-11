@@ -17,9 +17,18 @@ vi.mock("@api-hub/api-sdk", () => ({
   publishProjectMockCenterEndpoint
 }));
 
+import { AppPreferencesProvider } from "../../../lib/ui-preferences";
 import { ProjectMockCenter } from "./project-mock-center";
 
 describe("ProjectMockCenter", () => {
+  function renderWithPreferences() {
+    return render(
+      <AppPreferencesProvider>
+        <ProjectMockCenter projectId={7} />
+      </AppPreferencesProvider>
+    );
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -121,16 +130,16 @@ describe("ProjectMockCenter", () => {
   });
 
   it("shows runtime posture and updates access mode", async () => {
-    render(<ProjectMockCenter projectId={7} />);
+    renderWithPreferences();
 
-    expect(screen.getByText("Loading mock center...")).toBeInTheDocument();
+    expect(screen.getByText("正在加载 Mock 中心...")).toBeInTheDocument();
     expect(await screen.findByText("preview_token")).toBeInTheDocument();
     expect(screen.getByText("Get invoice")).toBeInTheDocument();
-    expect(screen.getByText("Draft drift")).toBeInTheDocument();
+    expect(screen.getByText("草稿有漂移")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Public mode" }));
-    fireEvent.change(screen.getByLabelText("Mock access token"), { target: { value: "rotated_token" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save mock access" }));
+    fireEvent.click(screen.getByRole("radio", { name: "公开模式" }));
+    fireEvent.change(screen.getByLabelText("Mock 访问令牌"), { target: { value: "rotated_token" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存 Mock 访问" }));
 
     await waitFor(() =>
       expect(updateProjectMockAccess).toHaveBeenCalledWith(7, {
@@ -139,28 +148,28 @@ describe("ProjectMockCenter", () => {
       })
     );
 
-    expect(await screen.findByText("Public traffic is allowed for every caller.")).toBeInTheDocument();
+    expect(await screen.findByText("所有调用方都可以访问公开 Mock 流量。")).toBeInTheDocument();
   });
 
   it("publishes one endpoint and refreshes the release card state", async () => {
-    render(<ProjectMockCenter projectId={7} />);
+    renderWithPreferences();
 
     const card = await screen.findByRole("article", { name: "Get invoice" });
-    expect(within(card).getByText("Release #4")).toBeInTheDocument();
+    expect(within(card).getByText("发布 #4")).toBeInTheDocument();
 
-    fireEvent.click(within(card).getByRole("button", { name: "Publish endpoint" }));
+    fireEvent.click(within(card).getByRole("button", { name: "发布接口" }));
 
     await waitFor(() => expect(publishProjectMockCenterEndpoint).toHaveBeenCalledWith(7, 31));
-    expect(await screen.findByText("Release #5")).toBeInTheDocument();
-    expect(screen.getByText("Mock disabled")).toBeInTheDocument();
+    expect(await screen.findByText("发布 #5")).toBeInTheDocument();
+    expect(screen.getByText("Mock 未启用")).toBeInTheDocument();
   });
 
   it("regenerates the shared runtime token from the access panel", async () => {
-    render(<ProjectMockCenter projectId={7} />);
+    renderWithPreferences();
 
     expect(await screen.findByText("preview_token")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Regenerate token" }));
+    fireEvent.click(screen.getByRole("button", { name: "重新生成令牌" }));
 
     await waitFor(() =>
       expect(updateProjectMockAccess).toHaveBeenCalledWith(7, {

@@ -118,22 +118,24 @@ export default function ProjectsPage() {
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="app-shell-card rounded-[2rem] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Active Group</p>
-          <h2 className="mt-3 text-2xl font-semibold text-slate-950">{activeGroup?.label ?? t("catalog.group.all")}</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{activeGroup?.description ?? t("catalog.group.all.description")}</p>
-          <div className="mt-5 rounded-[1.5rem] bg-slate-950 px-4 py-4 text-white">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Visible Projects</p>
+        <aside className="overflow-hidden rounded-[2rem] border border-slate-900/80 bg-[linear-gradient(180deg,#1d2028_0%,#0b0d11_100%)] p-5 text-white shadow-[0_28px_80px_rgba(15,23,42,0.22)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("catalog.activeGroup")}</p>
+          <h2 className="mt-3 text-2xl font-semibold text-white">{activeGroup?.label ?? t("catalog.group.all")}</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{activeGroup?.description ?? t("catalog.group.all.description")}</p>
+          <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/6 px-4 py-4 text-white">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("catalog.visibleProjects")}</p>
             <p className="mt-2 text-3xl font-semibold">{visibleProjects.length}</p>
             <p className="mt-2 text-sm text-slate-300">
-              {searchQuery.trim() ? `Filtered by "${searchQuery.trim()}"` : "Ready to open the next workspace."}
+              {searchQuery.trim()
+                ? t("catalog.filteredBy", { query: searchQuery.trim() })
+                : t("catalog.ready")}
             </p>
           </div>
         </aside>
 
         <div className="space-y-5">
           {isLoading ? (
-            <div className="app-shell-card rounded-[2rem] px-6 py-10 text-sm text-slate-500">Loading projects...</div>
+            <div className="app-shell-card rounded-[2rem] px-6 py-10 text-sm text-slate-500">{t("catalog.loading")}</div>
           ) : projects.length === 0 ? (
             <section className="app-shell-card rounded-[2rem] px-6 py-12 text-center">
               <p className="text-base font-semibold text-slate-950">{t("catalog.emptyAll")}</p>

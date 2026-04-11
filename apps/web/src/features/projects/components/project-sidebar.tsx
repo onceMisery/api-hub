@@ -2,6 +2,7 @@
 
 import type { ModuleTreeItem } from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
+import { useI18n } from "../../../lib/ui-preferences";
 
 import {
   readProjectSidebarQuickAccess,
@@ -65,6 +66,7 @@ export function ProjectSidebar({
   selectedEndpointId
 }: ProjectSidebarProps) {
   const [moduleName, setModuleName] = useState("");
+  const { t } = useI18n();
   const [quickAccessState, setQuickAccessState] = useState<ProjectSidebarQuickAccessState>({
     pinnedEndpointIds: [],
     recentEndpointIds: []
@@ -185,8 +187,8 @@ export function ProjectSidebar({
   return (
     <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Project Tree</p>
-        <h2 className="mt-2 text-lg font-semibold text-slate-950">Modules and endpoints</h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("Project Tree")}</p>
+        <h2 className="mt-2 text-lg font-semibold text-slate-950">{t("Modules and endpoints")}</h2>
       </div>
 
       <QuickAccessPanel pinnedEntries={pinnedEntries} recentEntries={recentEntries} onSelectEndpoint={onSelectEndpoint} />
@@ -213,24 +215,24 @@ export function ProjectSidebar({
         }}
       >
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-700">New module name</span>
+          <span className="text-sm font-medium text-slate-700">{t("New module name")}</span>
           <input
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
             disabled={!canWrite}
             onChange={(event) => setModuleName(event.target.value)}
-            placeholder="Core"
+            placeholder={t("Core")}
             value={moduleName}
           />
         </label>
         <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400" disabled={!canWrite} type="submit">
-          Add module
+          {t("Add module")}
         </button>
       </form>
 
       <div className="space-y-4">
         {visibleModules.length === 0 ? (
           <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-            {emptyStateMessage ?? "No matching nodes."}
+            {emptyStateMessage ?? t("No matching nodes.")}
           </div>
         ) : (
           visibleModules.map((module) => (
@@ -281,17 +283,28 @@ function QuickAccessPanel({
   recentEntries: QuickAccessEntry[];
   onSelectEndpoint: (endpointId: number) => void;
 }) {
+  const { t } = useI18n();
   return (
     <section className="mb-5 rounded-[1.8rem] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(245,241,232,0.92)_46%,_rgba(226,232,240,0.82)_100%)] p-4 shadow-[0_20px_52px_rgba(15,23,42,0.07)]">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Quick access</p>
-        <h3 className="text-base font-semibold tracking-tight text-slate-950">Pinned routes and recent focus lanes.</h3>
-        <p className="text-sm leading-6 text-slate-600">Personal shortcuts stay local to this browser and help you jump past large project trees.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("Quick access")}</p>
+        <h3 className="text-base font-semibold tracking-tight text-slate-950">{t("Pinned routes and recent focus lanes.")}</h3>
+        <p className="text-sm leading-6 text-slate-600">{t("Personal shortcuts stay local to this browser and help you jump past large project trees.")}</p>
       </div>
 
       <div className="mt-4 space-y-4">
-        <ShortcutLane emptyCopy="Pin important endpoints from the tree below." entries={pinnedEntries} label="Pinned" onSelectEndpoint={onSelectEndpoint} />
-        <ShortcutLane emptyCopy="Recently opened endpoints will appear here." entries={recentEntries} label="Recent" onSelectEndpoint={onSelectEndpoint} />
+        <ShortcutLane
+          emptyCopy={t("Pin important endpoints from the tree below.")}
+          entries={pinnedEntries}
+          label={t("Pinned")}
+          onSelectEndpoint={onSelectEndpoint}
+        />
+        <ShortcutLane
+          emptyCopy={t("Recently opened endpoints will appear here.")}
+          entries={recentEntries}
+          label={t("Recent")}
+          onSelectEndpoint={onSelectEndpoint}
+        />
       </div>
     </section>
   );
@@ -308,6 +321,7 @@ function ShortcutLane({
   label: string;
   onSelectEndpoint: (endpointId: number) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
@@ -325,7 +339,7 @@ function ShortcutLane({
         <div className="grid gap-3">
           {entries.map((entry) => (
             <button
-              aria-label={`Open quick access ${entry.name}`}
+              aria-label={t("Open quick access {name}", { name: entry.name })}
               className="rounded-[1.3rem] border border-white/70 bg-white/82 px-4 py-4 text-left shadow-[0_12px_32px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300"
               key={`${label}-${entry.endpointId}`}
               onClick={() => onSelectEndpoint(entry.endpointId)}
@@ -364,29 +378,30 @@ function NavigationDeck({
   sortMode: ProjectSidebarTreeSortMode;
   visibleTreeCounts: { endpointCount: number; groupCount: number; moduleCount: number };
 }) {
+  const { t } = useI18n();
   return (
     <section className="mb-5 rounded-[1.8rem] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92),rgba(148,163,184,0.28))] p-4 text-white shadow-[0_22px_60px_rgba(15,23,42,0.16)]">
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Navigation</p>
-        <h3 className="text-base font-semibold tracking-tight">Collapse noise and steer the tree.</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">{t("Navigation")}</p>
+        <h3 className="text-base font-semibold tracking-tight">{t("Collapse noise and steer the tree.")}</h3>
         <p className="text-sm leading-6 text-slate-300">
           {isSearchActive
-            ? "Search keeps matched branches open."
-            : "Change sort mode, collapse branches, and keep project-scale trees easier to scan."}
+            ? t("Search keeps matched branches open.")
+            : t("Change sort mode, collapse branches, and keep project-scale trees easier to scan.")}
         </p>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <DeckStat label="Modules" value={visibleTreeCounts.moduleCount} />
-        <DeckStat label="Groups" value={visibleTreeCounts.groupCount} />
-        <DeckStat label="Endpoints" value={visibleTreeCounts.endpointCount} />
+        <DeckStat label={t("Modules")} value={visibleTreeCounts.moduleCount} />
+        <DeckStat label={t("Groups")} value={visibleTreeCounts.groupCount} />
+        <DeckStat label={t("Endpoints")} value={visibleTreeCounts.endpointCount} />
       </div>
 
       <div className="mt-4 space-y-3">
         <div className="grid gap-2 sm:grid-cols-3">
-          <NavigationSortButton isActive={sortMode === "project"} label="Project order" onClick={() => onSortModeChange("project")} />
-          <NavigationSortButton isActive={sortMode === "name"} label="A-Z" onClick={() => onSortModeChange("name")} />
-          <NavigationSortButton isActive={sortMode === "method"} label="Method" onClick={() => onSortModeChange("method")} />
+          <NavigationSortButton isActive={sortMode === "project"} label={t("Project order")} onClick={() => onSortModeChange("project")} />
+          <NavigationSortButton isActive={sortMode === "name"} label={t("A-Z")} onClick={() => onSortModeChange("name")} />
+          <NavigationSortButton isActive={sortMode === "method"} label={t("Method")} onClick={() => onSortModeChange("method")} />
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <button
@@ -395,7 +410,7 @@ function NavigationDeck({
             onClick={onExpandAll}
             type="button"
           >
-            Expand all
+            {t("Expand all")}
           </button>
           <button
             className="rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-60"
@@ -403,7 +418,7 @@ function NavigationDeck({
             onClick={onCollapseAll}
             type="button"
           >
-            Collapse all
+            {t("Collapse all")}
           </button>
         </div>
       </div>
@@ -487,6 +502,7 @@ function ModuleSection({
 }) {
   const [groupName, setGroupName] = useState("");
   const [moduleDraftName, setModuleDraftName] = useState(module.name);
+  const { t } = useI18n();
   const moduleEndpointCount = module.groups.reduce((count, group) => count + group.endpoints.length, 0);
   const containsSelectedEndpoint = Boolean(
     selectedEndpointId &&
@@ -494,7 +510,8 @@ function ModuleSection({
   );
   const isCollapsed =
     !isSearchActive && !containsSelectedEndpoint && collapsedModuleIds.includes(module.id);
-  const collapseLabel = `${isCollapsed ? "Expand" : "Collapse"} module ${module.id}`;
+  const collapseAction = isCollapsed ? t("Expand") : t("Collapse");
+  const collapseLabel = `${collapseAction} ${t("module")} ${module.id}`;
   const disclosureDisabled = isSearchActive || containsSelectedEndpoint;
 
   return (
@@ -510,39 +527,44 @@ function ModuleSection({
                 onClick={() => onToggleModuleCollapse(module.id)}
                 type="button"
               >
-                {isCollapsed ? "Expand" : "Collapse"}
+                {collapseAction}
               </button>
               <div>
                 <p className="text-sm font-semibold">{module.name}</p>
                 <p className="mt-2 text-xs text-slate-300">
-                  {module.groups.length} groups · {moduleEndpointCount} endpoints
+                  {t("sidebar.moduleSummary", {
+                    groups: module.groups.length,
+                    endpoints: moduleEndpointCount
+                  })}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200">
-                module
+                {t("module")}
               </span>
               <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                {module.groups.length} groups
+                {t("{count} groups", { count: module.groups.length })}
               </span>
               <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                {moduleEndpointCount} endpoints
+                {t("{count} endpoints", { count: moduleEndpointCount })}
               </span>
             </div>
           </div>
           {isSearchActive ? (
-            <p className="text-xs text-slate-300">Search mode keeps matching branches open.</p>
+            <p className="text-xs text-slate-300">{t("Search mode keeps matching branches open.")}</p>
           ) : containsSelectedEndpoint ? (
-            <p className="text-xs text-slate-300">The active endpoint branch stays visible while you work.</p>
+            <p className="text-xs text-slate-300">{t("The active endpoint branch stays visible while you work.")}</p>
           ) : null}
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
           <label className="space-y-2 text-slate-100">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Module {module.id} name</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+              {t("Module {id} name", { id: module.id })}
+            </span>
             <input
-              aria-label={`Module ${module.id} name`}
+              aria-label={t("Module {id} name", { id: module.id })}
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-300/70 focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!canWrite}
               onChange={(event) => setModuleDraftName(event.target.value)}
@@ -550,29 +572,29 @@ function ModuleSection({
             />
           </label>
           <button
-            aria-label={`Rename module ${module.id}`}
+              aria-label={t("Rename module {id}", { id: module.id })}
             className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!canWrite}
             onClick={() => void onRenameModule(module.id, { name: moduleDraftName.trim() || module.name })}
             type="button"
-          >
-            Rename
+            >
+              {t("Rename")}
           </button>
           <button
-            aria-label={`Delete module ${module.id}`}
+              aria-label={t("Delete module {id}", { id: module.id })}
             className="rounded-2xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!canWrite}
             onClick={() => void onDeleteModule(module.id)}
             type="button"
           >
-            Delete
+            {t("Delete")}
           </button>
         </div>
       </div>
 
       {isCollapsed ? (
         <div className="rounded-[1.4rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-500">
-          Module collapsed. Expand it to manage groups and endpoints.
+          {t("Module collapsed. Expand it to manage groups and endpoints.")}
         </div>
       ) : (
         <>
@@ -590,22 +612,22 @@ function ModuleSection({
             }}
           >
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">New group name</span>
+              <span className="text-sm font-medium text-slate-700">{t("New group name")}</span>
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                 disabled={!canWrite}
                 onChange={(event) => setGroupName(event.target.value)}
-                placeholder="Users"
+                placeholder={t("Users")}
                 value={groupName}
               />
             </label>
             <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
-              Add group
+              {t("Add group")}
             </button>
           </form>
 
           {module.groups.length === 0 ? (
-            <p className="px-4 text-sm text-slate-500">No groups yet.</p>
+            <p className="px-4 text-sm text-slate-500">{t("No groups yet.")}</p>
           ) : (
             module.groups.map((group) => (
               <GroupSection
@@ -668,12 +690,14 @@ function GroupSection({
   const [endpointMethod, setEndpointMethod] = useState("GET");
   const [endpointPath, setEndpointPath] = useState("");
   const [groupDraftName, setGroupDraftName] = useState(group.name);
+  const { t } = useI18n();
   const containsSelectedEndpoint = Boolean(
     selectedEndpointId && group.endpoints.some((endpoint) => endpoint.id === selectedEndpointId)
   );
   const isCollapsed =
     !isSearchActive && !containsSelectedEndpoint && collapsedGroupIds.includes(group.id);
-  const collapseLabel = `${isCollapsed ? "Expand" : "Collapse"} group ${group.id}`;
+  const collapseAction = isCollapsed ? t("Expand") : t("Collapse");
+  const collapseLabel = `${collapseAction} ${t("group")} ${group.id}`;
   const disclosureDisabled = isSearchActive || containsSelectedEndpoint;
 
   return (
@@ -688,27 +712,29 @@ function GroupSection({
               onClick={() => onToggleGroupCollapse(group.id)}
               type="button"
             >
-              {isCollapsed ? "Expand" : "Collapse"}
+              {collapseAction}
             </button>
             <div>
               <p className="text-sm font-semibold text-slate-900">{group.name}</p>
-              <p className="mt-2 text-xs text-slate-500">{group.endpoints.length} endpoints</p>
+              <p className="mt-2 text-xs text-slate-500">{t("{count} endpoints", { count: group.endpoints.length })}</p>
             </div>
           </div>
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            {group.endpoints.length} endpoints
-          </span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              {t("{count} endpoints", { count: group.endpoints.length })}
+            </span>
         </div>
         {isSearchActive ? (
-          <p className="text-xs text-slate-500">Search mode keeps matching branches open.</p>
+          <p className="text-xs text-slate-500">{t("Search mode keeps matching branches open.")}</p>
         ) : containsSelectedEndpoint ? (
-          <p className="text-xs text-slate-500">The active endpoint branch stays visible while you work.</p>
+          <p className="text-xs text-slate-500">{t("The active endpoint branch stays visible while you work.")}</p>
         ) : null}
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Group {group.id} name</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              {t("Group {id} name", { id: group.id })}
+            </span>
             <input
-              aria-label={`Group ${group.id} name`}
+              aria-label={t("Group {id} name", { id: group.id })}
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
               disabled={!canWrite}
               onChange={(event) => setGroupDraftName(event.target.value)}
@@ -716,29 +742,29 @@ function GroupSection({
             />
           </label>
           <button
-            aria-label={`Rename group ${group.id}`}
+            aria-label={t("Rename group {id}", { id: group.id })}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!canWrite}
             onClick={() => void onRenameGroup(group.id, { name: groupDraftName.trim() || group.name })}
             type="button"
           >
-            Rename
+            {t("Rename")}
           </button>
           <button
-            aria-label={`Delete group ${group.id}`}
+            aria-label={t("Delete group {id}", { id: group.id })}
             className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!canWrite}
             onClick={() => void onDeleteGroup(group.id)}
             type="button"
           >
-            Delete
+            {t("Delete")}
           </button>
         </div>
       </div>
 
       {isCollapsed ? (
         <div className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white/80 px-4 py-4 text-sm text-slate-500">
-          Group collapsed. Expand it to manage endpoints.
+          {t("Group collapsed. Expand it to manage endpoints.")}
         </div>
       ) : (
         <>
@@ -763,18 +789,18 @@ function GroupSection({
             }}
           >
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">New endpoint name</span>
+              <span className="text-sm font-medium text-slate-700">{t("New endpoint name")}</span>
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                 disabled={!canWrite}
                 onChange={(event) => setEndpointName(event.target.value)}
-                placeholder="Create User"
+                placeholder={t("Create User")}
                 value={endpointName}
               />
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">New endpoint method</span>
+              <span className="text-sm font-medium text-slate-700">{t("New endpoint method")}</span>
               <select
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                 disabled={!canWrite}
@@ -790,18 +816,18 @@ function GroupSection({
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">New endpoint path</span>
+              <span className="text-sm font-medium text-slate-700">{t("New endpoint path")}</span>
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                 disabled={!canWrite}
                 onChange={(event) => setEndpointPath(event.target.value)}
-                placeholder="/users"
+                placeholder={t("/users")}
                 value={endpointPath}
               />
             </label>
 
             <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
-              Add endpoint
+              {t("Add endpoint")}
             </button>
           </form>
 
@@ -851,6 +877,9 @@ function EndpointNode({
 }) {
   const [endpointDraftName, setEndpointDraftName] = useState(endpoint.name);
   const [endpointDraftPath, setEndpointDraftPath] = useState(endpoint.path);
+  const { t } = useI18n();
+  const pinAction = isPinned ? t("Unpin") : t("Pin");
+  const pinLabel = t("{action} endpoint {id}", { action: pinAction, id: endpoint.id });
 
   return (
     <div
@@ -869,7 +898,7 @@ function EndpointNode({
           <p className={`mt-2 truncate text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>{endpoint.path}</p>
         </button>
         <button
-          aria-label={`${isPinned ? "Unpin" : "Pin"} endpoint ${endpoint.id}`}
+          aria-label={pinLabel}
           className={`rounded-2xl border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
             isActive
               ? "border-white/15 bg-white/10 text-white hover:bg-white/15"
@@ -880,17 +909,17 @@ function EndpointNode({
           onClick={() => onTogglePin(endpoint.id)}
           type="button"
         >
-          {isPinned ? "Pinned" : "Pin"}
+          {isPinned ? t("Pinned") : t("Pin")}
         </button>
       </div>
 
       <div className="grid gap-2">
-        <label className="space-y-2">
-          <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
-            Endpoint {endpoint.id} name
-          </span>
-          <input
-            aria-label={`Endpoint ${endpoint.id} name`}
+          <label className="space-y-2">
+            <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
+              {t("Endpoint {id} name", { id: endpoint.id })}
+            </span>
+            <input
+              aria-label={t("Endpoint {id} name", { id: endpoint.id })}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
               isActive
                 ? "border-white/15 bg-white/10 text-white placeholder:text-slate-300/70 focus:border-white/30"
@@ -902,11 +931,11 @@ function EndpointNode({
           />
         </label>
         <label className="space-y-2">
-          <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
-            Endpoint {endpoint.id} path
-          </span>
-          <input
-            aria-label={`Endpoint ${endpoint.id} path`}
+            <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
+              {t("Endpoint {id} path", { id: endpoint.id })}
+            </span>
+            <input
+              aria-label={t("Endpoint {id} path", { id: endpoint.id })}
             className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${
               isActive
                 ? "border-white/15 bg-white/10 text-white placeholder:text-slate-300/70 focus:border-white/30"
@@ -921,7 +950,7 @@ function EndpointNode({
 
       <div className="grid gap-2 sm:grid-cols-2">
         <button
-          aria-label={`Rename endpoint ${endpoint.id}`}
+          aria-label={t("Rename endpoint {id}", { id: endpoint.id })}
           className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
             isActive
               ? "border-white/15 bg-white/10 text-white hover:bg-white/15"
@@ -938,10 +967,10 @@ function EndpointNode({
           }
           type="button"
         >
-          Rename endpoint
+          {t("Rename endpoint")}
         </button>
         <button
-          aria-label={`Delete endpoint ${endpoint.id}`}
+          aria-label={t("Delete endpoint {id}", { id: endpoint.id })}
           className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
             isActive
               ? "border-rose-300/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
@@ -951,7 +980,7 @@ function EndpointNode({
           onClick={() => void onDeleteEndpoint(endpoint.id)}
           type="button"
         >
-          Delete endpoint
+          {t("Delete endpoint")}
         </button>
       </div>
     </div>

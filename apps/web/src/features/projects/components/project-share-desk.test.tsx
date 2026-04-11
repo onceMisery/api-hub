@@ -17,9 +17,18 @@ vi.mock("@api-hub/api-sdk", () => ({
   updateProjectShareLink
 }));
 
+import { AppPreferencesProvider } from "../../../lib/ui-preferences";
 import { ProjectShareDesk } from "./project-share-desk";
 
 describe("ProjectShareDesk", () => {
+  function renderWithPreferences() {
+    return render(
+      <AppPreferencesProvider>
+        <ProjectShareDesk projectId={7} />
+      </AppPreferencesProvider>
+    );
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(navigator, {
@@ -101,16 +110,16 @@ describe("ProjectShareDesk", () => {
   });
 
   it("loads share links, creates a new link, and copies a public url", async () => {
-    render(<ProjectShareDesk projectId={7} />);
+    renderWithPreferences();
 
-    expect(screen.getByText("Loading share links...")).toBeInTheDocument();
+    expect(screen.getByText("正在加载分享链接...")).toBeInTheDocument();
     const existingCard = await screen.findByRole("article", { name: "External reviewers" });
     expect(existingCard).toBeInTheDocument();
     expect(within(existingCard).getByText("Read-only contract access", { selector: "p" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Share name"), { target: { value: "QA handoff" } });
-    fireEvent.change(screen.getByLabelText("Share description"), { target: { value: "Fresh handoff link" } });
-    fireEvent.click(screen.getByRole("button", { name: "Create share link" }));
+    fireEvent.change(screen.getByLabelText("分享名称"), { target: { value: "QA handoff" } });
+    fireEvent.change(screen.getByLabelText("分享描述"), { target: { value: "Fresh handoff link" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建分享链接" }));
 
     await waitFor(() =>
       expect(createProjectShareLink).toHaveBeenCalledWith(7, {
@@ -123,7 +132,7 @@ describe("ProjectShareDesk", () => {
     expect(await screen.findByText("QA handoff")).toBeInTheDocument();
 
     const qaCard = screen.getByRole("article", { name: "QA handoff" });
-    fireEvent.click(within(qaCard).getByRole("button", { name: "Copy link" }));
+    fireEvent.click(within(qaCard).getByRole("button", { name: "复制链接" }));
 
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("http://localhost:3000/share/share_public999")
@@ -131,12 +140,12 @@ describe("ProjectShareDesk", () => {
   });
 
   it("updates enablement and expiry state from the card action", async () => {
-    render(<ProjectShareDesk projectId={7} />);
+    renderWithPreferences();
 
     const card = await screen.findByRole("article", { name: "External reviewers" });
-    expect(within(card).getByText("Expires Apr 30, 2026")).toBeInTheDocument();
+    expect(within(card).getByText("有效期 2026-04-30")).toBeInTheDocument();
 
-    fireEvent.click(within(card).getByRole("button", { name: "Disable link" }));
+    fireEvent.click(within(card).getByRole("button", { name: "禁用链接" }));
 
     await waitFor(() =>
       expect(updateProjectShareLink).toHaveBeenCalledWith(7, 3, {
@@ -144,17 +153,17 @@ describe("ProjectShareDesk", () => {
       })
     );
 
-    expect(await screen.findByText("Disabled")).toBeInTheDocument();
+    expect(await screen.findByText("已禁用")).toBeInTheDocument();
   });
 
   it("edits existing share details and can clear expiry", async () => {
-    render(<ProjectShareDesk projectId={7} />);
+    renderWithPreferences();
 
     const card = await screen.findByRole("article", { name: "External reviewers" });
 
-    fireEvent.change(within(card).getByLabelText("Share name 3"), { target: { value: "Partner docs" } });
-    fireEvent.change(within(card).getByLabelText("Share description 3"), { target: { value: "Partner-facing contract access" } });
-    fireEvent.click(within(card).getByRole("button", { name: "Save details" }));
+    fireEvent.change(within(card).getByLabelText("分享名称 3"), { target: { value: "Partner docs" } });
+    fireEvent.change(within(card).getByLabelText("分享描述 3"), { target: { value: "Partner-facing contract access" } });
+    fireEvent.click(within(card).getByRole("button", { name: "保存详情" }));
 
     await waitFor(() =>
       expect(updateProjectShareLink).toHaveBeenNthCalledWith(1, 7, 3, {
@@ -163,8 +172,8 @@ describe("ProjectShareDesk", () => {
       })
     );
 
-    fireEvent.change(within(card).getByLabelText("Expiry 3"), { target: { value: "" } });
-    fireEvent.click(within(card).getByRole("button", { name: "Save expiry" }));
+    fireEvent.change(within(card).getByLabelText("有效期 3"), { target: { value: "" } });
+    fireEvent.click(within(card).getByRole("button", { name: "保存有效期" }));
 
     await waitFor(() =>
       expect(updateProjectShareLink).toHaveBeenNthCalledWith(2, 7, 3, {

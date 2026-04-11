@@ -87,6 +87,13 @@ export function SessionBar({ backHref }: SessionBarProps = {}) {
       : theme === "dark"
         ? t("session.themeLight")
         : t("session.themeSystem");
+  const localeSwitchText = nextLocale === "zh-CN" ? t("session.localeSwitch.zh") : t("session.localeSwitch.en");
+  const themeButtonText =
+    theme === "system"
+      ? t("session.themeSwitch.system")
+      : theme === "dark"
+        ? t("session.themeSwitch.dark")
+        : t("session.themeSwitch.light");
 
   return (
     <section className="app-shell-card rounded-[1.8rem] px-5 py-4 backdrop-blur">
@@ -112,13 +119,16 @@ export function SessionBar({ backHref }: SessionBarProps = {}) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            {t("session.preferenceLabel")}
+          </span>
           <button
             aria-label={localeLabel}
             className="app-button-secondary rounded-2xl px-4 py-2 text-sm font-medium transition hover:opacity-90"
             onClick={() => setLocale(nextLocale)}
             type="button"
           >
-            {locale === "zh-CN" ? "EN" : "中"}
+            {localeSwitchText}
           </button>
           <button
             aria-label={themeLabel}
@@ -126,7 +136,7 @@ export function SessionBar({ backHref }: SessionBarProps = {}) {
             onClick={handleThemeCycle}
             type="button"
           >
-            {theme === "system" ? "Auto" : theme === "dark" ? "Dark" : "Light"}
+            {themeButtonText}
           </button>
           <button
             className="app-button-primary rounded-2xl px-4 py-2 text-sm font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"

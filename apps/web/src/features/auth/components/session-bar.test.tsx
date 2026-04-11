@@ -84,7 +84,7 @@ describe("SessionBar", () => {
 
     expect(await screen.findByText("Administrator")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "返回项目列表" })).toHaveAttribute("href", "/console/projects");
-    expect(screen.getByRole("button", { name: "切换为 English" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "切换为英文" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "切换为深色模式" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "退出登录" })).toBeInTheDocument();
   });

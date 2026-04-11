@@ -33,10 +33,12 @@ export function ProjectCatalogToolbar({
   return (
     <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
       <div className="overflow-hidden rounded-[2rem] border border-slate-900/80 bg-[linear-gradient(180deg,#1f1f22_0%,#0b0b0d_100%)] p-4 text-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
-        <div className="rounded-[1.4rem] bg-white/8 p-3">
-          <div className="flex items-center justify-between gap-3 rounded-[1rem] bg-white/8 px-4 py-3">
+        <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-3">
+          <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-white/10 bg-white/6 px-4 py-3">
             <span className="text-lg font-semibold">{t("catalog.title")}</span>
-            <span className="text-sm text-slate-300">Dynamic</span>
+            <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+              {t("catalog.consoleBadge")}
+            </span>
           </div>
         </div>
 
@@ -45,7 +47,9 @@ export function ProjectCatalogToolbar({
             <button
               aria-pressed={activeFilter === group.filter}
               className={`flex w-full items-center justify-between gap-4 rounded-[1.2rem] px-4 py-4 text-left transition ${
-                activeFilter === group.filter ? "bg-white/12 text-white" : "bg-transparent text-slate-200 hover:bg-white/8"
+                activeFilter === group.filter
+                  ? "border border-white/12 bg-white/12 text-white shadow-[0_18px_40px_rgba(2,6,23,0.25)]"
+                  : "border border-transparent bg-transparent text-slate-200 hover:border-white/10 hover:bg-white/8"
               }`}
               key={group.filter}
               onClick={() => onFilterChange(group.filter)}
@@ -80,9 +84,7 @@ export function ProjectCatalogToolbar({
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("catalog.heading")}</p>
               <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">{t("catalog.subtitle")}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                Start from a project group, then move into the exact workspace you want to edit, review, or govern.
-              </p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{t("catalog.heroDetail")}</p>
             </div>
             <button
               className="app-button-primary rounded-2xl px-5 py-3 text-sm font-semibold transition hover:opacity-90"

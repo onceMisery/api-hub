@@ -9,6 +9,8 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { useI18n } from "../../../lib/ui-preferences";
+
 type ProjectShareDeskProps = {
   projectId: number;
 };
@@ -17,6 +19,7 @@ type ShareDrafts = Record<number, string>;
 type ShareMetadataDrafts = Record<number, { name: string; description: string }>;
 
 export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
+  const { t } = useI18n();
   const [shareLinks, setShareLinks] = useState<ShareLinkDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,25 +64,23 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1480px] flex-col gap-6 p-6 text-slate-900">
-      <section className="overflow-hidden rounded-[2.4rem] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.10),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(145deg,_rgba(255,255,255,0.98),_rgba(241,245,249,0.92))] p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
+      <section className="overflow-hidden rounded-[2.4rem] border border-slate-900/80 bg-[linear-gradient(180deg,#1d2028_0%,#0b0d11_100%)] p-6 text-white shadow-[0_30px_90px_rgba(15,23,42,0.20)]">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">Publication Desk</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Share docs</h1>
-            <p className="mt-4 text-sm leading-7 text-slate-600">
-              Create revocable public documentation links, tune expiry, and hand reviewers a cleaner browse surface than the full authenticated workbench.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">{t("shareDesk.heroEyebrow")}</p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">{t("shareDesk.heroTitle")}</h1>
+            <p className="mt-4 text-sm leading-7 text-slate-300">{t("shareDesk.heroSubtitle")}</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <StatusPill label={`${stats.active} active`} tone="emerald" />
-              <StatusPill label={`${stats.expired} expired`} tone="amber" />
-              <StatusPill label={`${stats.total} total links`} tone="slate" />
+              <StatusPill label={t("shareDesk.activeCount", { count: stats.active })} tone="emerald" />
+              <StatusPill label={t("shareDesk.expiredCount", { count: stats.expired })} tone="amber" />
+              <StatusPill label={t("shareDesk.totalCount", { count: stats.total })} tone="slate" />
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px]">
-            <StatCard label="Active" value={stats.active} />
-            <StatCard label="Expired" value={stats.expired} />
-            <StatCard label="Total" value={stats.total} />
+            <StatCard label={t("shareDesk.state.enabled")} value={stats.active} />
+            <StatCard label={t("shareDesk.state.expired")} value={stats.expired} />
+            <StatCard label={t("shareDesk.totalCount", { count: 0 }).replace(/^0\s*/, "")} value={stats.total} />
           </div>
         </div>
       </section>
@@ -88,46 +89,46 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
 
       <section className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
         <form
-          className="rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)]"
+          className="app-shell-card rounded-[2rem] p-5"
           onSubmit={(event) => {
             event.preventDefault();
             void handleCreateShareLink();
           }}
         >
           <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Create link</p>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Release a curated public URL</h2>
-            <p className="text-sm leading-6 text-slate-600">Name the audience, set optional expiry, and publish a share code that can be disabled instantly.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("shareDesk.createEyebrow")}</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{t("shareDesk.createTitle")}</h2>
+            <p className="text-sm leading-6 text-slate-600">{t("shareDesk.createDescription")}</p>
           </div>
 
           <div className="mt-5 space-y-4">
             <label className="block space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share name</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("shareDesk.nameLabel")}</span>
               <input
-                aria-label="Share name"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                aria-label={t("shareDesk.nameLabel")}
+                className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                 onChange={(event) => setName(event.target.value)}
-                placeholder="External reviewers"
+                placeholder={t("shareDesk.placeholder.name")}
                 value={name}
               />
             </label>
 
             <label className="block space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share description</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("shareDesk.descriptionLabel")}</span>
               <textarea
-                aria-label="Share description"
-                className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                aria-label={t("shareDesk.descriptionLabel")}
+                className="app-input min-h-28 w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="Read-only contract access for partners, QA, or launch review."
+                placeholder={t("shareDesk.placeholder.description")}
                 value={description}
               />
             </label>
 
             <label className="block space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share expiry</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("shareDesk.expiryLabel")}</span>
               <input
-                aria-label="Share expiry"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                aria-label={t("shareDesk.expiryLabel")}
+                className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                 onChange={(event) => setExpiresAt(event.target.value)}
                 type="datetime-local"
                 value={expiresAt}
@@ -135,33 +136,35 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
             </label>
           </div>
 
-          <button className="mt-5 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800" type="submit">
-            Create share link
+          <button className="app-button-primary mt-5 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition hover:opacity-90" type="submit">
+            {t("shareDesk.createAction")}
           </button>
         </form>
 
-        <section className="rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+        <section className="app-shell-card rounded-[2rem] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Live links</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Managed share inventory</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("shareDesk.liveEyebrow")}</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{t("shareDesk.liveTitle")}</h2>
             </div>
-            <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">Project #{projectId}</div>
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
+              {t("shareDesk.projectLabel", { id: projectId })}
+            </div>
           </div>
 
           {isLoading ? (
             <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-              Loading share links...
+              {t("shareDesk.loading")}
             </div>
           ) : shareLinks.length === 0 ? (
             <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-              No share links were created for this project yet.
+              {t("shareDesk.empty")}
             </div>
           ) : (
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
               {shareLinks.map((shareLink) => {
                 const publicUrl = buildPublicShareUrl(shareLink.shareCode);
-                const shareState = getShareState(shareLink);
+                const shareState = getShareState(shareLink, t);
 
                 return (
                   <article
@@ -175,27 +178,31 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
                           <h3 className="text-lg font-semibold text-slate-950">{shareLink.name}</h3>
                           <StatusPill label={shareState.label} tone={shareState.tone} />
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">{shareLink.description || "No description provided for this share link."}</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {shareLink.description || t("shareDesk.emptyDescription")}
+                        </p>
                       </div>
                       <Link
                         className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                         href={`/share/${shareLink.shareCode}`}
                       >
-                        Open public page
+                        {t("shareDesk.openPublicPage")}
                       </Link>
                     </div>
 
                     <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Public URL</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t("shareDesk.publicUrl")}</p>
                       <p className="mt-2 break-all font-mono text-sm text-slate-700">{publicUrl}</p>
                     </div>
 
                     <div className="mt-4 space-y-4">
                       <label className="block space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{`Share name ${shareLink.id}`}</span>
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          {t("shareDesk.nameLabelById", { id: shareLink.id })}
+                        </span>
                         <input
-                          aria-label={`Share name ${shareLink.id}`}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                          aria-label={t("shareDesk.nameLabelById", { id: shareLink.id })}
+                          className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                           onChange={(event) =>
                             setShareMetadataDrafts((currentDrafts) => ({
                               ...currentDrafts,
@@ -210,10 +217,12 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
                       </label>
 
                       <label className="block space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{`Share description ${shareLink.id}`}</span>
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          {t("shareDesk.descriptionLabelById", { id: shareLink.id })}
+                        </span>
                         <textarea
-                          aria-label={`Share description ${shareLink.id}`}
-                          className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                          aria-label={t("shareDesk.descriptionLabelById", { id: shareLink.id })}
+                          className="app-input min-h-24 w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                           onChange={(event) =>
                             setShareMetadataDrafts((currentDrafts) => ({
                               ...currentDrafts,
@@ -230,20 +239,24 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
 
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        {shareLink.expiresAt ? `Expires ${formatShareDate(shareLink.expiresAt)}` : "No expiry"}
+                        {shareLink.expiresAt
+                          ? t("shareDesk.validUntilShort", { date: formatShareDate(shareLink.expiresAt) })
+                          : t("shareDesk.noExpiry")}
                       </span>
                       {copiedCode === shareLink.shareCode ? (
                         <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">
-                          Copied
+                          {t("shareDesk.copied")}
                         </span>
                       ) : null}
                     </div>
 
                     <label className="mt-4 block space-y-2">
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{`Expiry ${shareLink.id}`}</span>
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("shareDesk.expiryLabelById", { id: shareLink.id })}
+                      </span>
                       <input
-                        aria-label={`Expiry ${shareLink.id}`}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                        aria-label={t("shareDesk.expiryLabelById", { id: shareLink.id })}
+                        className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                         onChange={(event) =>
                           setExpiryDrafts((currentDrafts) => ({
                             ...currentDrafts,
@@ -261,21 +274,21 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
                         onClick={() => void handleSaveDetails(shareLink.id)}
                         type="button"
                       >
-                        Save details
+                        {t("shareDesk.saveDetails")}
                       </button>
                       <button
                         className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                         onClick={() => void handleCopyLink(publicUrl, shareLink.shareCode)}
                         type="button"
                       >
-                        Copy link
+                        {t("shareDesk.copy")}
                       </button>
                       <button
                         className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                         onClick={() => void handleSaveExpiry(shareLink.id)}
                         type="button"
                       >
-                        Save expiry
+                        {t("shareDesk.saveExpiry")}
                       </button>
                       <button
                         className={`rounded-full px-4 py-3 text-sm font-medium text-white transition ${
@@ -284,7 +297,7 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
                         onClick={() => void handleToggleLink(shareLink)}
                         type="button"
                       >
-                        {shareLink.enabled ? "Disable link" : "Enable link"}
+                        {shareLink.enabled ? t("shareDesk.disable") : t("shareDesk.enable")}
                       </button>
                     </div>
                   </article>
@@ -385,7 +398,7 @@ export function ProjectShareDesk({ projectId }: ProjectShareDeskProps) {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[1.6rem] border border-white/60 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.20)]">
+    <div className="rounded-[1.6rem] border border-white/12 bg-white/6 px-5 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.20)]">
       <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
@@ -405,23 +418,23 @@ function StatusPill({ label, tone }: { label: string; tone: "amber" | "emerald" 
   return <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${toneClasses}`}>{label}</span>;
 }
 
-function getShareState(shareLink: ShareLinkDetail) {
+function getShareState(shareLink: ShareLinkDetail, t: (key: string, values?: Record<string, string | number>) => string) {
   if (isExpired(shareLink.expiresAt)) {
     return {
-      label: "Expired",
+      label: t("shareDesk.state.expired"),
       tone: "amber" as const
     };
   }
 
   if (!shareLink.enabled) {
     return {
-      label: "Disabled",
+      label: t("shareDesk.state.disabled"),
       tone: "rose" as const
     };
   }
 
   return {
-    label: "Enabled",
+    label: t("shareDesk.state.enabled"),
     tone: "emerald" as const
   };
 }
@@ -435,12 +448,15 @@ function buildPublicShareUrl(shareCode: string) {
 }
 
 function formatShareDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric"
-  }).format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getUTCDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isExpired(value: string | null) {

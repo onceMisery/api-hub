@@ -587,7 +587,7 @@ describe("ProjectShell", () => {
           }
         ]
       });
-    fetchEndpointVersions.mockResolvedValueOnce({
+    fetchEndpointVersions.mockReset().mockResolvedValue({
       data: [
         {
           id: 2,
@@ -636,7 +636,8 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
-    fireEvent.click((await screen.findAllByRole("button", { name: "Restore snapshot v1" }))[0]);
+    await waitFor(() => expect(fetchEndpointVersions).toHaveBeenCalledWith(31));
+    fireEvent.click(await screen.findByRole("button", { name: "Restore snapshot v1" }, { timeout: 5000 }));
 
     await waitFor(() =>
       expect(updateEndpoint).toHaveBeenCalledWith(31, {
@@ -676,7 +677,7 @@ describe("ProjectShell", () => {
   });
 
   it("shows the current published release lane summary inside the project workbench", async () => {
-    fetchEndpointVersions.mockResolvedValueOnce({
+    fetchEndpointVersions.mockReset().mockResolvedValue({
       data: [
         {
           id: 1,
@@ -699,13 +700,14 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
+    await waitFor(() => expect(fetchEndpointVersions).toHaveBeenCalledWith(31));
     await openWorkbenchTab("Mock");
     expect(await screen.findByText("No published release yet.")).toBeInTheDocument();
     expect((await screen.findAllByText("Draft lane")).length).toBeGreaterThan(0);
 
     await openWorkbenchTab("Documentation");
     fireEvent.click(await screen.findByRole("button", { name: "Compare snapshot v1" }));
-    expect((await screen.findAllByText("1 total changes")).length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText("1 total changes").length).toBeGreaterThan(0));
   });
 
   it("filters modules, groups, and endpoints from the tree search", async () => {

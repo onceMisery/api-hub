@@ -9,11 +9,14 @@ import {
 } from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
 
+import { useI18n } from "../../../lib/ui-preferences";
+
 type ProjectMockCenterProps = {
   projectId: number;
 };
 
 export function ProjectMockCenter({ projectId }: ProjectMockCenterProps) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<MockAccessMode>("private");
   const [token, setToken] = useState("");
   const [items, setItems] = useState<ProjectMockCenterItem[]>([]);
@@ -35,41 +38,59 @@ export function ProjectMockCenter({ projectId }: ProjectMockCenterProps) {
       `${item.endpointName} ${item.method} ${item.path} ${item.moduleName ?? ""} ${item.groupName ?? ""}`.toLowerCase().includes(query)
     );
   }, [items, searchQuery]);
+  const runtimeBaseUrl = useMemo(() => {
+    if (typeof window === "undefined") {
+      return `/mock/${projectId}`;
+    }
+
+    return new URL(`/mock/${projectId}`, window.location.origin).toString();
+  }, [projectId]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1480px] flex-col gap-6 p-6 text-slate-900">
-      <section className="overflow-hidden rounded-[2.4rem] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(15,23,42,0.06),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(56,189,248,0.12),_transparent_28%),linear-gradient(145deg,_rgba(255,255,255,0.98),_rgba(241,245,249,0.92))] p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
+      <section className="overflow-hidden rounded-[2.4rem] border border-slate-900/80 bg-[linear-gradient(180deg,#1d2028_0%,#0b0d11_100%)] p-6 text-white shadow-[0_30px_90px_rgba(15,23,42,0.20)]">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">Mock Runtime Access</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Mock center</h1>
-            <p className="mt-4 text-sm leading-7 text-slate-600">
-              Control project-wide runtime posture, keep the shared token visible, and publish changed endpoints without hopping across editor tabs.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">{t("mockCenter.heroEyebrow")}</p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">{t("mockCenter.heroTitle")}</h1>
+            <p className="mt-4 text-sm leading-7 text-slate-300">{t("mockCenter.heroSubtitle")}</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px]">
-            <HeroStat label="Visible endpoints" value={filteredItems.length} />
-            <HeroStat label="Changed drafts" value={items.filter((item) => item.draftChanged).length} />
-            <HeroStat label="Published" value={items.filter((item) => item.latestReleaseNo !== null).length} />
+            <HeroStat label={t("mockCenter.visibleEndpoints")} value={filteredItems.length} />
+            <HeroStat label={t("mockCenter.changedDrafts")} value={items.filter((item) => item.draftChanged).length} />
+            <HeroStat label={t("mockCenter.published")} value={items.filter((item) => item.latestReleaseNo !== null).length} />
           </div>
         </div>
       </section>
 
       {error ? <div className="rounded-[1.8rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div> : null}
 
+      <section className="overflow-hidden rounded-[2rem] border border-sky-200/80 bg-[linear-gradient(135deg,_rgba(239,246,255,0.98),_rgba(224,242,254,0.86))] p-5 shadow-[0_20px_55px_rgba(14,116,144,0.10)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">{t("mockCenter.runtimeBase")}</p>
+            <h2 className="mt-2 break-all text-2xl font-semibold tracking-tight text-slate-950">{runtimeBaseUrl}</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{t("mockCenter.runtimeBaseDetail")}</p>
+          </div>
+          <div className="rounded-[1.4rem] border border-white/70 bg-white/75 px-4 py-3 text-sm text-slate-600 shadow-[0_16px_36px_rgba(15,23,42,0.06)]">
+            {t("mockCenter.runtimeBaseHint")}
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <section className="rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Access policy</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Mode cards and runtime token</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">Choose whether runtime traffic stays private, accepts a shared project token, or becomes fully public.</p>
+        <section className="app-shell-card rounded-[2rem] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("mockCenter.heroEyebrow")}</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{t("mockCenter.runtimeCardTitle")}</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{t("mockCenter.runtimeTitle")}</p>
 
           <div className="mt-5 grid gap-3">
             {(
               [
-                ["private", "Private mode", "Only signed-in project readers can hit runtime mock traffic."],
-                ["token", "Token mode", "Bearer auth or X-ApiHub-Mock-Token can pass runtime access."],
-                ["public", "Public mode", "Anonymous callers can hit runtime mock traffic without auth."]
+                ["private", t("mockCenter.mode.private.label"), t("mockCenter.mode.private.detail")],
+                ["token", t("mockCenter.mode.token.label"), t("mockCenter.mode.token.detail")],
+                ["public", t("mockCenter.mode.public.label"), t("mockCenter.mode.public.detail")]
               ] as const
             ).map(([optionValue, label, detail]) => {
               const checked = mode === optionValue;
@@ -99,54 +120,54 @@ export function ProjectMockCenter({ projectId }: ProjectMockCenterProps) {
           </div>
 
           <label className="mt-5 block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Mock access token</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("mockCenter.runtimeToken")}</span>
             <input
-              aria-label="Mock access token"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+              aria-label={t("mockCenter.runtimeToken")}
+              className="app-input w-full rounded-2xl px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
               onChange={(event) => setToken(event.target.value)}
               value={token}
             />
           </label>
 
           <div className="mt-4 rounded-[1.45rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Token preview</p>
-            <p className="mt-2 break-all font-mono text-sm text-slate-700">{token || "No token set"}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t("mockCenter.runtimeTokenPreview")}</p>
+            <p className="mt-2 break-all font-mono text-sm text-slate-700">{token || t("mockCenter.runtimeTokenEmpty")}</p>
           </div>
 
           <div className="mt-4 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
-            {getRuntimeMessage(mode)}
+            {getRuntimeMessage(mode, t)}
           </div>
 
           <button
-            className="mt-5 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="app-button-primary mt-5 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
             onClick={() => void handleSaveAccess()}
             type="button"
           >
-            Save mock access
+            {t("mockCenter.saveAccess")}
           </button>
           <button
-            className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="app-button-secondary mt-3 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
             onClick={() => void handleRegenerateToken()}
             type="button"
           >
-            Regenerate token
+            {t("mockCenter.regenerateToken")}
           </button>
         </section>
 
-        <section className="rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+        <section className="app-shell-card rounded-[2rem] p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Publish center</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Endpoint release posture</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("mockCenter.publishEyebrow")}</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{t("mockCenter.publishTitle")}</h2>
             </div>
 
             <label className="block w-full max-w-md space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Search endpoints</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("mockCenter.publishSearch")}</span>
               <input
-                aria-label="Search endpoints"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                aria-label={t("mockCenter.publishSearch")}
+                className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search endpoint names, methods, paths, or groups"
+                placeholder={t("mockCenter.publishSearchPlaceholder")}
                 value={searchQuery}
               />
             </label>
@@ -154,11 +175,11 @@ export function ProjectMockCenter({ projectId }: ProjectMockCenterProps) {
 
           {isLoading ? (
             <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-              Loading mock center...
+              {t("mockCenter.loading")}
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="mt-5 rounded-[1.7rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-              No endpoints match the current search.
+              {t("mockCenter.emptySearch")}
             </div>
           ) : (
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -175,34 +196,47 @@ export function ProjectMockCenter({ projectId }: ProjectMockCenterProps) {
                         <h3 className="text-lg font-semibold text-slate-950">{item.endpointName}</h3>
                       </div>
                       <p className="mt-2 font-mono text-sm text-slate-600">{item.path}</p>
-                      <p className="mt-2 text-sm text-slate-500">{[item.moduleName, item.groupName].filter(Boolean).join(" / ") || "Ungrouped"}</p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {[item.moduleName, item.groupName].filter(Boolean).join(" / ") || t("mockCenter.searchUngrouped")}
+                      </p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${item.draftChanged ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-                      {item.draftChanged ? "Draft drift" : "In sync"}
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+                        item.draftChanged ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {item.draftChanged ? t("mockCenter.runtimeDrift") : t("mockCenter.runtimeInSync")}
                     </span>
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <MiniStat label="Release" value={item.latestReleaseNo === null ? "Not published" : `Release #${item.latestReleaseNo}`} />
-                    <MiniStat label="Rules" value={`${item.enabledRuleCount}/${item.totalRuleCount}`} />
-                    <MiniStat label="Responses" value={String(item.responseFieldCount)} />
+                    <MiniStat
+                      label={t("mockCenter.releaseLabel")}
+                      value={
+                        item.latestReleaseNo === null
+                          ? t("mockCenter.releaseNotPublished")
+                          : t("mockCenter.releaseValue", { count: item.latestReleaseNo })
+                      }
+                    />
+                    <MiniStat label={t("mockCenter.rules")} value={`${item.enabledRuleCount}/${item.totalRuleCount}`} />
+                    <MiniStat label={t("mockCenter.responses")} value={String(item.responseFieldCount)} />
                   </div>
 
                   <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
                     {item.mockEnabled
                       ? item.latestReleaseAt
-                        ? `Latest runtime snapshot published ${formatPublishTime(item.latestReleaseAt)}.`
-                        : "Mock enabled but not published yet."
-                      : "Mock disabled"}
+                        ? t("mockCenter.runtimeLatestPublished", { time: formatPublishTime(item.latestReleaseAt) })
+                        : t("mockCenter.mockEnabledNotPublished")
+                      : t("mockCenter.mockDisabled")}
                   </div>
 
                   <button
-                    className="mt-4 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="app-button-primary mt-4 rounded-full px-4 py-3 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={!item.mockEnabled}
                     onClick={() => void handlePublish(item.endpointId)}
                     type="button"
                   >
-                    Publish endpoint
+                    {t("mockCenter.publishAction")}
                   </button>
                 </article>
               ))}
@@ -271,7 +305,7 @@ export function ProjectMockCenter({ projectId }: ProjectMockCenterProps) {
 
 function HeroStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[1.6rem] border border-white/60 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.20)]">
+    <div className="rounded-[1.6rem] border border-white/12 bg-white/6 px-5 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.20)]">
       <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
@@ -287,26 +321,29 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getRuntimeMessage(mode: MockAccessMode) {
+function getRuntimeMessage(mode: MockAccessMode, t: (key: string, values?: Record<string, string | number>) => string) {
   switch (mode) {
     case "public":
-      return "Public traffic is allowed for every caller.";
+      return t("mockCenter.runtime.public");
     case "token":
-      return "Mock requests can use project auth or the shared X-ApiHub-Mock-Token header.";
+      return t("mockCenter.runtime.token");
     default:
-      return "Only signed-in users with project read access can call runtime mock traffic.";
+      return t("mockCenter.runtime.private");
   }
 }
 
 function formatPublishTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric"
-  }).format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getUTCDate()}`.padStart(2, "0");
+  const hours = `${date.getUTCHours()}`.padStart(2, "0");
+  const minutes = `${date.getUTCMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
 }
 
 function methodPillClasses(method: string) {

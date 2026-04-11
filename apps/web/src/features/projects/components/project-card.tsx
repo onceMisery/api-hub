@@ -13,7 +13,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
   const debugRuleCount = t("project.debugRuleCount", { count: project.debugAllowedHosts.length });
 
   return (
-    <article className="group app-shell-card-strong overflow-hidden rounded-[2rem] p-5 transition hover:-translate-y-1 hover:shadow-[0_32px_90px_rgba(15,23,42,0.14)]">
+    <article className="group app-shell-card-strong overflow-hidden rounded-[2rem] border border-slate-900/10 p-5 transition hover:-translate-y-1 hover:shadow-[0_32px_90px_rgba(15,23,42,0.16)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{project.projectKey}</p>
@@ -37,7 +37,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
         <Badge label={project.canManageMembers ? t("project.badge.manage") : t("project.badge.review")} />
       </div>
 
-      <div className="mt-5 rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.97),rgba(15,23,42,0.88))] p-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
+      <div className="mt-5 rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.90),rgba(30,41,59,0.92))] p-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.20)]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t("project.runtimePosture")}</p>
         <p className="mt-2 text-sm text-slate-200">{debugRuleCount}</p>
 

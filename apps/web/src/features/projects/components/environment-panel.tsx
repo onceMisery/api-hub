@@ -4,6 +4,7 @@ import type { CreateEnvironmentPayload, DebugTargetRule, EnvironmentDetail, Envi
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { buildClonedEnvironmentPayload, buildEnvironmentBundle, describeAuthMode, parseEnvironmentBundle } from "./environment-bundle-utils";
+import { useI18n } from "../../../lib/ui-preferences";
 import { DebugTargetRuleEditor } from "./debug-target-rule-editor";
 
 type EnvironmentPanelProps = {
@@ -84,6 +85,8 @@ export function EnvironmentPanel({
     }
   }, [importBundleText]);
 
+  const { t } = useI18n();
+
   useEffect(() => {
     setProjectDebugRules(projectDebugAllowedHosts);
   }, [projectDebugAllowedHosts]);
@@ -153,24 +156,30 @@ export function EnvironmentPanel({
   const effectiveImportError = importError ?? importPreview.error;
   const importSummary =
     importPreview.payloads.length === 1
-      ? "1 environment ready to import"
-      : `${importPreview.payloads.length} environments ready to import`;
+      ? t("1 environment ready to import")
+      : t("{count} environments ready to import", { count: importPreview.payloads.length });
 
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Environments</p>
-        <h3 className="mt-2 text-xl font-semibold text-slate-950">Target environments</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Manage debug-safe environments, auth presets, and portable workbench bundles.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("Environments")}</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">{t("Target environments")}</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          {t("Manage debug-safe environments, auth presets, and portable workbench bundles.")}
+        </p>
       </div>
 
       <div className="mb-5 overflow-hidden rounded-[1.8rem] border border-slate-200 bg-[linear-gradient(145deg,rgba(15,23,42,0.98),rgba(30,41,59,0.94),rgba(148,163,184,0.28))] p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-300">Environment Lab</p>
-            <h4 className="mt-3 text-2xl font-semibold tracking-tight text-white">Portable presets with safer import and cloning.</h4>
+            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-300">{t("Environment Lab")}</p>
+            <h4 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+              {t("Portable presets with safer import and cloning.")}
+            </h4>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Export current environments into a bundle, import non-default copies into this project, or clone a preset for isolated testing without mutating the default lane.
+              {t(
+                "Export current environments into a bundle, import non-default copies into this project, or clone a preset for isolated testing without mutating the default lane."
+              )}
             </p>
           </div>
 
@@ -181,7 +190,7 @@ export function EnvironmentPanel({
               onClick={() => setIsExportOpen((current) => !current)}
               type="button"
             >
-              Open export bundle
+              {t("Open export bundle")}
             </button>
             <button
               aria-pressed={isImportOpen}
@@ -190,37 +199,43 @@ export function EnvironmentPanel({
               onClick={() => setIsImportOpen((current) => !current)}
               type="button"
             >
-              Open environment import
+              {t("Open environment import")}
             </button>
           </div>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <LabStatCard label="Environment count" value={String(environments.length)} detail="Live presets in this workbench" />
+          <LabStatCard label={t("Environment count")} value={String(environments.length)} detail={t("Live presets in this workbench")} />
           <LabStatCard
-            label="Active environment"
-            value={selectedEnvironment?.name ?? "None selected"}
-            detail={selectedEnvironment ? formatAuthModeLabel(selectedEnvironment.authMode) : "Pick a preset for debug runs"}
+            label={t("Active environment")}
+            value={selectedEnvironment?.name ?? t("None selected")}
+            detail={selectedEnvironment ? formatAuthModeLabel(selectedEnvironment.authMode, t) : t("Pick a preset for debug runs")}
           />
           <LabStatCard
-            label="Default environment"
-            value={defaultEnvironment?.name ?? "Not set"}
-            detail={defaultEnvironment ? defaultEnvironment.baseUrl : "Imports never replace the default flag"}
+            label={t("Default environment")}
+            value={defaultEnvironment?.name ?? t("Not set")}
+            detail={defaultEnvironment ? defaultEnvironment.baseUrl : t("Imports never replace the default flag")}
           />
         </div>
 
         {isExportOpen ? (
           <div className="mt-5 rounded-[1.5rem] border border-white/12 bg-black/15 p-4">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">Export bundle</p>
-                <p className="mt-1 text-xs leading-5 text-slate-300">Version 1 bundles include headers, query presets, variables, debug rules, and auth settings.</p>
-              </div>
+            <div>
+              <p className="text-sm font-semibold text-white">{t("Export bundle")}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">
+                {t("Version 1 bundles include headers, query presets, variables, debug rules, and auth settings.")}
+              </p>
+            </div>
               <span className="rounded-full border border-white/12 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200">
-                Read only
+                {t("Read only")}
               </span>
             </div>
-            <Field helper="Copy this JSON into another project workbench to seed matching environments." label="Environment bundle export" mutedLabel>
+            <Field
+              helper={t("Copy this JSON into another project workbench to seed matching environments.")}
+              label={t("Environment bundle export")}
+              mutedLabel
+            >
               <textarea
                 aria-label="Environment bundle export"
                 className="min-h-48 w-full rounded-[1.4rem] border border-white/10 bg-slate-950/80 px-4 py-4 font-mono text-sm leading-6 text-slate-100 outline-none"
@@ -235,8 +250,8 @@ export function EnvironmentPanel({
           <div className="mt-5 rounded-[1.5rem] border border-white/12 bg-white/8 p-4 backdrop-blur">
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
               <Field
-                helper="Only version 1 bundles are accepted. Imported environments are always created as non-default copies."
-                label="Environment bundle import"
+              helper={t("Only version 1 bundles are accepted. Imported environments are always created as non-default copies.")}
+              label={t("Environment bundle import")}
                 mutedLabel
               >
                 <textarea
@@ -253,25 +268,25 @@ export function EnvironmentPanel({
               </Field>
 
               <div className="rounded-[1.4rem] border border-white/12 bg-black/15 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Import preview</p>
-                <p className="mt-3 text-lg font-semibold text-white">
-                  {importPreview.payloads.length > 0 ? importSummary : "No bundle loaded"}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  {effectiveImportError
-                    ? effectiveImportError
-                    : importPreview.payloads.length > 0
-                      ? "Every imported environment will land as a non-default copy."
-                      : "Paste a bundle to validate it before running the batch import."}
-                </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">{t("Import preview")}</p>
+              <p className="mt-3 text-lg font-semibold text-white">
+                {importPreview.payloads.length > 0 ? importSummary : t("No bundle loaded")}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {effectiveImportError
+                  ? effectiveImportError
+                  : importPreview.payloads.length > 0
+                    ? t("Every imported environment will land as a non-default copy.")
+                    : t("Paste a bundle to validate it before running the batch import.")}
+              </p>
                 <button
                   className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-slate-300"
-                  disabled={!canWrite || isImportingBundle || importPreview.payloads.length === 0 || Boolean(importPreview.error)}
-                  onClick={() => void handleImportBundle()}
-                  type="button"
-                >
-                  {isImportingBundle ? "Importing..." : "Import environment bundle"}
-                </button>
+                disabled={!canWrite || isImportingBundle || importPreview.payloads.length === 0 || Boolean(importPreview.error)}
+                onClick={() => void handleImportBundle()}
+                type="button"
+              >
+                  {isImportingBundle ? t("Importing...") : t("Import environment bundle")}
+              </button>
               </div>
             </div>
           </div>
@@ -280,8 +295,10 @@ export function EnvironmentPanel({
 
       <div className="mb-5 space-y-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Project Policy</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Control which hosts this project can debug against before environment overrides apply.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("Project Policy")}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {t("Control which hosts this project can debug against before environment overrides apply.")}
+          </p>
         </div>
         <DebugTargetRuleEditor labelPrefix="Project" onChange={setProjectDebugRules} rules={projectDebugRules} />
         <button
@@ -290,7 +307,7 @@ export function EnvironmentPanel({
           onClick={() => void onUpdateProjectDebugPolicy(sanitizeDebugRules(projectDebugRules))}
           type="button"
         >
-          Save project debug policy
+          {t("Save project debug policy")}
         </button>
       </div>
 
@@ -307,14 +324,14 @@ export function EnvironmentPanel({
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">New environment</p>
-            <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">Add a reusable target profile</h4>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("New environment")}</p>
+            <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">{t("Add a reusable target profile")}</h4>
           </div>
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {formatAuthModeLabel(createForm.authMode)}
+            {formatAuthModeLabel(createForm.authMode, t)}
           </span>
         </div>
-        <Field label="New environment name">
+        <Field label={t("New environment name")}>
           <input
             aria-label="New environment name"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
@@ -324,7 +341,7 @@ export function EnvironmentPanel({
             value={createForm.name}
           />
         </Field>
-        <Field label="New environment base URL">
+        <Field label={t("New environment base URL")}>
           <input
             aria-label="New environment base URL"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
@@ -334,7 +351,7 @@ export function EnvironmentPanel({
             value={createForm.baseUrl}
           />
         </Field>
-        <Field label="New environment variables">
+        <Field label={t("New environment variables")}>
           <textarea
             aria-label="New environment variables"
             className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
@@ -344,7 +361,7 @@ export function EnvironmentPanel({
             value={createVariablesText}
           />
         </Field>
-        <Field label="New environment headers">
+        <Field label={t("New environment headers")}>
           <textarea
             aria-label="New environment headers"
             className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
@@ -354,7 +371,7 @@ export function EnvironmentPanel({
             value={createHeadersText}
           />
         </Field>
-        <Field label="New environment query">
+        <Field label={t("New environment query")}>
           <textarea
             aria-label="New environment query"
             className="min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
@@ -364,7 +381,7 @@ export function EnvironmentPanel({
             value={createQueryText}
           />
         </Field>
-        <Field label="New environment auth mode">
+        <Field label={t("New environment auth mode")}>
           <select
             aria-label="New environment auth mode"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
@@ -372,11 +389,11 @@ export function EnvironmentPanel({
             onChange={(event) => setCreateForm((current) => ({ ...current, authMode: event.target.value as CreateEnvironmentPayload["authMode"] }))}
             value={createForm.authMode}
           >
-            <option value="none">No auth preset</option>
-            <option value="bearer">Bearer token</option>
-            <option value="api_key_header">API key header</option>
-            <option value="api_key_query">API key query parameter</option>
-            <option value="basic">Basic auth</option>
+            <option value="none">{t("No auth preset")}</option>
+            <option value="bearer">{t("Bearer token")}</option>
+            <option value="api_key_header">{t("API key header")}</option>
+            <option value="api_key_query">{t("API key query parameter")}</option>
+            <option value="basic">{t("Basic auth")}</option>
           </select>
         </Field>
         <div className="grid gap-3 md:grid-cols-2">
@@ -401,7 +418,7 @@ export function EnvironmentPanel({
             />
           </Field>
         </div>
-        <Field label="New environment debug host mode">
+        <Field label={t("New environment debug host mode")}>
           <select
             aria-label="New environment debug host mode"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
@@ -414,14 +431,14 @@ export function EnvironmentPanel({
             }
             value={createForm.debugHostMode}
           >
-            <option value="inherit">Inherit global + project</option>
-            <option value="append">Append environment rules</option>
-            <option value="override">Override project rules</option>
+            <option value="inherit">{t("Inherit global + project")}</option>
+            <option value="append">{t("Append environment rules")}</option>
+            <option value="override">{t("Override project rules")}</option>
           </select>
         </Field>
-        <Field label="New environment debug rules">
+        <Field label={t("New environment debug rules")}>
           <DebugTargetRuleEditor
-            labelPrefix="New environment"
+            labelPrefix={t("New environment")}
             onChange={(debugAllowedHosts) => setCreateForm((current) => ({ ...current, debugAllowedHosts }))}
             rules={createForm.debugAllowedHosts}
           />
@@ -433,17 +450,17 @@ export function EnvironmentPanel({
             onChange={(event) => setCreateForm((current) => ({ ...current, isDefault: event.target.checked }))}
             type="checkbox"
           />
-          Default environment
+          {t("Default environment")}
         </label>
         <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400" disabled={!canWrite} type="submit">
-          Add environment
+          {t("Add environment")}
         </button>
       </form>
 
       <div className="mt-5 space-y-3">
         {environments.length === 0 ? (
           <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
-            No environments yet.
+            {t("No environments yet.")}
           </div>
         ) : (
           environments.map((environment) => (
@@ -499,6 +516,8 @@ function EnvironmentCard({
   const [queryText, setQueryText] = useState(formatEntries(environment.defaultQuery, "="));
   const authModeDescription = useMemo(() => describeAuthMode(draft.authMode), [draft.authMode]);
 
+  const { t } = useI18n();
+
   useEffect(() => {
     setDraft({
       baseUrl: environment.baseUrl,
@@ -523,28 +542,32 @@ function EnvironmentCard({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className={`text-sm font-semibold ${isSelected ? "text-white" : "text-slate-900"}`}>{environment.name}</span>
-          {isSelected ? <span className="rounded-full bg-white/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">Active</span> : null}
+          {isSelected ? (
+            <span className="rounded-full bg-white/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+              {t("Active")}
+            </span>
+          ) : null}
           {environment.isDefault ? (
             <span className={`rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${isSelected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"}`}>
-              Default
+              {t("Default")}
             </span>
           ) : null}
           <span className={`rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${isSelected ? "bg-cyan-400/15 text-cyan-100" : "bg-sky-50 text-sky-700"}`}>
-            {formatAuthModeLabel(environment.authMode)}
+            {formatAuthModeLabel(environment.authMode, t)}
           </span>
-        </div>
-        <button
-          aria-label={`Use environment ${environment.id}`}
+          </div>
+          <button
+            aria-label={`Use environment ${environment.id}`}
           className={`rounded-2xl border px-3 py-2 text-xs font-medium transition ${isSelected ? "border-white/15 bg-white/10 text-white hover:bg-white/15" : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white"}`}
           onClick={() => onSelectEnvironment(environment.id)}
           type="button"
         >
-          Use environment
-        </button>
+            {t("Use environment")}
+          </button>
       </div>
 
       <div className="mt-4 grid gap-3">
-        <Field label={`Environment ${environment.id} name`} dark={isSelected}>
+        <Field label={t("Environment {id} name", { id: environment.id })} dark={isSelected}>
           <input
             aria-label={`Environment ${environment.id} name`}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -553,7 +576,7 @@ function EnvironmentCard({
             value={draft.name}
           />
         </Field>
-        <Field label={`Environment ${environment.id} base URL`} dark={isSelected}>
+        <Field label={t("Environment {id} base URL", { id: environment.id })} dark={isSelected}>
           <input
             aria-label={`Environment ${environment.id} base URL`}
             className={`w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -562,7 +585,7 @@ function EnvironmentCard({
             value={draft.baseUrl}
           />
         </Field>
-        <Field label={`Environment ${environment.id} variables`} dark={isSelected}>
+        <Field label={t("Environment {id} variables", { id: environment.id })} dark={isSelected}>
           <textarea
             aria-label={`Environment ${environment.id} variables`}
             className={`min-h-24 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -574,7 +597,7 @@ function EnvironmentCard({
             value={variablesText}
           />
         </Field>
-        <Field label={`Environment ${environment.id} headers`} dark={isSelected}>
+        <Field label={t("Environment {id} headers", { id: environment.id })} dark={isSelected}>
           <textarea
             aria-label={`Environment ${environment.id} headers`}
             className={`min-h-24 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -586,7 +609,7 @@ function EnvironmentCard({
             value={headersText}
           />
         </Field>
-        <Field label={`Environment ${environment.id} query`} dark={isSelected}>
+        <Field label={t("Environment {id} query", { id: environment.id })} dark={isSelected}>
           <textarea
             aria-label={`Environment ${environment.id} query`}
             className={`min-h-20 w-full rounded-2xl border px-4 py-3 font-mono text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -598,7 +621,7 @@ function EnvironmentCard({
             value={queryText}
           />
         </Field>
-        <Field label={`Environment ${environment.id} auth mode`} dark={isSelected}>
+        <Field label={t("Environment {id} auth mode", { id: environment.id })} dark={isSelected}>
           <select
             aria-label={`Environment ${environment.id} auth mode`}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -635,7 +658,7 @@ function EnvironmentCard({
             />
           </Field>
         </div>
-        <Field label={`Environment ${environment.id} debug host mode`} dark={isSelected}>
+        <Field label={t("Environment {id} debug host mode", { id: environment.id })} dark={isSelected}>
           <select
             aria-label={`Environment ${environment.id} debug host mode`}
             className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${isSelected ? "border-white/15 bg-white/10 text-white focus:border-white/30" : "border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400"}`}
@@ -656,7 +679,7 @@ function EnvironmentCard({
         <Field label={`Environment ${environment.id} debug rules`} dark={isSelected}>
           <DebugTargetRuleEditor
             dark={isSelected}
-            labelPrefix={`Environment ${environment.id}`}
+            labelPrefix={t("Environment {id}", { id: environment.id })}
             onChange={(debugAllowedHosts) => setDraft((current) => ({ ...current, debugAllowedHosts }))}
             rules={draft.debugAllowedHosts}
           />
@@ -669,7 +692,7 @@ function EnvironmentCard({
             onChange={(event) => setDraft((current) => ({ ...current, isDefault: event.target.checked }))}
             type="checkbox"
           />
-          Default environment
+          {t("Default environment")}
         </label>
       </div>
 
@@ -681,7 +704,7 @@ function EnvironmentCard({
           onClick={() => void onCloneEnvironment(buildClonedEnvironmentPayload(environment))}
           type="button"
         >
-          Clone
+          {t("Clone")}
         </button>
         <button
           aria-label={`Save environment ${environment.id}`}
@@ -704,7 +727,7 @@ function EnvironmentCard({
           }
           type="button"
         >
-          Save environment
+          {t("Save environment")}
         </button>
         <button
           aria-label={`Delete environment ${environment.id}`}
@@ -713,7 +736,7 @@ function EnvironmentCard({
           onClick={() => void onDeleteEnvironment(environment.id)}
           type="button"
         >
-          Delete environment
+          {t("Delete environment")}
         </button>
       </div>
     </div>
@@ -752,19 +775,19 @@ function LabStatCard({ detail, label, value }: { detail: string; label: string; 
   );
 }
 
-function formatAuthModeLabel(mode: CreateEnvironmentPayload["authMode"] | UpdateEnvironmentPayload["authMode"]) {
+function formatAuthModeLabel(mode: CreateEnvironmentPayload["authMode"] | UpdateEnvironmentPayload["authMode"], t: ReturnType<typeof useI18n>["t"]) {
   switch (mode) {
     case "bearer":
-      return "Bearer preset";
+      return t("Bearer preset");
     case "api_key_header":
-      return "Header API key";
+      return t("Header API key");
     case "api_key_query":
-      return "Query API key";
+      return t("Query API key");
     case "basic":
-      return "Basic auth";
+      return t("Basic auth");
     case "none":
     default:
-      return "No auth preset";
+      return t("No auth preset");
   }
 }
 

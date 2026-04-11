@@ -11,6 +11,7 @@ function PreferenceProbe() {
       <p>{locale}</p>
       <p>{resolvedTheme}</p>
       <p>{t("session.title")}</p>
+      <p>{t("catalog.createProject")}</p>
       <button onClick={() => setLocale("en-US")} type="button">
         set english
       </button>
@@ -57,6 +58,7 @@ describe("AppPreferencesProvider", () => {
 
     expect(screen.getByText("zh-CN")).toBeInTheDocument();
     expect(screen.getByText("会话")).toBeInTheDocument();
+    expect(screen.getByText("创建项目")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("dark")).toBeInTheDocument();

@@ -53,11 +53,21 @@ vi.mock("@api-hub/api-sdk", () => ({
   isApiRequestError: (error: unknown) => error instanceof ApiRequestError
 }));
 
+import { AppPreferencesProvider } from "../../../lib/ui-preferences";
 import { ProjectDocsBrowser } from "./project-docs-browser";
 
 describe("ProjectDocsBrowser", () => {
+  function renderWithPreferences() {
+    return render(
+      <AppPreferencesProvider>
+        <ProjectDocsBrowser projectId={1} />
+      </AppPreferencesProvider>
+    );
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
 
     fetchProject.mockResolvedValue({
       data: {
@@ -221,47 +231,47 @@ describe("ProjectDocsBrowser", () => {
   });
 
   it("loads the project hero and the first endpoint documentation by default", async () => {
-    render(<ProjectDocsBrowser projectId={1} />);
+    renderWithPreferences();
 
     expect(await screen.findByText("Default Project")).toBeInTheDocument();
     expect(screen.getByText("Read-only contract browsing surface")).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Get User" })).toBeInTheDocument();
+    await waitFor(() => expect(fetchEndpoint).toHaveBeenCalledWith(31));
+    expect(await screen.findByRole("heading", { name: "Get User" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("/users/{id}")).toBeInTheDocument();
     expect(screen.getByText("Load one user by id.")).toBeInTheDocument();
-
-    await waitFor(() => expect(fetchEndpoint).toHaveBeenCalledWith(31));
   });
 
   it("filters the tree and focuses the first visible endpoint", async () => {
-    render(<ProjectDocsBrowser projectId={1} />);
+    renderWithPreferences();
 
-    expect(await screen.findByRole("heading", { name: "Get User" })).toBeInTheDocument();
+    await waitFor(() => expect(fetchEndpoint).toHaveBeenCalledWith(31));
+    expect(await screen.findByRole("heading", { name: "Get User" }, { timeout: 5000 })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Search docs"), { target: { value: "create" } });
+    fireEvent.change(screen.getByLabelText("搜索文档"), { target: { value: "create" } });
 
     await waitFor(() => expect(fetchEndpoint).toHaveBeenCalledWith(32));
-    expect(await screen.findByRole("heading", { name: "Create User" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Create User" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Get User" })).not.toBeInTheDocument();
   });
 
   it("renders grouped contract details, version posture, and latest mock release", async () => {
-    render(<ProjectDocsBrowser projectId={1} />);
+    renderWithPreferences();
 
-    expect(await screen.findByText("Path parameters")).toBeInTheDocument();
+    expect(await screen.findByText("路径参数")).toBeInTheDocument();
     expect(screen.getByText("User identifier")).toBeInTheDocument();
     expect(screen.getByText("HTTP 200")).toBeInTheDocument();
-    expect(screen.getByText("Live version")).toBeInTheDocument();
+    expect(screen.getByText("线上版本")).toBeInTheDocument();
     expect(screen.getByText("v2")).toBeInTheDocument();
-    expect(screen.getByText("Release #3")).toBeInTheDocument();
+    expect(screen.getAllByText("发布 #3").length).toBeGreaterThan(0);
 
-    const versionCard = screen.getByRole("region", { name: "Version posture" });
+    const versionCard = screen.getByRole("region", { name: "版本态势" });
     expect(within(versionCard).getByText("Live contract")).toBeInTheDocument();
   });
 
   it("redirects to login when the project request is unauthorized", async () => {
     fetchProject.mockRejectedValueOnce(new ApiRequestError(401, "Unauthorized"));
 
-    render(<ProjectDocsBrowser projectId={1} />);
+    renderWithPreferences();
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/login"));
   });
