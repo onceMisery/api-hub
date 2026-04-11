@@ -1176,7 +1176,7 @@ docker compose up -d mysql
 
 ```bash
 cd services/apihub-server
-.\gradlew.bat bootRun
+mvn spring-boot:run
 ```
 
 3. ????
@@ -1231,7 +1231,8 @@ http://localhost:3000/login
 
 ```bash
 cd services/apihub-server
-.\gradlew.bat clean test --tests com.apihub.auth.web.AuthControllerTest --tests com.apihub.common.web.HealthControllerTest --tests com.apihub.project.web.ProjectTreeControllerTest --tests com.apihub.common.config.ProjectSecurityTest --no-daemon
+mvn test -Dtest=AuthControllerTest,HealthControllerTest,ProjectTreeControllerTest,ProjectSecurityTest
+mvn package
 ```
 
 ?????
