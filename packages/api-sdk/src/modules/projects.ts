@@ -5,6 +5,10 @@ export type ProjectSummary = {
   name: string;
   projectKey: string;
   description: string | null;
+  debugAllowedHosts: DebugTargetRule[];
+  currentUserRole: string | null;
+  canWrite: boolean;
+  canManageMembers: boolean;
 };
 
 export type DebugTargetRule = {
@@ -113,6 +117,13 @@ export type EnvironmentDetail = {
 
 export type UpdateProjectPayload = {
   name: string;
+  description: string;
+  debugAllowedHosts: DebugTargetRule[];
+};
+
+export type CreateProjectPayload = {
+  name: string;
+  projectKey: string;
   description: string;
   debugAllowedHosts: DebugTargetRule[];
 };
@@ -347,6 +358,13 @@ export type DebugHistoryFilters = {
 
 export function fetchProjects() {
   return apiFetch<ProjectSummary[]>("/api/v1/projects");
+}
+
+export function createProject(payload: CreateProjectPayload) {
+  return apiFetch<ProjectDetail>("/api/v1/projects", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function fetchProject(projectId: number) {
