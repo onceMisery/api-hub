@@ -655,6 +655,78 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("Runtime source remains Release #4")).toBeInTheDocument();
   });
 
+  it("compares the draft against the inspected release without changing runtime source messaging", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            endpointId: 7,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          }
+        ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Draft rule",
+            priority: 100,
+            enabled: true,
+            queryConditions: [],
+            headerConditions: [],
+            bodyConditions: [],
+            statusCode: 200,
+            mediaType: "application/json",
+            body: "{\"draft\":true}"
+          }
+        ]}
+        mockReleases={[
+          {
+            id: 31,
+            endpointId: 7,
+            releaseNo: 4,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-11T09:00:00Z"
+          },
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"legacyId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"old\"}]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-10T09:00:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Inspect published release"), { target: { value: "21" } });
+
+    expect(screen.queryByText("Draft response fields changed from 0 to 1.")).not.toBeInTheDocument();
+    expect(screen.getByText("Draft enabled rules changed from 0 to 1.")).toBeInTheDocument();
+    expect(screen.getByText("Runtime source remains Release #4")).toBeInTheDocument();
+  });
+
   it("shows unpublished runtime state when no release exists", () => {
     render(
       <EndpointEditor

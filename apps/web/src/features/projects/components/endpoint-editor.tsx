@@ -229,14 +229,14 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => mockReleases.find((release) => String(release.id) === inspectedReleaseId) ?? latestRelease,
     [inspectedReleaseId, latestRelease, mockReleases]
   );
-  const publishedRuntimeSummary = useMemo(() => summarizeMockRelease(latestRelease), [latestRelease]);
+  const publishedRuntimeSummary = useMemo(() => summarizeMockRelease(inspectedRelease), [inspectedRelease]);
   const draftRuntimeSummary = useMemo(
     () => summarizeDraftRuntime(responseRows, mockRuleRows),
     [responseRows, mockRuleRows]
   );
   const runtimeDiffItems = useMemo(
-    () => buildRuntimeDiffItems(publishedRuntimeSummary, draftRuntimeSummary, latestRelease !== null),
-    [draftRuntimeSummary, latestRelease, publishedRuntimeSummary]
+    () => buildRuntimeDiffItems(publishedRuntimeSummary, draftRuntimeSummary, inspectedRelease !== null),
+    [draftRuntimeSummary, inspectedRelease, publishedRuntimeSummary]
   );
   const publishedResponseGroups = useMemo(() => buildPublishedResponseGroups(inspectedRelease), [inspectedRelease]);
   const publishedRuleItems = useMemo(() => buildPublishedRuleItems(inspectedRelease), [inspectedRelease]);
