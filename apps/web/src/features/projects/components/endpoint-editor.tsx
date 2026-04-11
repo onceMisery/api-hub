@@ -21,10 +21,12 @@ import {
   buildPublishedRuleItems,
   buildRuleSummary,
   buildRuntimeDiffItems,
+  formatBodyConditions,
   buildSnapshotDiff,
   formatConditions,
   formatRulePreviewBody,
   normalizeSnapshot,
+  parseBodyConditions,
   parseConditions,
   summarizeDraftRuntime,
   summarizeMockRelease,
@@ -97,6 +99,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [compareVersionId, setCompareVersionId] = useState("");
   const [simulationQueryText, setSimulationQueryText] = useState("");
   const [simulationHeaderText, setSimulationHeaderText] = useState("");
+  const [simulationBodyText, setSimulationBodyText] = useState("");
   const [simulationResult, setSimulationResult] = useState<MockSimulationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -125,6 +128,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setCompareVersionId("");
     setSimulationQueryText("");
     setSimulationHeaderText("");
+    setSimulationBodyText("");
     setSimulationResult(null);
     setPublishMessage(null);
     setSaveMessage(null);
@@ -166,6 +170,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setMockRuleRows(
       mockRules.map((rule) => ({
         body: rule.body ?? "{}",
+        bodyConditionsText: formatBodyConditions(rule.bodyConditions),
         enabled: rule.enabled,
         headerConditionsText: formatConditions(rule.headerConditions),
         mediaType: rule.mediaType,
@@ -297,9 +302,11 @@ export function EndpointEditor(props: EndpointEditorProps) {
       <EndpointMockSimulatorPanel
         canRun={Boolean(onSimulateMock)}
         isSimulating={isSimulating}
+        onBodyTextChange={setSimulationBodyText}
         onHeaderTextChange={setSimulationHeaderText}
         onQueryTextChange={setSimulationQueryText}
         onRun={() => void handleRunSimulation()}
+        simulationBodyText={simulationBodyText}
         simulationHeaderText={simulationHeaderText}
         simulationMessage={simulationMessage}
         simulationQueryText={simulationQueryText}
@@ -443,6 +450,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     return {
       draftRules: mockRuleRows.map((rule) => ({
         body: rule.body,
+        bodyConditions: parseBodyConditions(rule.bodyConditionsText),
         enabled: rule.enabled,
         headerConditions: parseConditions(rule.headerConditionsText),
         mediaType: rule.mediaType,
@@ -451,6 +459,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
         ruleName: rule.ruleName,
         statusCode: rule.statusCode
       })),
+      bodySample: simulationBodyText,
       draftResponses: responseRows.map((response) => ({
         dataType: response.dataType,
         description: response.description,
@@ -492,6 +501,7 @@ function createResponseDraft(): ResponseDraft {
 function createMockRuleDraft(): MockRuleDraft {
   return {
     body: "{}",
+    bodyConditionsText: "",
     enabled: true,
     headerConditionsText: "",
     mediaType: "application/json",

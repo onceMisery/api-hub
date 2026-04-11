@@ -787,6 +787,7 @@ describe("ProjectShell", () => {
           enabled: true,
           queryConditions: [{ name: "mode", value: "strict" }],
           headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+          bodyConditions: [],
           statusCode: 401,
           mediaType: "application/json",
           body: "{\"error\":\"token expired\"}"
@@ -848,6 +849,7 @@ describe("ProjectShell", () => {
         draftRules: [
           {
             body: "{\"error\":\"token expired\"}",
+            bodyConditions: [],
             enabled: true,
             headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
             mediaType: "application/json",
@@ -868,6 +870,7 @@ describe("ProjectShell", () => {
             required: true
           }
         ],
+        bodySample: "",
         headerSamples: [{ name: "x-scenario", value: "unauthorized" }],
         querySamples: [{ name: "mode", value: "strict" }]
       })

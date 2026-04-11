@@ -1,4 +1,4 @@
-import type { MockConditionEntry, MockReleaseDetail } from "@api-hub/api-sdk";
+import type { MockBodyConditionEntry, MockConditionEntry, MockReleaseDetail } from "@api-hub/api-sdk";
 
 export type ParameterDraft = {
   sectionType: string;
@@ -25,6 +25,7 @@ export type MockRuleDraft = {
   enabled: boolean;
   queryConditionsText: string;
   headerConditionsText: string;
+  bodyConditionsText: string;
   statusCode: number;
   mediaType: string;
   body: string;
@@ -54,6 +55,7 @@ export type MockReleaseRuleSnapshot = {
   enabled: boolean;
   queryConditions: MockConditionEntry[];
   headerConditions: MockConditionEntry[];
+  bodyConditions: MockBodyConditionEntry[];
   statusCode: number;
   mediaType: string;
 };
@@ -97,6 +99,32 @@ export function parseConditions(text: string): MockConditionEntry[] {
     .filter((condition) => condition.name);
 }
 
+export function formatBodyConditions(conditions: MockBodyConditionEntry[] | undefined) {
+  return (conditions ?? []).map((condition) => `${condition.jsonPath}=${condition.expectedValue}`).join("\n");
+}
+
+export function parseBodyConditions(text: string): MockBodyConditionEntry[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex === -1) {
+        return {
+          jsonPath: line,
+          expectedValue: ""
+        };
+      }
+
+      return {
+        jsonPath: line.slice(0, separatorIndex).trim(),
+        expectedValue: line.slice(separatorIndex + 1).trim()
+      };
+    })
+    .filter((condition) => condition.jsonPath);
+}
+
 export function buildRuleSummary(rule: MockRuleDraft) {
   const queryConditions = parseConditions(rule.queryConditionsText).map(
     (condition) => `query ${condition.name}=${condition.value}`
@@ -104,7 +132,10 @@ export function buildRuleSummary(rule: MockRuleDraft) {
   const headerConditions = parseConditions(rule.headerConditionsText).map(
     (condition) => `header ${condition.name}=${condition.value}`
   );
-  const conditions = [...queryConditions, ...headerConditions];
+  const bodyConditions = parseBodyConditions(rule.bodyConditionsText).map(
+    (condition) => `body ${condition.jsonPath}=${condition.expectedValue}`
+  );
+  const conditions = [...queryConditions, ...headerConditions, ...bodyConditions];
 
   if (conditions.length === 0) {
     return ["Matches any request for this endpoint."];
@@ -431,6 +462,7 @@ function readReleaseRules(snapshotJson: string): MockReleaseRuleSnapshot[] {
 
 function normalizeMockReleaseRule(rule: Partial<MockReleaseRuleSnapshot>): MockReleaseRuleSnapshot {
   return {
+    bodyConditions: normalizeBodyConditionEntries(rule.bodyConditions),
     enabled: rule.enabled !== false,
     headerConditions: normalizeConditionEntries(rule.headerConditions),
     mediaType: typeof rule.mediaType === "string" ? rule.mediaType : "application/json",
@@ -465,6 +497,30 @@ function normalizeConditionEntries(conditions: unknown): MockConditionEntry[] {
     .filter((condition): condition is MockConditionEntry => condition !== null);
 }
 
+function normalizeBodyConditionEntries(conditions: unknown): MockBodyConditionEntry[] {
+  if (!Array.isArray(conditions)) {
+    return [];
+  }
+
+  return conditions
+    .map((condition) => {
+      if (!condition || typeof condition !== "object") {
+        return null;
+      }
+
+      const candidate = condition as Partial<MockBodyConditionEntry>;
+      if (typeof candidate.jsonPath !== "string") {
+        return null;
+      }
+
+      return {
+        jsonPath: candidate.jsonPath,
+        expectedValue: typeof candidate.expectedValue === "string" ? candidate.expectedValue : ""
+      };
+    })
+    .filter((condition): condition is MockBodyConditionEntry => condition !== null);
+}
+
 function emptyMockRuntimeSummary(): MockRuntimeSummary {
   return {
     enabledRuleCount: 0,
@@ -477,7 +533,10 @@ function emptyMockRuntimeSummary(): MockRuntimeSummary {
 function buildPublishedRuleConditions(rule: MockReleaseRuleSnapshot) {
   const queryConditions = rule.queryConditions.map((condition) => `query ${condition.name}=${condition.value}`);
   const headerConditions = rule.headerConditions.map((condition) => `header ${condition.name}=${condition.value}`);
-  const conditions = [...queryConditions, ...headerConditions];
+  const bodyConditions = rule.bodyConditions.map(
+    (condition) => `body ${condition.jsonPath}=${condition.expectedValue}`
+  );
+  const conditions = [...queryConditions, ...headerConditions, ...bodyConditions];
 
   if (conditions.length > 0) {
     return conditions;

@@ -6,6 +6,7 @@ type MockRuleRow = {
   enabled: boolean;
   queryConditionsText: string;
   headerConditionsText: string;
+  bodyConditionsText: string;
   statusCode: number;
   mediaType: string;
   body: string;
@@ -38,7 +39,7 @@ export function EndpointMockRulesPanel({
     <EditorPanel title="Mock Rules">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-slate-500">Match exact query or header values before falling back to the default mock preview.</p>
+          <p className="text-sm text-slate-500">Match exact query, header, or body JSONPath values before falling back to the default mock preview.</p>
           <button
             className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
             onClick={onAddRule}
@@ -105,6 +106,16 @@ export function EndpointMockRulesPanel({
                     />
                   </Field>
                 </div>
+
+                <Field label={`Mock rule ${index + 1} body conditions`}>
+                  <textarea
+                    aria-label={`Mock rule ${index + 1} body conditions`}
+                    className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+                    onChange={(event) => onUpdateRule(index, "bodyConditionsText", event.target.value)}
+                    placeholder="$.user.id=31"
+                    value={rule.bodyConditionsText}
+                  />
+                </Field>
 
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
                   <Field label={`Mock rule ${index + 1} body`}>

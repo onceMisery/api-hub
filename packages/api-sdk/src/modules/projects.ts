@@ -262,6 +262,7 @@ export type MockSimulationPayload = {
   draftResponses: MockSimulationResponseItem[];
   querySamples: MockConditionEntry[];
   headerSamples: MockConditionEntry[];
+  bodySample: string;
 };
 
 export type MockSimulationResult = {

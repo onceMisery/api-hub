@@ -144,6 +144,7 @@ describe("EndpointEditor", () => {
     fireEvent.change(screen.getByLabelText("Mock rule 1 name"), { target: { value: "Unauthorized" } });
     fireEvent.change(screen.getByLabelText("Mock rule 1 query conditions"), { target: { value: "mode=strict" } });
     fireEvent.change(screen.getByLabelText("Mock rule 1 header conditions"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 body conditions"), { target: { value: "$.user.id=31" } });
     fireEvent.change(screen.getByLabelText("Mock rule 1 response status"), { target: { value: "401" } });
     fireEvent.change(screen.getByLabelText("Mock rule 1 body"), { target: { value: "{\"error\":\"token expired\"}" } });
     fireEvent.click(screen.getByRole("button", { name: "Save mock rules" }));
@@ -152,6 +153,7 @@ describe("EndpointEditor", () => {
       expect(onSaveMockRules).toHaveBeenCalledWith([
         {
           body: "{\"error\":\"token expired\"}",
+          bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
           enabled: true,
           headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
           mediaType: "application/json",
@@ -384,6 +386,7 @@ describe("EndpointEditor", () => {
             enabled: true,
             queryConditions: [{ name: "mode", value: "strict" }],
             headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
             statusCode: 401,
             mediaType: "application/json",
             body: "{\"error\":\"token expired\"}"
@@ -396,6 +399,7 @@ describe("EndpointEditor", () => {
 
     fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
     fireEvent.change(screen.getByLabelText("Simulator header samples"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Simulator request body"), { target: { value: "{\"user\":{\"id\":31}}" } });
     fireEvent.click(screen.getByRole("button", { name: "Run mock simulation" }));
 
     await waitFor(() =>
@@ -403,6 +407,7 @@ describe("EndpointEditor", () => {
         draftRules: [
           {
             body: "{\"error\":\"token expired\"}",
+            bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
             enabled: true,
             headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
             mediaType: "application/json",
@@ -433,7 +438,8 @@ describe("EndpointEditor", () => {
           }
         ],
         headerSamples: [{ name: "x-scenario", value: "unauthorized" }],
-        querySamples: [{ name: "mode", value: "strict" }]
+        querySamples: [{ name: "mode", value: "strict" }],
+        bodySample: "{\"user\":{\"id\":31}}"
       })
     );
 

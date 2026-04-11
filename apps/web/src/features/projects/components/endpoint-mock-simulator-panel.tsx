@@ -5,31 +5,35 @@ import { EditorPanel, Field, PreviewMetric } from "./endpoint-editor-shared";
 type EndpointMockSimulatorPanelProps = {
   simulationQueryText: string;
   simulationHeaderText: string;
+  simulationBodyText: string;
   simulationResult: MockSimulationResult | null;
   simulationMessage: string | null;
   isSimulating: boolean;
   canRun: boolean;
   onQueryTextChange: (value: string) => void;
   onHeaderTextChange: (value: string) => void;
+  onBodyTextChange: (value: string) => void;
   onRun: () => void;
 };
 
 export function EndpointMockSimulatorPanel({
   simulationQueryText,
   simulationHeaderText,
+  simulationBodyText,
   simulationResult,
   simulationMessage,
   isSimulating,
   canRun,
   onQueryTextChange,
   onHeaderTextChange,
+  onBodyTextChange,
   onRun
 }: EndpointMockSimulatorPanelProps) {
   return (
     <EditorPanel title="Mock Simulator">
       <div className="space-y-4">
         <p className="text-sm text-slate-500">
-          Send query and header samples to the backend resolver. This only simulates exact `query/header` matches against the current draft.
+          Send query, header, and request body samples to the backend resolver. This simulates exact `query/header` matches plus body JSONPath checks against the current draft.
         </p>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -52,6 +56,16 @@ export function EndpointMockSimulatorPanel({
             />
           </Field>
         </div>
+
+        <Field label="Simulator request body">
+          <textarea
+            aria-label="Simulator request body"
+            className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
+            onChange={(event) => onBodyTextChange(event.target.value)}
+            placeholder='{"user":{"id":31}}'
+            value={simulationBodyText}
+          />
+        </Field>
 
         <div className="flex items-center gap-3">
           <button
