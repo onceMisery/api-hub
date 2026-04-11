@@ -3,6 +3,7 @@ package com.apihub.debug.service;
 import com.apihub.debug.config.DebugSecurityProperties;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,6 +24,7 @@ public class JdkDebugHttpExecutor implements DebugHttpExecutor {
     private final HttpClient httpClient;
     private final DebugSecurityProperties debugSecurityProperties;
 
+    @Autowired
     public JdkDebugHttpExecutor(DebugSecurityProperties debugSecurityProperties) {
         this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(debugSecurityProperties.getConnectTimeoutMs()))

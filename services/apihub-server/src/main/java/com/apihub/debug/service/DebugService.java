@@ -13,6 +13,7 @@ import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.repository.ProjectRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -45,6 +46,7 @@ public class DebugService {
     private final DebugSecurityProperties debugSecurityProperties;
     private final DebugHostResolver debugHostResolver;
 
+    @Autowired
     public DebugService(ProjectRepository projectRepository,
                         EndpointRepository endpointRepository,
                         DebugHttpExecutor debugHttpExecutor,
