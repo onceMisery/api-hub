@@ -834,11 +834,13 @@ describe("ProjectShell", () => {
     render(<ProjectShell projectId={1} />);
 
     expect((await screen.findAllByText("Release #2")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Inspecting Release #2")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish mock" }));
 
     await waitFor(() => expect(publishEndpointMockRelease).toHaveBeenCalledWith(31));
     expect((await screen.findAllByText("Release #3")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Inspecting Release #3")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
     fireEvent.change(screen.getByLabelText("Simulator header samples"), { target: { value: "x-scenario=unauthorized" } });

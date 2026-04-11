@@ -97,6 +97,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [mockRuleRows, setMockRuleRows] = useState<MockRuleDraft[]>([]);
   const [versionForm, setVersionForm] = useState({ changeSummary: "", version: "" });
   const [compareVersionId, setCompareVersionId] = useState("");
+  const [inspectedReleaseId, setInspectedReleaseId] = useState("");
   const [simulationQueryText, setSimulationQueryText] = useState("");
   const [simulationHeaderText, setSimulationHeaderText] = useState("");
   const [simulationBodyText, setSimulationBodyText] = useState("");
@@ -138,6 +139,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setSimulationMessage(null);
     setVersionMessage(null);
   }, [endpoint]);
+
+  useEffect(() => {
+    setInspectedReleaseId(mockReleases[0] ? String(mockReleases[0].id) : "");
+  }, [endpoint?.id, mockReleases]);
 
   useEffect(() => {
     setParameterRows(
@@ -220,6 +225,10 @@ export function EndpointEditor(props: EndpointEditorProps) {
     return buildSnapshotDiff(normalizeSnapshot(compareVersion.snapshotJson), currentSnapshot);
   }, [compareVersion, currentSnapshot]);
   const latestRelease = mockReleases[0] ?? null;
+  const inspectedRelease = useMemo(
+    () => mockReleases.find((release) => String(release.id) === inspectedReleaseId) ?? latestRelease,
+    [inspectedReleaseId, latestRelease, mockReleases]
+  );
   const publishedRuntimeSummary = useMemo(() => summarizeMockRelease(latestRelease), [latestRelease]);
   const draftRuntimeSummary = useMemo(
     () => summarizeDraftRuntime(responseRows, mockRuleRows),
@@ -229,8 +238,8 @@ export function EndpointEditor(props: EndpointEditorProps) {
     () => buildRuntimeDiffItems(publishedRuntimeSummary, draftRuntimeSummary, latestRelease !== null),
     [draftRuntimeSummary, latestRelease, publishedRuntimeSummary]
   );
-  const publishedResponseGroups = useMemo(() => buildPublishedResponseGroups(latestRelease), [latestRelease]);
-  const publishedRuleItems = useMemo(() => buildPublishedRuleItems(latestRelease), [latestRelease]);
+  const publishedResponseGroups = useMemo(() => buildPublishedResponseGroups(inspectedRelease), [inspectedRelease]);
+  const publishedRuleItems = useMemo(() => buildPublishedRuleItems(inspectedRelease), [inspectedRelease]);
 
   if (isLoading) {
     return (
@@ -315,9 +324,13 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
       <PublishedRuntimePanel
         draftRuntimeSummary={draftRuntimeSummary}
+        inspectedRelease={inspectedRelease}
+        inspectedReleaseId={inspectedRelease ? String(inspectedRelease.id) : ""}
         isPublishing={isPublishing}
         latestRelease={latestRelease}
         mockUrl={buildMockUrl(projectId, formState.path)}
+        mockReleases={mockReleases}
+        onInspectedReleaseChange={setInspectedReleaseId}
         onPublish={onPublishMockRelease ? () => void handlePublishMock() : undefined}
         publishMessage={publishMessage}
         publishedResponseGroups={publishedResponseGroups}

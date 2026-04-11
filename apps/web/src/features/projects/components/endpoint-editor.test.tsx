@@ -606,6 +606,55 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("header x-scenario=unauthorized")).toBeInTheDocument();
   });
 
+  it("inspects an older mock release while keeping runtime pinned to the latest release", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockReleases={[
+          {
+            id: 31,
+            endpointId: 7,
+            releaseNo: 4,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"}]",
+            rulesSnapshotJson:
+              "[{\"ruleName\":\"Latest rule\",\"priority\":120,\"enabled\":true,\"queryConditions\":[],\"headerConditions\":[],\"bodyConditions\":[],\"statusCode\":200,\"mediaType\":\"application/json\",\"body\":\"{\\\"ok\\\":true}\"}]",
+            createdAt: "2026-04-11T09:00:00Z"
+          },
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson:
+              "[{\"ruleName\":\"Legacy rule\",\"priority\":80,\"enabled\":true,\"queryConditions\":[],\"headerConditions\":[],\"bodyConditions\":[],\"statusCode\":503,\"mediaType\":\"application/json\",\"body\":\"{\\\"legacy\\\":true}\"}]",
+            createdAt: "2026-04-10T09:00:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Release #4 is the only snapshot served by runtime.")).toBeInTheDocument();
+    expect(screen.getByText("Inspecting Release #4")).toBeInTheDocument();
+    expect(screen.getByText("Latest rule")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Inspect published release"), { target: { value: "21" } });
+
+    expect(screen.getByText("Inspecting Release #3")).toBeInTheDocument();
+    expect(screen.getByText("Legacy rule")).toBeInTheDocument();
+    expect(screen.getByText("Runtime source remains Release #4")).toBeInTheDocument();
+  });
+
   it("shows unpublished runtime state when no release exists", () => {
     render(
       <EndpointEditor
