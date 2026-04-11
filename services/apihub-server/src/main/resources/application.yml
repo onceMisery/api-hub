@@ -6,6 +6,10 @@ spring:
     url: ${APIHUB_DB_URL:jdbc:mysql://localhost:3306/apihub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
     username: ${APIHUB_DB_USERNAME:root}
     password: ${APIHUB_DB_PASSWORD:root}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 apihub:
   auth:
