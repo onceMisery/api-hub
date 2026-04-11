@@ -1,5 +1,6 @@
 package com.apihub.project.service;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
@@ -30,7 +31,9 @@ import com.apihub.project.model.ProjectDtos.GroupTreeItem;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleTreeItem;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
+import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
+import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
@@ -55,15 +58,18 @@ public class ProjectService {
     private final EndpointRepository endpointRepository;
     private final MockRuntimeResolver mockRuntimeResolver;
     private final DebugTargetRuleValidator debugTargetRuleValidator;
+    private final AuthUserRepository authUserRepository;
 
     public ProjectService(ProjectRepository projectRepository,
                           EndpointRepository endpointRepository,
                           MockRuntimeResolver mockRuntimeResolver,
-                          DebugTargetRuleValidator debugTargetRuleValidator) {
+                          DebugTargetRuleValidator debugTargetRuleValidator,
+                          AuthUserRepository authUserRepository) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.mockRuntimeResolver = mockRuntimeResolver;
         this.debugTargetRuleValidator = debugTargetRuleValidator;
+        this.authUserRepository = authUserRepository;
     }
 
     @Transactional(readOnly = true)
@@ -256,6 +262,59 @@ public class ProjectService {
     public void deleteEnvironment(Long userId, Long environmentId) {
         requireEnvironmentWriteAccess(userId, environmentId);
         projectRepository.deleteEnvironment(environmentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectMemberDetail> listProjectMembers(Long projectId) {
+        return listProjectMembers(1L, projectId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectMemberDetail> listProjectMembers(Long userId, Long projectId) {
+        requireProjectReadAccess(userId, projectId);
+        return projectRepository.listProjectMembers(projectId);
+    }
+
+    public ProjectMemberDetail saveProjectMember(Long projectId, UpsertProjectMemberRequest request) {
+        return saveProjectMember(1L, projectId, request);
+    }
+
+    public ProjectMemberDetail saveProjectMember(Long userId, Long projectId, UpsertProjectMemberRequest request) {
+        requireProjectMemberAdminAccess(userId, projectId);
+        validateProjectMemberRequest(request);
+
+        ProjectMemberDetail targetMember = projectRepository.listProjectMembers(projectId).stream()
+                .filter(member -> member.username().equals(request.username()))
+                .findFirst()
+                .orElseGet(() -> authUserRepository.findActiveByUsername(request.username())
+                        .map(user -> new ProjectMemberDetail(
+                                user.id(),
+                                user.username(),
+                                user.displayName(),
+                                user.email(),
+                                request.roleCode(),
+                                false))
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found")));
+
+        if (targetMember.owner() && !"project_admin".equals(request.roleCode()) && projectRepository.countProjectAdmins(projectId) <= 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove the last project admin");
+        }
+
+        return projectRepository.saveProjectMember(projectId, targetMember.userId(), request);
+    }
+
+    public void deleteProjectMember(Long projectId, Long memberUserId) {
+        deleteProjectMember(1L, projectId, memberUserId);
+    }
+
+    public void deleteProjectMember(Long userId, Long projectId, Long memberUserId) {
+        requireProjectMemberAdminAccess(userId, projectId);
+        ProjectMemberDetail member = projectRepository.findProjectMember(projectId, memberUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project member not found"));
+        if ("project_admin".equals(member.roleCode()) && projectRepository.countProjectAdmins(projectId) <= 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove the last project admin");
+        }
+        projectRepository.deleteProjectMember(projectId, memberUserId);
     }
 
     @Transactional(readOnly = true)
@@ -458,6 +517,14 @@ public class ProjectService {
         return project;
     }
 
+    private ProjectDetail requireProjectMemberAdminAccess(Long userId, Long projectId) {
+        ProjectDetail project = requireProjectReadAccess(userId, projectId);
+        if (!project.canManageMembers()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project member management denied");
+        }
+        return project;
+    }
+
     private ProjectRepository.ModuleReference requireModuleReadAccess(Long userId, Long moduleId) {
         ProjectRepository.ModuleReference module = projectRepository.findModuleReference(moduleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Module not found"));
@@ -518,6 +585,18 @@ public class ProjectService {
             return OBJECT_MAPPER.writeValueAsString(value);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize mock release snapshot", exception);
+        }
+    }
+
+    private void validateProjectMemberRequest(UpsertProjectMemberRequest request) {
+        if (request == null || request.username() == null || request.username().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project member username is required");
+        }
+        if (request.roleCode() == null || request.roleCode().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project member role is required");
+        }
+        if (!List.of("project_admin", "editor", "tester", "viewer").contains(request.roleCode())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported project member role");
         }
     }
 }

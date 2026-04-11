@@ -25,11 +25,25 @@ public final class ProjectDtos {
             String description,
             List<DebugTargetRuleEntry> debugAllowedHosts,
             String currentUserRole,
-            boolean canWrite
+            boolean canWrite,
+            boolean canManageMembers
     ) {
         public ProjectDetail(Long id, String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
-            this(id, name, projectKey, description, debugAllowedHosts, null, false);
+            this(id, name, projectKey, description, debugAllowedHosts, null, false, false);
         }
+    }
+
+    public record ProjectMemberDetail(
+            Long userId,
+            String username,
+            String displayName,
+            String email,
+            String roleCode,
+            boolean owner
+    ) {
+    }
+
+    public record UpsertProjectMemberRequest(String username, String roleCode) {
     }
 
     public record ProjectTreeResponse(List<ModuleTreeItem> modules) {

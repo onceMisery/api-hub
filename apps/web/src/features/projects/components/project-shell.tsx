@@ -8,6 +8,7 @@ import {
   createGroup,
   createModule,
   createVersion,
+  deleteProjectMember,
   deleteEndpoint,
   deleteEnvironment,
   deleteGroup,
@@ -16,6 +17,7 @@ import {
   fetchEndpointMockRules,
   fetchEndpointMockReleases,
   fetchEnvironments,
+  fetchProjectMembers,
   fetchProject,
   fetchDebugHistory,
   fetchEndpointParameters,
@@ -27,6 +29,7 @@ import {
   replaceEndpointMockRules,
   replaceEndpointResponses,
   publishEndpointMockRelease,
+  saveProjectMember,
   simulateEndpointMock,
   updateEndpoint,
   updateEnvironment,
@@ -48,8 +51,10 @@ import {
   type ParameterDetail,
   type ParameterUpsertItem,
   type ProjectDetail,
+  type ProjectMemberDetail,
   type ResponseDetail,
   type ResponseUpsertItem,
+  type UpsertProjectMemberPayload,
   type UpdateEndpointPayload,
   type UpdateEnvironmentPayload,
   type VersionDetail
@@ -61,6 +66,7 @@ import { SessionBar } from "../../auth/components/session-bar";
 import { EndpointEditor } from "./endpoint-editor";
 import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
+import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectSidebar } from "./project-sidebar";
 
 type ProjectShellProps = {
@@ -71,6 +77,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const router = useRouter();
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [projectMembers, setProjectMembers] = useState<ProjectMemberDetail[]>([]);
   const [environments, setEnvironments] = useState<EnvironmentDetail[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<number | null>(null);
@@ -114,6 +121,10 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   useEffect(() => {
     void reloadEnvironments();
+  }, [projectId]);
+
+  useEffect(() => {
+    void reloadProjectMembers();
   }, [projectId]);
 
   useEffect(() => {
@@ -232,6 +243,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   }, [modules]);
   const filteredModules = useMemo(() => filterModules(modules, searchQuery), [modules, searchQuery]);
   const canWrite = project?.canWrite ?? false;
+  const canManageMembers = project?.canManageMembers ?? false;
   const accessLabel = formatProjectAccess(project?.currentUserRole);
   const selectedEnvironment = useMemo(
     () => environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
@@ -343,6 +355,12 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onUpdateEnvironment={handleUpdateEnvironment}
             selectedEnvironmentId={selectedEnvironmentId}
           />
+          <ProjectMembersPanel
+            canManageMembers={canManageMembers}
+            members={projectMembers}
+            onDeleteMember={handleDeleteProjectMember}
+            onSaveMember={handleSaveProjectMember}
+          />
           <DebugConsole
             canClearHistory={canWrite}
             endpoint={endpoint}
@@ -439,6 +457,19 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  async function reloadProjectMembers() {
+    try {
+      const response = await fetchProjectMembers(projectId);
+      setProjectMembers(response.data);
+    } catch (loadError) {
+      if (handleUnauthorized(loadError)) {
+        return;
+      }
+
+      setError(loadError instanceof Error ? loadError.message : "Failed to load project members");
+    }
+  }
+
   async function handleCreateModule(payload: { name: string }) {
     setError(null);
 
@@ -504,6 +535,40 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       }
 
       setError(updateError instanceof Error ? updateError.message : "Failed to update project debug policy");
+    }
+  }
+
+  async function handleSaveProjectMember(payload: UpsertProjectMemberPayload) {
+    setError(null);
+
+    try {
+      await saveProjectMember(projectId, payload);
+      await reloadProjectMembers();
+      await reloadProject();
+    } catch (saveError) {
+      if (handleUnauthorized(saveError)) {
+        return;
+      }
+
+      setError(saveError instanceof Error ? saveError.message : "Failed to save project member");
+      throw saveError;
+    }
+  }
+
+  async function handleDeleteProjectMember(memberUserId: number) {
+    setError(null);
+
+    try {
+      await deleteProjectMember(projectId, memberUserId);
+      await reloadProjectMembers();
+      await reloadProject();
+    } catch (deleteError) {
+      if (handleUnauthorized(deleteError)) {
+        return;
+      }
+
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete project member");
+      throw deleteError;
     }
   }
 

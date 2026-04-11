@@ -10,6 +10,9 @@ VALUES (3, 'editor', 'Editor User', 'editor@local.dev', 'hash', 0, 'active');
 INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
 VALUES (4, 'tester', 'Tester User', 'tester@local.dev', 'hash', 0, 'active');
 
+INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
+VALUES (5, 'member-admin', 'Member Admin', 'member-admin@local.dev', 'hash', 0, 'active');
+
 INSERT INTO space (id, name, space_key, owner_id, status)
 VALUES (1, 'Default Space', 'default', 1, 'active');
 

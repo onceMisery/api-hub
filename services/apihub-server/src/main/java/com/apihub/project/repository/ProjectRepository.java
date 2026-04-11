@@ -13,6 +13,8 @@ import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
+import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
@@ -47,7 +49,16 @@ public class ProjectRepository {
             rs.getString("description"),
             deserializeDebugRules(rs.getString("debug_allowed_hosts_json")),
             rs.getString("current_user_role"),
-            rs.getBoolean("can_write"));
+            rs.getBoolean("can_write"),
+            rs.getBoolean("can_manage_members"));
+
+    private static final RowMapper<ProjectMemberDetail> PROJECT_MEMBER_ROW_MAPPER = (rs, rowNum) -> new ProjectMemberDetail(
+            rs.getLong("user_id"),
+            rs.getString("username"),
+            rs.getString("display_name"),
+            rs.getString("email"),
+            rs.getString("role_code"),
+            rs.getBoolean("owner"));
 
     private static final RowMapper<ModuleDetail> MODULE_ROW_MAPPER = (rs, rowNum) -> new ModuleDetail(
             rs.getLong("id"),
@@ -98,7 +109,12 @@ public class ProjectRepository {
                                     when project.owner_id = ? then true
                                     when project_member.role_code in ('project_admin', 'editor') then true
                                     else false
-                                end as can_write
+                                end as can_write,
+                                case
+                                    when project.owner_id = ? then true
+                                    when project_member.role_code = 'project_admin' then true
+                                    else false
+                                end as can_manage_members
                 from project
                 left join project_member
                   on project_member.project_id = project.id
@@ -107,7 +123,7 @@ public class ProjectRepository {
                 where project.owner_id = ?
                    or project_member.id is not null
                 order by project.id
-                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, userId);
+                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, userId, userId);
     }
 
     public Optional<ProjectDetail> findProject(Long userId, Long projectId) {
@@ -125,7 +141,12 @@ public class ProjectRepository {
                            when project.owner_id = ? then true
                            when project_member.role_code in ('project_admin', 'editor') then true
                            else false
-                       end as can_write
+                       end as can_write,
+                       case
+                           when project.owner_id = ? then true
+                           when project_member.role_code = 'project_admin' then true
+                           else false
+                       end as can_manage_members
                 from project
                 left join project_member
                   on project_member.project_id = project.id
@@ -133,7 +154,7 @@ public class ProjectRepository {
                  and project_member.member_status = 'active'
                 where project.id = ?
                   and (project.owner_id = ? or project_member.id is not null)
-                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, projectId, userId).stream().findFirst();
+                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, userId, projectId, userId).stream().findFirst();
     }
 
     public Optional<ProjectDetail> findProject(Long projectId) {
@@ -170,6 +191,23 @@ public class ProjectRepository {
                   and (
                         project.owner_id = ?
                      or project_member.role_code in ('project_admin', 'editor')
+                  )
+                """, Integer.class, userId, projectId, userId);
+        return matched != null && matched > 0;
+    }
+
+    public boolean canManageProjectMembers(Long userId, Long projectId) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from project
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.id = ?
+                  and (
+                        project.owner_id = ?
+                     or project_member.role_code = 'project_admin'
                   )
                 """, Integer.class, userId, projectId, userId);
         return matched != null && matched > 0;
@@ -423,6 +461,118 @@ public class ProjectRepository {
 
     public void deleteEnvironment(Long environmentId) {
         jdbcTemplate.update("delete from environment where id = ?", environmentId);
+    }
+
+    public List<ProjectMemberDetail> listProjectMembers(Long projectId) {
+        return jdbcTemplate.query("""
+                select u.id as user_id,
+                       u.username,
+                       u.display_name,
+                       u.email,
+                       case
+                           when p.owner_id = u.id then 'project_admin'
+                           else pm.role_code
+                       end as role_code,
+                       case
+                           when p.owner_id = u.id then true
+                           else false
+                       end as owner
+                from project p
+                join sys_user u
+                  on u.status = 'active'
+                left join project_member pm
+                  on pm.project_id = p.id
+                 and pm.user_id = u.id
+                 and pm.member_status = 'active'
+                where p.id = ?
+                  and (p.owner_id = u.id or pm.id is not null)
+                order by owner desc, u.id
+                """, PROJECT_MEMBER_ROW_MAPPER, projectId);
+    }
+
+    public Optional<ProjectMemberDetail> findProjectMember(Long projectId, Long userId) {
+        return jdbcTemplate.query("""
+                select u.id as user_id,
+                       u.username,
+                       u.display_name,
+                       u.email,
+                       case
+                           when p.owner_id = u.id then 'project_admin'
+                           else pm.role_code
+                       end as role_code,
+                       case
+                           when p.owner_id = u.id then true
+                           else false
+                       end as owner
+                from project p
+                join sys_user u
+                  on u.id = ?
+                 and u.status = 'active'
+                left join project_member pm
+                  on pm.project_id = p.id
+                 and pm.user_id = u.id
+                 and pm.member_status = 'active'
+                where p.id = ?
+                  and (p.owner_id = u.id or pm.id is not null)
+                """, PROJECT_MEMBER_ROW_MAPPER, userId, projectId).stream().findFirst();
+    }
+
+    public ProjectMemberDetail saveProjectMember(Long projectId, Long userId, UpsertProjectMemberRequest request) {
+        Integer existingId = jdbcTemplate.query("""
+                select id
+                from project_member
+                where project_id = ?
+                  and user_id = ?
+                """, rs -> rs.next() ? rs.getInt("id") : null, projectId, userId);
+
+        if (existingId == null) {
+            jdbcTemplate.update("""
+                    insert into project_member (project_id, user_id, role_code, member_status)
+                    values (?, ?, ?, 'active')
+                    """, projectId, userId, request.roleCode());
+        } else {
+            jdbcTemplate.update("""
+                    update project_member
+                    set role_code = ?,
+                        member_status = 'active'
+                    where project_id = ?
+                      and user_id = ?
+                    """, request.roleCode(), projectId, userId);
+        }
+
+        return findProjectMember(projectId, userId).orElseThrow();
+    }
+
+    public void deleteProjectMember(Long projectId, Long userId) {
+        jdbcTemplate.update("""
+                delete from project_member
+                where project_id = ?
+                  and user_id = ?
+                """, projectId, userId);
+    }
+
+    public long countProjectAdmins(Long projectId) {
+        Long count = jdbcTemplate.queryForObject("""
+                select count(*)
+                from (
+                    select p.owner_id as user_id
+                    from project p
+                    join sys_user u
+                      on u.id = p.owner_id
+                     and u.status = 'active'
+                    where p.id = ?
+                    union
+                    select pm.user_id
+                    from project_member pm
+                    join sys_user u
+                      on u.id = pm.user_id
+                     and u.status = 'active'
+                    where pm.project_id = ?
+                      and pm.member_status = 'active'
+                      and pm.role_code = 'project_admin'
+                ) admins
+                """, Long.class, projectId, projectId);
+        return count == null ? 0L : count;
     }
 
     private String nextModuleKey(Long projectId, String name) {

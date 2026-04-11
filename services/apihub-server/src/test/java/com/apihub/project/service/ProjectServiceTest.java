@@ -1,5 +1,6 @@
 package com.apihub.project.service;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
@@ -12,6 +13,8 @@ import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
+import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
 import com.apihub.debug.service.DebugTargetRuleValidator;
@@ -35,6 +38,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 
 @JdbcTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:project-service;MODE=MySQL;DB_CLOSE_DELAY=-1",
@@ -42,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.datasource.username=sa",
         "spring.datasource.password="
 })
-@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class, DebugTargetRuleValidator.class})
+@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class, DebugTargetRuleValidator.class, AuthUserRepository.class})
 @Sql(scripts = "/project-service-schema.sql")
 @Sql(scripts = "/project-service-data.sql")
 class ProjectServiceTest {
@@ -75,10 +79,13 @@ class ProjectServiceTest {
         assertThat(projectService.getProject(2L, 1L).projectKey()).isEqualTo("default");
         assertThat(projectService.getProject(2L, 1L).currentUserRole()).isEqualTo("viewer");
         assertThat(projectService.getProject(2L, 1L).canWrite()).isFalse();
+        assertThat(projectService.getProject(2L, 1L).canManageMembers()).isFalse();
         assertThat(projectService.getProject(3L, 1L).currentUserRole()).isEqualTo("editor");
         assertThat(projectService.getProject(3L, 1L).canWrite()).isTrue();
+        assertThat(projectService.getProject(3L, 1L).canManageMembers()).isFalse();
         assertThat(projectService.getProject(4L, 1L).currentUserRole()).isEqualTo("tester");
         assertThat(projectService.getProject(4L, 1L).canWrite()).isFalse();
+        assertThat(projectService.getProject(4L, 1L).canManageMembers()).isFalse();
         assertThat(projectService.getProjectTree(2L, 1L).modules()).hasSize(1);
         assertThat(projectService.listModules(4L, 1L)).extracting("name").containsExactly("Core");
         assertThat(projectService.listEnvironments(4L, 1L)).extracting("name").containsExactly("Local");
@@ -114,6 +121,69 @@ class ProjectServiceTest {
 
         assertThat(module.name()).isEqualTo("Editor Module");
         assertThat(projectService.listModules(3L, 1L)).extracting("name").contains("Editor Module");
+    }
+
+    @Test
+    void shouldListProjectMembersForReadableProject() {
+        assertThat(projectService.listProjectMembers(1L, 1L))
+                .extracting(ProjectMemberDetail::username, ProjectMemberDetail::roleCode)
+                .containsExactlyInAnyOrder(
+                        tuple("admin", "project_admin"),
+                        tuple("viewer", "viewer"),
+                        tuple("editor", "editor"),
+                        tuple("tester", "tester"));
+    }
+
+    @Test
+    void shouldAllowProjectAdminToManageMembers() {
+        ProjectMemberDetail created = projectService.saveProjectMember(1L, 1L, new UpsertProjectMemberRequest("member-admin", "viewer"));
+
+        assertThat(created.username()).isEqualTo("member-admin");
+        assertThat(created.roleCode()).isEqualTo("viewer");
+
+        ProjectMemberDetail updated = projectService.saveProjectMember(1L, 1L, new UpsertProjectMemberRequest("member-admin", "editor"));
+        assertThat(updated.roleCode()).isEqualTo("editor");
+
+        assertThat(projectService.listProjectMembers(1L, 1L))
+                .extracting(ProjectMemberDetail::username, ProjectMemberDetail::roleCode)
+                .contains(tuple("member-admin", "editor"));
+
+        projectService.deleteProjectMember(1L, 1L, updated.userId());
+
+        assertThat(projectService.listProjectMembers(1L, 1L))
+                .extracting(ProjectMemberDetail::username)
+                .doesNotContain("member-admin");
+    }
+
+    @Test
+    void shouldRejectEditorViewerAndTesterWhenManagingMembers() {
+        assertThatThrownBy(() -> projectService.saveProjectMember(3L, 1L, new UpsertProjectMemberRequest("viewer", "editor")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        assertThatThrownBy(() -> projectService.deleteProjectMember(2L, 1L, 3L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        assertThatThrownBy(() -> projectService.deleteProjectMember(4L, 1L, 3L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void shouldPreventRemovingOrDowngradingLastProjectAdmin() {
+        assertThatThrownBy(() -> projectService.saveProjectMember(1L, 1L, new UpsertProjectMemberRequest("admin", "viewer")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        assertThatThrownBy(() -> projectService.deleteProjectMember(1L, 1L, 1L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

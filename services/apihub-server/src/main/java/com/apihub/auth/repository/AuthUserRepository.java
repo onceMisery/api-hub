@@ -17,7 +17,7 @@ public class AuthUserRepository {
     public Optional<UserCredential> findActiveByUsername(String username) {
         return jdbcTemplate.query(
                 """
-                select id, username, display_name, password_hash, status, token_version
+                select id, username, display_name, email, password_hash, status, token_version
                 from sys_user
                 where username = ? and status = 'active'
                 """,
@@ -26,6 +26,7 @@ public class AuthUserRepository {
                         rs.getLong("id"),
                         rs.getString("username"),
                         rs.getString("display_name"),
+                        rs.getString("email"),
                         rs.getString("password_hash"),
                         rs.getString("status"),
                         rs.getInt("token_version")))
@@ -37,7 +38,7 @@ public class AuthUserRepository {
     public Optional<UserCredential> findActiveById(Long userId) {
         return jdbcTemplate.query(
                 """
-                select id, username, display_name, password_hash, status, token_version
+                select id, username, display_name, email, password_hash, status, token_version
                 from sys_user
                 where id = ? and status = 'active'
                 """,
@@ -46,6 +47,7 @@ public class AuthUserRepository {
                         rs.getLong("id"),
                         rs.getString("username"),
                         rs.getString("display_name"),
+                        rs.getString("email"),
                         rs.getString("password_hash"),
                         rs.getString("status"),
                         rs.getInt("token_version")))
@@ -72,6 +74,9 @@ public class AuthUserRepository {
         return tokenVersion == null ? 0 : tokenVersion;
     }
 
-    public record UserCredential(Long id, String username, String displayName, String passwordHash, String status, int tokenVersion) {
+    public record UserCredential(Long id, String username, String displayName, String email, String passwordHash, String status, int tokenVersion) {
+        public UserCredential(Long id, String username, String displayName, String passwordHash, String status, int tokenVersion) {
+            this(id, username, displayName, null, passwordHash, status, tokenVersion);
+        }
     }
 }

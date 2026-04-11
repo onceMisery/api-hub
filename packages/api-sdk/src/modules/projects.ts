@@ -20,6 +20,21 @@ export type ProjectDetail = {
   debugAllowedHosts: DebugTargetRule[];
   currentUserRole: string | null;
   canWrite: boolean;
+  canManageMembers: boolean;
+};
+
+export type ProjectMemberDetail = {
+  userId: number;
+  username: string;
+  displayName: string;
+  email: string;
+  roleCode: "project_admin" | "editor" | "tester" | "viewer";
+  owner: boolean;
+};
+
+export type UpsertProjectMemberPayload = {
+  username: string;
+  roleCode: "project_admin" | "editor" | "tester" | "viewer";
 };
 
 export type EndpointTreeItem = {
@@ -336,6 +351,23 @@ export function fetchProjects() {
 
 export function fetchProject(projectId: number) {
   return apiFetch<ProjectDetail>(`/api/v1/projects/${projectId}`);
+}
+
+export function fetchProjectMembers(projectId: number) {
+  return apiFetch<ProjectMemberDetail[]>(`/api/v1/projects/${projectId}/members`);
+}
+
+export function saveProjectMember(projectId: number, payload: UpsertProjectMemberPayload) {
+  return apiFetch<ProjectMemberDetail>(`/api/v1/projects/${projectId}/members`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteProjectMember(projectId: number, memberUserId: number) {
+  return apiFetch<null>(`/api/v1/projects/${projectId}/members/${memberUserId}`, {
+    method: "DELETE"
+  });
 }
 
 export function fetchProjectTree(projectId: number) {

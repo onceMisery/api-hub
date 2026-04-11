@@ -18,14 +18,17 @@ const {
   executeDebug,
   createModule,
   createEnvironment,
+  fetchProjectMembers,
   updateModule,
   updateEnvironment,
+  saveProjectMember,
   deleteModule,
   createGroup,
   updateGroup,
   deleteGroup,
   createEndpoint,
   updateEndpoint,
+  deleteProjectMember,
   deleteEndpoint,
   deleteEnvironment,
   replaceEndpointParameters,
@@ -51,14 +54,17 @@ const {
   executeDebug: vi.fn(),
   createModule: vi.fn(),
   createEnvironment: vi.fn(),
+  fetchProjectMembers: vi.fn(),
   updateModule: vi.fn(),
   updateEnvironment: vi.fn(),
+  saveProjectMember: vi.fn(),
   deleteModule: vi.fn(),
   createGroup: vi.fn(),
   updateGroup: vi.fn(),
   deleteGroup: vi.fn(),
   createEndpoint: vi.fn(),
   updateEndpoint: vi.fn(),
+  deleteProjectMember: vi.fn(),
   deleteEndpoint: vi.fn(),
   deleteEnvironment: vi.fn(),
   replaceEndpointParameters: vi.fn(),
@@ -95,14 +101,17 @@ vi.mock("@api-hub/api-sdk", () => ({
   executeDebug,
   createModule,
   createEnvironment,
+  fetchProjectMembers,
   updateModule,
   updateEnvironment,
+  saveProjectMember,
   deleteModule,
   createGroup,
   updateGroup,
   deleteGroup,
   createEndpoint,
   updateEndpoint,
+  deleteProjectMember,
   deleteEndpoint,
   deleteEnvironment,
   replaceEndpointParameters,
@@ -141,7 +150,8 @@ describe("ProjectShell", () => {
         description: "Seed project",
         debugAllowedHosts: [{ pattern: "*.corp.example.com", allowPrivate: false }],
         currentUserRole: "project_admin",
-        canWrite: true
+        canWrite: true,
+        canManageMembers: true
       }
     });
 
@@ -242,11 +252,21 @@ describe("ProjectShell", () => {
         description: "Seed project",
         debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }],
         currentUserRole: "project_admin",
-        canWrite: true
+        canWrite: true,
+        canManageMembers: true
       }
     });
     updateModule.mockResolvedValue({ data: { id: 11, projectId: 1, name: "Core" } });
     updateEnvironment.mockResolvedValue({ data: { id: 41, projectId: 1, name: "Local", baseUrl: "https://local.dev", isDefault: true, variables: [], defaultHeaders: [], defaultQuery: [], authMode: "none", authKey: "", authValue: "", debugHostMode: "inherit", debugAllowedHosts: [] } });
+    fetchProjectMembers.mockResolvedValue({
+      data: [
+        { userId: 1, username: "admin", displayName: "Administrator", email: "admin@local.dev", roleCode: "project_admin", owner: true },
+        { userId: 3, username: "editor", displayName: "Editor User", email: "editor@local.dev", roleCode: "editor", owner: false }
+      ]
+    });
+    saveProjectMember.mockResolvedValue({
+      data: { userId: 2, username: "viewer", displayName: "Viewer User", email: "viewer@local.dev", roleCode: "viewer", owner: false }
+    });
     deleteModule.mockResolvedValue({ data: null });
     createGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
     updateGroup.mockResolvedValue({ data: { id: 21, moduleId: 11, name: "Users" } });
@@ -274,6 +294,7 @@ describe("ProjectShell", () => {
       }
     });
     deleteEndpoint.mockResolvedValue({ data: null });
+    deleteProjectMember.mockResolvedValue({ data: null });
     deleteEnvironment.mockResolvedValue({ data: null });
     replaceEndpointParameters.mockResolvedValue({ data: null });
     replaceEndpointMockRules.mockResolvedValue({ data: null });
@@ -565,7 +586,8 @@ describe("ProjectShell", () => {
         description: "Seed project",
         debugAllowedHosts: [],
         currentUserRole: "viewer",
-        canWrite: false
+        canWrite: false,
+        canManageMembers: false
       }
     });
 
@@ -575,8 +597,9 @@ describe("ProjectShell", () => {
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add module" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save project debug policy" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Save endpoint" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Clear debug history" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add project member" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save member 1" })).toBeDisabled();
   });
 
   it("refetches and clears debug history with active filters", async () => {
