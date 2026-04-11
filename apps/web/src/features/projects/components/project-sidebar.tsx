@@ -11,6 +11,19 @@ import {
   writeProjectSidebarQuickAccess,
   type ProjectSidebarQuickAccessState
 } from "./project-sidebar-quick-access";
+import {
+  collapseAllBranches,
+  expandAllBranches,
+  readProjectSidebarTreePreferences,
+  sanitizeProjectSidebarTreePreferences,
+  setProjectSidebarTreeSortMode,
+  sortProjectSidebarModules,
+  toggleCollapsedGroup,
+  toggleCollapsedModule,
+  writeProjectSidebarTreePreferences,
+  type ProjectSidebarTreePreferences,
+  type ProjectSidebarTreeSortMode
+} from "./project-sidebar-tree-preferences";
 
 type ProjectSidebarProps = {
   allModules?: ModuleTreeItem[];
@@ -18,6 +31,7 @@ type ProjectSidebarProps = {
   emptyStateMessage?: string | null;
   modules: ModuleTreeItem[];
   projectId: number;
+  searchQuery?: string;
   selectedEndpointId: number | null;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
@@ -37,6 +51,7 @@ export function ProjectSidebar({
   emptyStateMessage = null,
   modules,
   projectId,
+  searchQuery = "",
   onCreateEndpoint,
   onCreateGroup,
   onCreateModule,
@@ -54,9 +69,20 @@ export function ProjectSidebar({
     pinnedEndpointIds: [],
     recentEndpointIds: []
   });
+  const [treePreferences, setTreePreferences] = useState<ProjectSidebarTreePreferences>({
+    sortMode: "project",
+    collapsedModuleIds: [],
+    collapsedGroupIds: []
+  });
   const quickAccessModules = allModules ?? modules;
+  const isSearchActive = searchQuery.trim().length > 0;
   const endpointLookup = useMemo(() => buildQuickAccessEntryLookup(quickAccessModules), [quickAccessModules]);
   const availableEndpointIds = useMemo(() => Array.from(endpointLookup.keys()), [endpointLookup]);
+  const availableModuleIds = useMemo(() => quickAccessModules.map((module) => module.id), [quickAccessModules]);
+  const availableGroupIds = useMemo(
+    () => quickAccessModules.flatMap((module) => module.groups.map((group) => group.id)),
+    [quickAccessModules]
+  );
   const pinnedEntries = useMemo(
     () => resolveQuickAccessEntries(quickAccessState.pinnedEndpointIds, endpointLookup),
     [endpointLookup, quickAccessState.pinnedEndpointIds]
@@ -69,12 +95,27 @@ export function ProjectSidebar({
       ),
     [endpointLookup, quickAccessState.pinnedEndpointIds, quickAccessState.recentEndpointIds]
   );
+  const visibleModules = useMemo(
+    () => sortProjectSidebarModules(modules, treePreferences.sortMode),
+    [modules, treePreferences.sortMode]
+  );
+  const visibleTreeCounts = useMemo(() => countTreeNodes(visibleModules), [visibleModules]);
 
   useEffect(() => {
     const nextState = sanitizeProjectSidebarQuickAccess(readProjectSidebarQuickAccess(projectId), availableEndpointIds);
     setQuickAccessState(nextState);
     writeProjectSidebarQuickAccess(projectId, nextState);
   }, [availableEndpointIds, projectId]);
+
+  useEffect(() => {
+    const nextState = sanitizeProjectSidebarTreePreferences(
+      readProjectSidebarTreePreferences(projectId),
+      availableModuleIds,
+      availableGroupIds
+    );
+    setTreePreferences(nextState);
+    writeProjectSidebarTreePreferences(projectId, nextState);
+  }, [availableGroupIds, availableModuleIds, projectId]);
 
   useEffect(() => {
     if (!selectedEndpointId || !endpointLookup.has(selectedEndpointId)) {
@@ -107,6 +148,40 @@ export function ProjectSidebar({
     });
   }
 
+  function updateTreePreferences(
+    updater: (currentState: ProjectSidebarTreePreferences) => ProjectSidebarTreePreferences
+  ) {
+    setTreePreferences((currentState) => {
+      const nextState = updater(
+        sanitizeProjectSidebarTreePreferences(currentState, availableModuleIds, availableGroupIds)
+      );
+      writeProjectSidebarTreePreferences(projectId, nextState);
+      return nextState;
+    });
+  }
+
+  function handleSortModeChange(sortMode: ProjectSidebarTreeSortMode) {
+    updateTreePreferences((currentState) => setProjectSidebarTreeSortMode(currentState, sortMode));
+  }
+
+  function handleCollapseAll() {
+    updateTreePreferences((currentState) =>
+      collapseAllBranches(currentState, availableModuleIds, availableGroupIds)
+    );
+  }
+
+  function handleExpandAll() {
+    updateTreePreferences((currentState) => expandAllBranches(currentState));
+  }
+
+  function handleToggleModuleCollapse(moduleId: number) {
+    updateTreePreferences((currentState) => toggleCollapsedModule(currentState, moduleId));
+  }
+
+  function handleToggleGroupCollapse(groupId: number) {
+    updateTreePreferences((currentState) => toggleCollapsedGroup(currentState, groupId));
+  }
+
   return (
     <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="mb-4">
@@ -115,6 +190,14 @@ export function ProjectSidebar({
       </div>
 
       <QuickAccessPanel pinnedEntries={pinnedEntries} recentEntries={recentEntries} onSelectEndpoint={onSelectEndpoint} />
+      <NavigationDeck
+        isSearchActive={isSearchActive}
+        onCollapseAll={handleCollapseAll}
+        onExpandAll={handleExpandAll}
+        onSortModeChange={handleSortModeChange}
+        sortMode={treePreferences.sortMode}
+        visibleTreeCounts={visibleTreeCounts}
+      />
 
       <form
         className="mb-5 space-y-2 rounded-[1.6rem] border border-slate-200 bg-white/90 p-4"
@@ -145,14 +228,17 @@ export function ProjectSidebar({
       </form>
 
       <div className="space-y-4">
-        {modules.length === 0 ? (
+        {visibleModules.length === 0 ? (
           <div className="rounded-[1.6rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
             {emptyStateMessage ?? "No matching nodes."}
           </div>
         ) : (
-          modules.map((module) => (
+          visibleModules.map((module) => (
             <ModuleSection
               canWrite={canWrite}
+              collapsedGroupIds={treePreferences.collapsedGroupIds}
+              collapsedModuleIds={treePreferences.collapsedModuleIds}
+              isSearchActive={isSearchActive}
               key={module.id}
               module={module}
               onCreateEndpoint={onCreateEndpoint}
@@ -163,6 +249,8 @@ export function ProjectSidebar({
               onRenameEndpoint={onRenameEndpoint}
               onRenameGroup={onRenameGroup}
               onRenameModule={onRenameModule}
+              onToggleGroupCollapse={handleToggleGroupCollapse}
+              onToggleModuleCollapse={handleToggleModuleCollapse}
               onTogglePin={handleTogglePin}
               onSelectEndpoint={onSelectEndpoint}
               pinnedEndpointIds={quickAccessState.pinnedEndpointIds}
@@ -261,8 +349,106 @@ function ShortcutLane({
   );
 }
 
+function NavigationDeck({
+  isSearchActive,
+  onCollapseAll,
+  onExpandAll,
+  onSortModeChange,
+  sortMode,
+  visibleTreeCounts
+}: {
+  isSearchActive: boolean;
+  onCollapseAll: () => void;
+  onExpandAll: () => void;
+  onSortModeChange: (sortMode: ProjectSidebarTreeSortMode) => void;
+  sortMode: ProjectSidebarTreeSortMode;
+  visibleTreeCounts: { endpointCount: number; groupCount: number; moduleCount: number };
+}) {
+  return (
+    <section className="mb-5 rounded-[1.8rem] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92),rgba(148,163,184,0.28))] p-4 text-white shadow-[0_22px_60px_rgba(15,23,42,0.16)]">
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Navigation</p>
+        <h3 className="text-base font-semibold tracking-tight">Collapse noise and steer the tree.</h3>
+        <p className="text-sm leading-6 text-slate-300">
+          {isSearchActive
+            ? "Search keeps matched branches open."
+            : "Change sort mode, collapse branches, and keep project-scale trees easier to scan."}
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <DeckStat label="Modules" value={visibleTreeCounts.moduleCount} />
+        <DeckStat label="Groups" value={visibleTreeCounts.groupCount} />
+        <DeckStat label="Endpoints" value={visibleTreeCounts.endpointCount} />
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <NavigationSortButton isActive={sortMode === "project"} label="Project order" onClick={() => onSortModeChange("project")} />
+          <NavigationSortButton isActive={sortMode === "name"} label="A-Z" onClick={() => onSortModeChange("name")} />
+          <NavigationSortButton isActive={sortMode === "method"} label="Method" onClick={() => onSortModeChange("method")} />
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            className="rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSearchActive}
+            onClick={onExpandAll}
+            type="button"
+          >
+            Expand all
+          </button>
+          <button
+            className="rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSearchActive}
+            onClick={onCollapseAll}
+            type="button"
+          >
+            Collapse all
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NavigationSortButton({
+  isActive,
+  label,
+  onClick
+}: {
+  isActive: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+        isActive
+          ? "border-white/20 bg-white/16 text-white"
+          : "border-white/12 bg-white/6 text-slate-200 hover:bg-white/12"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+    </button>
+  );
+}
+
+function DeckStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[1.3rem] border border-white/12 bg-black/15 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">{label}</p>
+      <p className="mt-2 text-xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
 function ModuleSection({
   canWrite,
+  collapsedGroupIds,
+  collapsedModuleIds,
+  isSearchActive,
   module,
   onCreateEndpoint,
   onCreateGroup,
@@ -272,12 +458,17 @@ function ModuleSection({
   onRenameEndpoint,
   onRenameGroup,
   onRenameModule,
+  onToggleGroupCollapse,
+  onToggleModuleCollapse,
   onTogglePin,
   onSelectEndpoint,
   pinnedEndpointIds,
   selectedEndpointId
 }: {
   canWrite: boolean;
+  collapsedGroupIds: number[];
+  collapsedModuleIds: number[];
+  isSearchActive: boolean;
   module: ModuleTreeItem;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onCreateGroup: (moduleId: number, payload: { name: string }) => Promise<void>;
@@ -287,6 +478,8 @@ function ModuleSection({
   onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
   onRenameModule: (moduleId: number, payload: { name: string }) => Promise<void>;
+  onToggleGroupCollapse: (groupId: number) => void;
+  onToggleModuleCollapse: (moduleId: number) => void;
   onTogglePin: (endpointId: number) => void;
   onSelectEndpoint: (endpointId: number) => void;
   pinnedEndpointIds: number[];
@@ -294,15 +487,55 @@ function ModuleSection({
 }) {
   const [groupName, setGroupName] = useState("");
   const [moduleDraftName, setModuleDraftName] = useState(module.name);
+  const moduleEndpointCount = module.groups.reduce((count, group) => count + group.endpoints.length, 0);
+  const containsSelectedEndpoint = Boolean(
+    selectedEndpointId &&
+      module.groups.some((group) => group.endpoints.some((endpoint) => endpoint.id === selectedEndpointId))
+  );
+  const isCollapsed =
+    !isSearchActive && !containsSelectedEndpoint && collapsedModuleIds.includes(module.id);
+  const collapseLabel = `${isCollapsed ? "Expand" : "Collapse"} module ${module.id}`;
+  const disclosureDisabled = isSearchActive || containsSelectedEndpoint;
 
   return (
     <section className="space-y-3 rounded-[1.7rem] border border-slate-200/70 bg-white/70 p-3">
       <div className="rounded-[1.4rem] bg-slate-950 px-4 py-4 text-white">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold">{module.name}</p>
-          <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200">
-            module
-          </span>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <button
+                aria-label={collapseLabel}
+                className="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={disclosureDisabled}
+                onClick={() => onToggleModuleCollapse(module.id)}
+                type="button"
+              >
+                {isCollapsed ? "Expand" : "Collapse"}
+              </button>
+              <div>
+                <p className="text-sm font-semibold">{module.name}</p>
+                <p className="mt-2 text-xs text-slate-300">
+                  {module.groups.length} groups · {moduleEndpointCount} endpoints
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200">
+                module
+              </span>
+              <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                {module.groups.length} groups
+              </span>
+              <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                {moduleEndpointCount} endpoints
+              </span>
+            </div>
+          </div>
+          {isSearchActive ? (
+            <p className="text-xs text-slate-300">Search mode keeps matching branches open.</p>
+          ) : containsSelectedEndpoint ? (
+            <p className="text-xs text-slate-300">The active endpoint branch stays visible while you work.</p>
+          ) : null}
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -337,53 +570,64 @@ function ModuleSection({
         </div>
       </div>
 
-      <form
-        className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!canWrite || !groupName.trim()) {
-            return;
-          }
-
-          void onCreateGroup(module.id, { name: groupName.trim() }).then(() => {
-            setGroupName("");
-          });
-        }}
-      >
-        <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-700">New group name</span>
-          <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-            disabled={!canWrite}
-            onChange={(event) => setGroupName(event.target.value)}
-            placeholder="Users"
-            value={groupName}
-          />
-        </label>
-        <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
-          Add group
-        </button>
-      </form>
-
-      {module.groups.length === 0 ? (
-        <p className="px-4 text-sm text-slate-500">No groups yet.</p>
+      {isCollapsed ? (
+        <div className="rounded-[1.4rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-500">
+          Module collapsed. Expand it to manage groups and endpoints.
+        </div>
       ) : (
-        module.groups.map((group) => (
-          <GroupSection
-            canWrite={canWrite}
-            group={group}
-            key={group.id}
-            onCreateEndpoint={onCreateEndpoint}
-            onDeleteEndpoint={onDeleteEndpoint}
-            onDeleteGroup={onDeleteGroup}
-            onRenameEndpoint={onRenameEndpoint}
-            onRenameGroup={onRenameGroup}
-            onTogglePin={onTogglePin}
-            onSelectEndpoint={onSelectEndpoint}
-            pinnedEndpointIds={pinnedEndpointIds}
-            selectedEndpointId={selectedEndpointId}
-          />
-        ))
+        <>
+          <form
+            className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!canWrite || !groupName.trim()) {
+                return;
+              }
+
+              void onCreateGroup(module.id, { name: groupName.trim() }).then(() => {
+                setGroupName("");
+              });
+            }}
+          >
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">New group name</span>
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                disabled={!canWrite}
+                onChange={(event) => setGroupName(event.target.value)}
+                placeholder="Users"
+                value={groupName}
+              />
+            </label>
+            <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
+              Add group
+            </button>
+          </form>
+
+          {module.groups.length === 0 ? (
+            <p className="px-4 text-sm text-slate-500">No groups yet.</p>
+          ) : (
+            module.groups.map((group) => (
+              <GroupSection
+                canWrite={canWrite}
+                collapsedGroupIds={collapsedGroupIds}
+                group={group}
+                isSearchActive={isSearchActive}
+                key={group.id}
+                onCreateEndpoint={onCreateEndpoint}
+                onDeleteEndpoint={onDeleteEndpoint}
+                onDeleteGroup={onDeleteGroup}
+                onRenameEndpoint={onRenameEndpoint}
+                onRenameGroup={onRenameGroup}
+                onToggleGroupCollapse={onToggleGroupCollapse}
+                onTogglePin={onTogglePin}
+                onSelectEndpoint={onSelectEndpoint}
+                pinnedEndpointIds={pinnedEndpointIds}
+                selectedEndpointId={selectedEndpointId}
+              />
+            ))
+          )}
+        </>
       )}
     </section>
   );
@@ -391,24 +635,30 @@ function ModuleSection({
 
 function GroupSection({
   canWrite,
+  collapsedGroupIds,
   group,
+  isSearchActive,
   onCreateEndpoint,
   onDeleteEndpoint,
   onDeleteGroup,
   onRenameEndpoint,
   onRenameGroup,
+  onToggleGroupCollapse,
   onTogglePin,
   onSelectEndpoint,
   pinnedEndpointIds,
   selectedEndpointId
 }: {
   canWrite: boolean;
+  collapsedGroupIds: number[];
   group: ModuleTreeItem["groups"][number];
+  isSearchActive: boolean;
   onCreateEndpoint: (groupId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onDeleteEndpoint: (endpointId: number) => Promise<void>;
   onDeleteGroup: (groupId: number) => Promise<void>;
   onRenameEndpoint: (endpointId: number, payload: { name: string; method: string; path: string; description: string }) => Promise<void>;
   onRenameGroup: (groupId: number, payload: { name: string }) => Promise<void>;
+  onToggleGroupCollapse: (groupId: number) => void;
   onTogglePin: (endpointId: number) => void;
   onSelectEndpoint: (endpointId: number) => void;
   pinnedEndpointIds: number[];
@@ -418,122 +668,164 @@ function GroupSection({
   const [endpointMethod, setEndpointMethod] = useState("GET");
   const [endpointPath, setEndpointPath] = useState("");
   const [groupDraftName, setGroupDraftName] = useState(group.name);
+  const containsSelectedEndpoint = Boolean(
+    selectedEndpointId && group.endpoints.some((endpoint) => endpoint.id === selectedEndpointId)
+  );
+  const isCollapsed =
+    !isSearchActive && !containsSelectedEndpoint && collapsedGroupIds.includes(group.id);
+  const collapseLabel = `${isCollapsed ? "Expand" : "Collapse"} group ${group.id}`;
+  const disclosureDisabled = isSearchActive || containsSelectedEndpoint;
 
   return (
     <div className="space-y-3 rounded-[1.5rem] border border-slate-200/70 bg-slate-50/70 p-3">
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-        <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Group {group.id} name</span>
-          <input
-            aria-label={`Group ${group.id} name`}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-            disabled={!canWrite}
-            onChange={(event) => setGroupDraftName(event.target.value)}
-            value={groupDraftName}
-          />
-        </label>
-        <button
-          aria-label={`Rename group ${group.id}`}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!canWrite}
-          onClick={() => void onRenameGroup(group.id, { name: groupDraftName.trim() || group.name })}
-          type="button"
-        >
-          Rename
-        </button>
-        <button
-          aria-label={`Delete group ${group.id}`}
-          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!canWrite}
-          onClick={() => void onDeleteGroup(group.id)}
-          type="button"
-        >
-          Delete
-        </button>
-      </div>
-
-      <form
-        className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!canWrite || !endpointName.trim() || !endpointPath.trim()) {
-            return;
-          }
-
-          void onCreateEndpoint(group.id, {
-            description: "",
-            method: endpointMethod,
-            name: endpointName.trim(),
-            path: endpointPath.trim()
-          }).then(() => {
-            setEndpointName("");
-            setEndpointMethod("GET");
-            setEndpointPath("");
-          });
-        }}
-      >
-        <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-700">New endpoint name</span>
-          <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-            disabled={!canWrite}
-            onChange={(event) => setEndpointName(event.target.value)}
-            placeholder="Create User"
-            value={endpointName}
-          />
-        </label>
-
-        <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-700">New endpoint method</span>
-          <select
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-            disabled={!canWrite}
-            onChange={(event) => setEndpointMethod(event.target.value)}
-            value={endpointMethod}
-          >
-            {["GET", "POST", "PUT", "PATCH", "DELETE"].map((method) => (
-              <option key={method} value={method}>
-                {method}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-700">New endpoint path</span>
-          <input
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-            disabled={!canWrite}
-            onChange={(event) => setEndpointPath(event.target.value)}
-            placeholder="/users"
-            value={endpointPath}
-          />
-        </label>
-
-        <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
-          Add endpoint
-        </button>
-      </form>
-
-      <div className="space-y-2">
-        {group.endpoints.map((endpoint) => {
-          const isActive = endpoint.id === selectedEndpointId;
-
-          return (
-            <EndpointNode
-              canWrite={canWrite}
-              endpoint={endpoint}
-              isPinned={pinnedEndpointIds.includes(endpoint.id)}
-              isActive={isActive}
-              key={endpoint.id}
-              onDeleteEndpoint={onDeleteEndpoint}
-              onRenameEndpoint={onRenameEndpoint}
-              onTogglePin={onTogglePin}
-              onSelectEndpoint={onSelectEndpoint}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <button
+              aria-label={collapseLabel}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disclosureDisabled}
+              onClick={() => onToggleGroupCollapse(group.id)}
+              type="button"
+            >
+              {isCollapsed ? "Expand" : "Collapse"}
+            </button>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{group.name}</p>
+              <p className="mt-2 text-xs text-slate-500">{group.endpoints.length} endpoints</p>
+            </div>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            {group.endpoints.length} endpoints
+          </span>
+        </div>
+        {isSearchActive ? (
+          <p className="text-xs text-slate-500">Search mode keeps matching branches open.</p>
+        ) : containsSelectedEndpoint ? (
+          <p className="text-xs text-slate-500">The active endpoint branch stays visible while you work.</p>
+        ) : null}
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <label className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Group {group.id} name</span>
+            <input
+              aria-label={`Group ${group.id} name`}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+              disabled={!canWrite}
+              onChange={(event) => setGroupDraftName(event.target.value)}
+              value={groupDraftName}
             />
-          );
-        })}
+          </label>
+          <button
+            aria-label={`Rename group ${group.id}`}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canWrite}
+            onClick={() => void onRenameGroup(group.id, { name: groupDraftName.trim() || group.name })}
+            type="button"
+          >
+            Rename
+          </button>
+          <button
+            aria-label={`Delete group ${group.id}`}
+            className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canWrite}
+            onClick={() => void onDeleteGroup(group.id)}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
       </div>
+
+      {isCollapsed ? (
+        <div className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white/80 px-4 py-4 text-sm text-slate-500">
+          Group collapsed. Expand it to manage endpoints.
+        </div>
+      ) : (
+        <>
+          <form
+            className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-white/90 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!canWrite || !endpointName.trim() || !endpointPath.trim()) {
+                return;
+              }
+
+              void onCreateEndpoint(group.id, {
+                description: "",
+                method: endpointMethod,
+                name: endpointName.trim(),
+                path: endpointPath.trim()
+              }).then(() => {
+                setEndpointName("");
+                setEndpointMethod("GET");
+                setEndpointPath("");
+              });
+            }}
+          >
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">New endpoint name</span>
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                disabled={!canWrite}
+                onChange={(event) => setEndpointName(event.target.value)}
+                placeholder="Create User"
+                value={endpointName}
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">New endpoint method</span>
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                disabled={!canWrite}
+                onChange={(event) => setEndpointMethod(event.target.value)}
+                value={endpointMethod}
+              >
+                {["GET", "POST", "PUT", "PATCH", "DELETE"].map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">New endpoint path</span>
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                disabled={!canWrite}
+                onChange={(event) => setEndpointPath(event.target.value)}
+                placeholder="/users"
+                value={endpointPath}
+              />
+            </label>
+
+            <button className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={!canWrite} type="submit">
+              Add endpoint
+            </button>
+          </form>
+
+          <div className="space-y-2">
+            {group.endpoints.map((endpoint) => {
+              const isActive = endpoint.id === selectedEndpointId;
+
+              return (
+                <EndpointNode
+                  canWrite={canWrite}
+                  endpoint={endpoint}
+                  isPinned={pinnedEndpointIds.includes(endpoint.id)}
+                  isActive={isActive}
+                  key={endpoint.id}
+                  onDeleteEndpoint={onDeleteEndpoint}
+                  onRenameEndpoint={onRenameEndpoint}
+                  onTogglePin={onTogglePin}
+                  onSelectEndpoint={onSelectEndpoint}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -664,6 +956,20 @@ function EndpointNode({
       </div>
     </div>
   );
+}
+
+function countTreeNodes(modules: ModuleTreeItem[]) {
+  const groupCount = modules.reduce((count, module) => count + module.groups.length, 0);
+  const endpointCount = modules.reduce(
+    (count, module) => count + module.groups.reduce((groupTotal, group) => groupTotal + group.endpoints.length, 0),
+    0
+  );
+
+  return {
+    endpointCount,
+    groupCount,
+    moduleCount: modules.length
+  };
 }
 
 function buildQuickAccessEntryLookup(modules: ModuleTreeItem[]) {

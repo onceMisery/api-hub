@@ -20,6 +20,7 @@ import {
   fetchProjectMembers,
   fetchProject,
   fetchDebugHistory,
+  fetchMe,
   fetchEndpointParameters,
   fetchEndpointResponses,
   fetchEndpointVersions,
@@ -50,6 +51,7 @@ import {
   type MockRuleUpsertItem,
   type ParameterDetail,
   type ParameterUpsertItem,
+  type AuthMe,
   type ProjectDetail,
   type ProjectMemberDetail,
   type ResponseDetail,
@@ -85,6 +87,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const router = useRouter();
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthMe | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberDetail[]>([]);
   const [environments, setEnvironments] = useState<EnvironmentDetail[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,6 +126,26 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   useEffect(() => {
     void reloadProject();
+  }, [projectId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void fetchMe()
+      .then((response) => {
+        if (isMounted) {
+          setCurrentUser(response.data);
+        }
+      })
+      .catch((loadError) => {
+        if (handleUnauthorized(loadError)) {
+          return;
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -297,6 +320,14 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     });
   }
 
+  function pushNotice(title: string, detail: string) {
+    notify({
+      detail,
+      title,
+      tone: "neutral"
+    });
+  }
+
   useEffect(() => {
     if (!searchQuery.trim()) {
       return;
@@ -387,6 +418,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onRenameModule={handleRenameModule}
             onSelectEndpoint={setSelectedEndpointId}
             projectId={projectId}
+            searchQuery={searchQuery}
             selectedEndpointId={selectedEndpointId}
           />
         )}
@@ -484,12 +516,14 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       const response = await fetchProject(projectId);
       setProject(response.data);
+      return response.data;
     } catch (loadError) {
       if (handleUnauthorized(loadError)) {
-        return;
+        return null;
       }
 
       setError(loadError instanceof Error ? loadError.message : "Failed to load project detail");
+      return null;
     }
   }
 
@@ -516,12 +550,14 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       const response = await fetchProjectMembers(projectId);
       setProjectMembers(response.data);
+      return response.data;
     } catch (loadError) {
       if (handleUnauthorized(loadError)) {
-        return;
+        return null;
       }
 
       setError(loadError instanceof Error ? loadError.message : "Failed to load project members");
+      return null;
     }
   }
 
@@ -637,12 +673,20 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   async function handleSaveProjectMember(payload: UpsertProjectMemberPayload) {
     setError(null);
+    const previousProject = project;
+    const affectsCurrentUser = currentUser?.username === payload.username;
 
     try {
       await saveProjectMember(projectId, payload);
       await reloadProjectMembers();
-      await reloadProject();
-      pushSuccess("Member access saved", `${payload.username} now has ${formatRoleCode(payload.roleCode)} access.`);
+      const nextProject = await reloadProject();
+      const accessFeedback = affectsCurrentUser ? buildCurrentUserAccessFeedback(previousProject, nextProject) : null;
+
+      if (accessFeedback) {
+        pushNotice(accessFeedback.title, accessFeedback.detail);
+      } else {
+        pushSuccess("Member access saved", `${payload.username} now has ${formatRoleCode(payload.roleCode)} access.`);
+      }
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
@@ -657,16 +701,24 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   async function handleDeleteProjectMember(memberUserId: number) {
     setError(null);
+    const previousProject = project;
     const memberName = projectMembers.find((member) => member.userId === memberUserId)?.username;
+    const affectsCurrentUser = currentUser?.id === memberUserId;
 
     try {
       await deleteProjectMember(projectId, memberUserId);
       await reloadProjectMembers();
-      await reloadProject();
-      pushSuccess(
-        "Member removed",
-        memberName ? `${memberName} was removed from project access.` : "The member was removed from project access."
-      );
+      const nextProject = await reloadProject();
+      const accessFeedback = affectsCurrentUser ? buildCurrentUserAccessFeedback(previousProject, nextProject, true) : null;
+
+      if (accessFeedback) {
+        pushNotice(accessFeedback.title, accessFeedback.detail);
+      } else {
+        pushSuccess(
+          "Member removed",
+          memberName ? `${memberName} was removed from project access.` : "The member was removed from project access."
+        );
+      }
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
@@ -1216,6 +1268,71 @@ function formatProjectAccess(role: string | null | undefined) {
     default:
       return "Project access";
   }
+}
+
+function buildCurrentUserAccessFeedback(
+  previousProject: ProjectDetail | null,
+  nextProject: ProjectDetail | null,
+  removed = false
+) {
+  const previousAccess = {
+    canManageMembers: previousProject?.canManageMembers ?? false,
+    canWrite: previousProject?.canWrite ?? false,
+    role: previousProject?.currentUserRole ?? null
+  };
+  const nextAccess = {
+    canManageMembers: nextProject?.canManageMembers ?? false,
+    canWrite: nextProject?.canWrite ?? false,
+    role: nextProject?.currentUserRole ?? null
+  };
+
+  if (
+    previousAccess.canManageMembers === nextAccess.canManageMembers &&
+    previousAccess.canWrite === nextAccess.canWrite &&
+    previousAccess.role === nextAccess.role
+  ) {
+    return null;
+  }
+
+  if (!nextProject || removed) {
+    return {
+      title: "Your access changed",
+      detail: "Your project membership changed. Refresh the workbench if some controls still look out of date."
+    };
+  }
+
+  if (previousAccess.canWrite && !nextAccess.canWrite) {
+    return {
+      title: "Your access changed",
+      detail: "This project is now read-only for your session."
+    };
+  }
+
+  if (!previousAccess.canWrite && nextAccess.canWrite) {
+    return {
+      title: "Your access changed",
+      detail: "Editing is now available for your session."
+    };
+  }
+
+  if (previousAccess.canManageMembers && !nextAccess.canManageMembers) {
+    return {
+      title: "Your access changed",
+      detail: "Member management is no longer available for your session."
+    };
+  }
+
+  if (!previousAccess.canManageMembers && nextAccess.canManageMembers) {
+    return {
+      title: "Your access changed",
+      detail: "Member management is now available for your session."
+    };
+  }
+
+  return {
+    title: "Your access changed",
+    detail: `Your role is now ${formatProjectAccess(nextAccess.role).replace(/ access$/i, "").toLowerCase()}.`
+  };
 }
 
 function formatRoleCode(roleCode: ProjectMemberDetail["roleCode"]) {

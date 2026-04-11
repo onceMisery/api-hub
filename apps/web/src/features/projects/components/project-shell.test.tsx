@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 
 const {
   mockReplace,
+  fetchMe,
   fetchProject,
   updateProject,
   fetchProjectTree,
@@ -39,6 +40,7 @@ const {
   simulateEndpointMock
 } = vi.hoisted(() => ({
   mockReplace: vi.fn(),
+  fetchMe: vi.fn(),
   fetchProject: vi.fn(),
   updateProject: vi.fn(),
   fetchProjectTree: vi.fn(),
@@ -86,6 +88,7 @@ vi.mock("../../auth/components/session-bar", () => ({
 }));
 
 vi.mock("@api-hub/api-sdk", () => ({
+  fetchMe,
   fetchProject,
   updateProject,
   fetchProjectTree,
@@ -142,6 +145,15 @@ describe("ProjectShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+
+    fetchMe.mockResolvedValue({
+      data: {
+        id: 1,
+        username: "admin",
+        displayName: "Administrator",
+        email: "admin@local.dev"
+      }
+    });
 
     fetchProject.mockResolvedValue({
       data: {
@@ -847,7 +859,7 @@ describe("ProjectShell", () => {
     render(<ProjectShell projectId={1} />);
 
     expect((await screen.findAllByText("Viewer access")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(screen.getAllByText("Read-only").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Add module" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save project debug policy" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Clear debug history" })).toBeDisabled();
@@ -858,6 +870,89 @@ describe("ProjectShell", () => {
     expect(await screen.findByText("You can review project access, but only project admins can change membership.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add project member" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save member 1" })).toBeDisabled();
+  });
+
+  it("shows immediate feedback when the current user's role changes to read-only", async () => {
+    fetchMe.mockResolvedValueOnce({
+      data: {
+        id: 5,
+        username: "member-admin",
+        displayName: "Project Admin",
+        email: "member-admin@local.dev"
+      }
+    });
+    fetchProject
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: {
+          id: 1,
+          name: "Default Project",
+          projectKey: "default",
+          description: "Seed project",
+          debugAllowedHosts: [],
+          currentUserRole: "project_admin",
+          canWrite: true,
+          canManageMembers: true
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 1,
+          name: "Default Project",
+          projectKey: "default",
+          description: "Seed project",
+          debugAllowedHosts: [],
+          currentUserRole: "viewer",
+          canWrite: false,
+          canManageMembers: false
+        }
+      });
+    fetchProjectMembers
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: [
+          { userId: 1, username: "admin", displayName: "Administrator", email: "admin@local.dev", roleCode: "project_admin", owner: true },
+          { userId: 5, username: "member-admin", displayName: "Project Admin", email: "member-admin@local.dev", roleCode: "project_admin", owner: false }
+        ]
+      })
+      .mockResolvedValueOnce({
+        data: [
+          { userId: 1, username: "admin", displayName: "Administrator", email: "admin@local.dev", roleCode: "project_admin", owner: true },
+          { userId: 5, username: "member-admin", displayName: "Project Admin", email: "member-admin@local.dev", roleCode: "viewer", owner: false }
+        ]
+      });
+    saveProjectMember.mockResolvedValueOnce({
+      data: {
+        userId: 5,
+        username: "member-admin",
+        displayName: "Project Admin",
+        email: "member-admin@local.dev",
+        roleCode: "viewer",
+        owner: false
+      }
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    expect((await screen.findAllByText("Project admin access")).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Manage access" }));
+    fireEvent.change(await screen.findByLabelText("Member 5 role"), { target: { value: "viewer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save member 5" }));
+
+    await waitFor(() =>
+      expect(saveProjectMember).toHaveBeenCalledWith(1, {
+        username: "member-admin",
+        roleCode: "viewer"
+      })
+    );
+
+    expect((await screen.findAllByText("Viewer access")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Read-only").length).toBeGreaterThan(0);
+
+    const toast = await screen.findByRole("status");
+    expect(within(toast).getByText("Your access changed")).toBeInTheDocument();
+    expect(within(toast).getByText("This project is now read-only for your session.")).toBeInTheDocument();
   });
 
   it("refetches and clears debug history with active filters", async () => {

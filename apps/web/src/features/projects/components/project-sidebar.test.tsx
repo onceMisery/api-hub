@@ -281,4 +281,107 @@ describe("ProjectSidebar", () => {
     expect(screen.getByRole("button", { name: "Open quick access Get User" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open quick access Create User" })).toBeInTheDocument();
   });
+
+  it("collapses and reopens module branches from the navigation controls", () => {
+    renderSidebar({ selectedEndpointId: null });
+
+    expect(screen.getByRole("button", { name: "Get User GET /users/{id}" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse module 11" }));
+    expect(screen.queryByRole("button", { name: "Get User GET /users/{id}" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand module 11" }));
+    expect(screen.getByRole("button", { name: "Get User GET /users/{id}" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+    expect(screen.queryByRole("button", { name: "Get User GET /users/{id}" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
+    expect(screen.getByRole("button", { name: "Get User GET /users/{id}" })).toBeInTheDocument();
+  });
+
+  it("switches between local tree sort modes", () => {
+    const sortModules = [
+      {
+        id: 11,
+        name: "Core",
+        groups: [
+          {
+            id: 21,
+            name: "Users",
+            endpoints: [
+              { id: 31, name: "Delete User", method: "DELETE", path: "/users/archive" },
+              { id: 32, name: "Create User", method: "POST", path: "/users" },
+              { id: 33, name: "Get User", method: "GET", path: "/users/{id}" }
+            ]
+          }
+        ]
+      }
+    ];
+    renderSidebar({ allModules: sortModules, modules: sortModules, selectedEndpointId: 33 });
+
+    fireEvent.click(screen.getByRole("button", { name: "A-Z" }));
+
+    const createButton = screen.getByRole("button", { name: "Create User POST /users" });
+    const deleteButton = screen.getByRole("button", { name: "Delete User DELETE /users/archive" });
+    const getButton = screen.getByRole("button", { name: "Get User GET /users/{id}" });
+
+    expect(createButton.compareDocumentPosition(deleteButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(deleteButton.compareDocumentPosition(getButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Method" }));
+
+    const getButtonByMethod = screen.getByRole("button", { name: "Get User GET /users/{id}" });
+    const createButtonByMethod = screen.getByRole("button", { name: "Create User POST /users" });
+    const deleteButtonByMethod = screen.getByRole("button", { name: "Delete User DELETE /users/archive" });
+
+    expect(getButtonByMethod.compareDocumentPosition(createButtonByMethod) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(createButtonByMethod.compareDocumentPosition(deleteButtonByMethod) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("keeps matched branches open while search is active even if they are stored as collapsed", () => {
+    const allModules = [
+      {
+        id: 11,
+        name: "Core",
+        groups: [
+          {
+            id: 21,
+            name: "Users",
+            endpoints: [{ id: 31, name: "Get User", method: "GET", path: "/users/{id}" }]
+          }
+        ]
+      },
+      {
+        id: 12,
+        name: "Billing",
+        groups: [
+          {
+            id: 22,
+            name: "Invoices",
+            endpoints: [{ id: 41, name: "Billing Overview", method: "GET", path: "/billing/overview" }]
+          }
+        ]
+      }
+    ];
+
+    window.localStorage.setItem(
+      "apihub.project-sidebar.tree-preferences.v1.project-1",
+      JSON.stringify({
+        sortMode: "project",
+        collapsedModuleIds: [12],
+        collapsedGroupIds: [22]
+      })
+    );
+
+    renderSidebar({
+      allModules,
+      modules: [allModules[1]],
+      searchQuery: "billing",
+      selectedEndpointId: null
+    });
+
+    expect(screen.getByText("Search keeps matched branches open.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Billing Overview GET /billing/overview" })).toBeInTheDocument();
+  });
 });
