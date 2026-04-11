@@ -35,7 +35,7 @@ describe("SessionBar", () => {
     fetchMe.mockResolvedValue({
       code: 0,
       message: "ok",
-      data: { id: 1, username: "admin", displayName: "Administrator" }
+      data: { id: 1, username: "admin", displayName: "Administrator", email: "admin@local.dev" }
     });
     logout.mockResolvedValue({ code: 0, message: "ok", data: null });
     saveTokens("access", "refresh");
@@ -43,6 +43,8 @@ describe("SessionBar", () => {
     render(<SessionBar />);
 
     expect(await screen.findByText("Administrator")).toBeInTheDocument();
+    expect(screen.getByText("@admin")).toBeInTheDocument();
+    expect(screen.getByText("admin@local.dev")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     await waitFor(() => expect(logout).toHaveBeenCalled());

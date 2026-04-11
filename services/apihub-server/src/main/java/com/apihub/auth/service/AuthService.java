@@ -56,7 +56,7 @@ public class AuthService {
     public AuthMeResponse me(Long userId) {
         var user = authUserRepository.findActiveById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
-        return new AuthMeResponse(user.id(), user.username(), user.displayName());
+        return new AuthMeResponse(user.id(), user.username(), user.displayName(), user.email());
     }
 
     public void logout(Long userId) {

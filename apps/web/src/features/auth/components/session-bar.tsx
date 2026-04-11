@@ -8,7 +8,7 @@ import { clearTokens, loadTokens } from "../../../lib/auth-store";
 
 export function SessionBar() {
   const router = useRouter();
-  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [session, setSession] = useState<{ displayName: string; username: string; email: string | null } | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
@@ -24,7 +24,11 @@ export function SessionBar() {
     void fetchMe()
       .then((response) => {
         if (isMounted) {
-          setDisplayName(response.data.displayName || response.data.username);
+          setSession({
+            displayName: response.data.displayName || response.data.username,
+            username: response.data.username,
+            email: response.data.email
+          });
         }
       })
       .catch(() => {
@@ -58,7 +62,13 @@ export function SessionBar() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Session</p>
-          <p className="mt-1 text-sm font-medium text-slate-900">{displayName ?? "Loading session..."}</p>
+          <p className="mt-1 text-sm font-medium text-slate-900">{session?.displayName ?? "Loading session..."}</p>
+          {session ? (
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              <span>@{session.username}</span>
+              {session.email ? <span>{session.email}</span> : null}
+            </div>
+          ) : null}
         </div>
         <button
           className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:text-slate-400"

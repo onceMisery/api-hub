@@ -66,4 +66,20 @@ describe("LoginForm", () => {
     expect(mockPush).toHaveBeenCalledWith("/console/projects");
     expect(mockRefresh).toHaveBeenCalled();
   });
+
+  it("prefills seeded role accounts for quick verification", async () => {
+    fetchMe.mockRejectedValue(new Error("No session"));
+
+    render(<LoginForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Use viewer account" }));
+    expect(screen.getByRole("textbox", { name: "Username" })).toHaveValue("viewer");
+    expect(screen.getByLabelText("Password")).toHaveValue("123456");
+
+    fireEvent.click(screen.getByRole("button", { name: "Use editor account" }));
+    expect(screen.getByRole("textbox", { name: "Username" })).toHaveValue("editor");
+
+    fireEvent.click(screen.getByRole("button", { name: "Use admin account" }));
+    expect(screen.getByRole("textbox", { name: "Username" })).toHaveValue("admin");
+  });
 });
