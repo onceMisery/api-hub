@@ -18,6 +18,7 @@ apihub:
     security:
       connect-timeout-ms: 5000
       read-timeout-ms: 10000
+      max-request-body-bytes: 65536
       max-response-body-bytes: 262144
       global-allowlist:
         - pattern: "local.dev"

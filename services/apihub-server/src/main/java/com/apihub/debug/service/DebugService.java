@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -85,6 +86,7 @@ public class DebugService {
         enforceTargetPolicy(project, environment, targetUri);
         List<DebugHeader> headers = mergeHeaders(environment.defaultHeaders(), request.headers(), environment, variables);
         String requestBody = substituteVariables(request.body(), variables);
+        requireRequestBodyWithinLimit(requestBody);
 
         DebugHttpResult result = debugHttpExecutor.execute(new DebugHttpRequest(
                 endpoint.method(),
@@ -168,6 +170,13 @@ public class DebugService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
         if (!projectRepository.canAccessProject(userId, projectId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
+    }
+
+    private void requireRequestBodyWithinLimit(String requestBody) {
+        byte[] bodyBytes = requestBody == null ? new byte[0] : requestBody.getBytes(StandardCharsets.UTF_8);
+        if (bodyBytes.length > debugSecurityProperties.getMaxRequestBodyBytes()) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Debug request body exceeded configured size limit");
         }
     }
 

@@ -260,6 +260,46 @@ class DebugServiceTest {
     }
 
     @Test
+    void shouldRejectDebugRequestBodyExceedingConfiguredLimit() {
+        DebugSecurityProperties debugSecurityProperties = new DebugSecurityProperties();
+        debugSecurityProperties.setMaxRequestBodyBytes(4);
+        debugSecurityProperties.setGlobalAllowlist(List.of(
+                new DebugSecurityProperties.AllowRule("local.dev", false)));
+        debugService = new DebugService(
+                projectRepository,
+                endpointRepository,
+                debugHttpExecutor,
+                debugHistoryRepository,
+                new DebugTargetPolicyResolver(),
+                new DebugTargetMatcher(),
+                debugSecurityProperties);
+        lenient().when(projectRepository.canAccessProject(1L, 1L)).thenReturn(true);
+
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(41L, 1L, "Local", "https://local.dev/api", true,
+                        List.of(), List.of(), List.of(), "none", "", "", "inherit", List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Create User", "POST", "/users", "Create", false)));
+
+        assertThatThrownBy(() -> debugService.execute(new ExecuteDebugRequest(
+                41L,
+                31L,
+                "",
+                List.of(),
+                "{\"name\":\"alice\"}")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+
+        verify(debugHttpExecutor, never()).execute(any());
+        verify(debugHistoryRepository, never()).saveHistory(anyLong(), anyLong(), anyLong(), anyString(), anyString(), anyList(), anyString(), anyInt(), anyList(), anyString(), anyLong());
+    }
+
+    @Test
     void shouldReturnProjectDebugHistory() {
         Instant createdAt = Instant.parse("2026-04-09T04:12:30Z");
         given(projectRepository.findProject(1L)).willReturn(Optional.of(new ProjectDetail(1L, "Default", "default", "Seed", List.of())));

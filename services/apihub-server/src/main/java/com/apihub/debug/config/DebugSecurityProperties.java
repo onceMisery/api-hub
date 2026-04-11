@@ -11,6 +11,7 @@ public class DebugSecurityProperties {
 
     private long connectTimeoutMs = 5000;
     private long readTimeoutMs = 10000;
+    private int maxRequestBodyBytes = 65536;
     private int maxResponseBodyBytes = 262144;
     private List<AllowRule> globalAllowlist = List.of();
 
@@ -28,6 +29,14 @@ public class DebugSecurityProperties {
 
     public void setReadTimeoutMs(long readTimeoutMs) {
         this.readTimeoutMs = readTimeoutMs;
+    }
+
+    public int getMaxRequestBodyBytes() {
+        return maxRequestBodyBytes;
+    }
+
+    public void setMaxRequestBodyBytes(int maxRequestBodyBytes) {
+        this.maxRequestBodyBytes = maxRequestBodyBytes;
     }
 
     public int getMaxResponseBodyBytes() {
