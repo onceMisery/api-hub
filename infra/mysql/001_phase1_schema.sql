@@ -202,9 +202,8 @@ CREATE TABLE mock_rule (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY idx_mock_rule_endpoint_priority (endpoint_id, priority DESC, id ASC),
-  CONSTRAINT fk_mock_rule_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
-  CONSTRAINT fk_mock_rule_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id),
-  CONSTRAINT fk_mock_rule_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user (id)
+  KEY idx_mock_rule_created_by (created_by),
+  KEY idx_mock_rule_updated_by (updated_by)
 );
 
 CREATE TABLE mock_release (
@@ -217,8 +216,7 @@ CREATE TABLE mock_release (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_mock_release_endpoint_release_no (endpoint_id, release_no),
   KEY idx_mock_release_endpoint_created (endpoint_id, created_at DESC, id DESC),
-  CONSTRAINT fk_mock_release_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
-  CONSTRAINT fk_mock_release_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+  KEY idx_mock_release_created_by (created_by)
 );
 
 CREATE TABLE debug_history (
@@ -238,8 +236,6 @@ CREATE TABLE debug_history (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY idx_debug_history_project_created (project_id, created_at DESC),
   KEY idx_debug_history_endpoint_created (endpoint_id, created_at DESC),
-  CONSTRAINT fk_debug_history_project FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
-  CONSTRAINT fk_debug_history_environment FOREIGN KEY (environment_id) REFERENCES environment (id) ON DELETE CASCADE,
-  CONSTRAINT fk_debug_history_endpoint FOREIGN KEY (endpoint_id) REFERENCES api_endpoint (id) ON DELETE CASCADE,
-  CONSTRAINT fk_debug_history_created_by FOREIGN KEY (created_by) REFERENCES sys_user (id)
+  KEY idx_debug_history_environment_created (environment_id, created_at DESC),
+  KEY idx_debug_history_created_by_created (created_by, created_at DESC)
 );

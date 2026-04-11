@@ -134,6 +134,10 @@ CREATE TABLE mock_rule (
   updated_by BIGINT NOT NULL
 );
 
+CREATE INDEX idx_mock_rule_endpoint_priority ON mock_rule (endpoint_id, priority DESC, id ASC);
+CREATE INDEX idx_mock_rule_created_by ON mock_rule (created_by);
+CREATE INDEX idx_mock_rule_updated_by ON mock_rule (updated_by);
+
 CREATE TABLE mock_release (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   endpoint_id BIGINT NOT NULL,
@@ -144,6 +148,9 @@ CREATE TABLE mock_release (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (endpoint_id, release_no)
 );
+
+CREATE INDEX idx_mock_release_endpoint_created ON mock_release (endpoint_id, created_at DESC, id DESC);
+CREATE INDEX idx_mock_release_created_by ON mock_release (created_by);
 
 CREATE TABLE debug_history (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -161,3 +168,8 @@ CREATE TABLE debug_history (
   created_by BIGINT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_debug_history_project_created ON debug_history (project_id, created_at DESC);
+CREATE INDEX idx_debug_history_environment_created ON debug_history (environment_id, created_at DESC);
+CREATE INDEX idx_debug_history_endpoint_created ON debug_history (endpoint_id, created_at DESC);
+CREATE INDEX idx_debug_history_created_by_created ON debug_history (created_by, created_at DESC);
