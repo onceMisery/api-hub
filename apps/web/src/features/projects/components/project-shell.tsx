@@ -521,6 +521,9 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       if (handleUnauthorized(loadError)) {
         return null;
       }
+      if (isProjectAccessForbidden(loadError)) {
+        return PROJECT_ACCESS_FORBIDDEN;
+      }
 
       setError(loadError instanceof Error ? loadError.message : "Failed to load project detail");
       return null;
@@ -554,6 +557,9 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     } catch (loadError) {
       if (handleUnauthorized(loadError)) {
         return null;
+      }
+      if (isProjectAccessForbidden(loadError)) {
+        return PROJECT_ACCESS_FORBIDDEN;
       }
 
       setError(loadError instanceof Error ? loadError.message : "Failed to load project members");
@@ -678,9 +684,20 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
     try {
       await saveProjectMember(projectId, payload);
-      await reloadProjectMembers();
+      const nextMembers = await reloadProjectMembers();
+      if (affectsCurrentUser && nextMembers === PROJECT_ACCESS_FORBIDDEN) {
+        handleProjectAccessRemoved();
+        return;
+      }
       const nextProject = await reloadProject();
-      const accessFeedback = affectsCurrentUser ? buildCurrentUserAccessFeedback(previousProject, nextProject) : null;
+      if (affectsCurrentUser && nextProject === PROJECT_ACCESS_FORBIDDEN) {
+        handleProjectAccessRemoved();
+        return;
+      }
+      const accessFeedback =
+        affectsCurrentUser && nextProject !== PROJECT_ACCESS_FORBIDDEN
+          ? buildCurrentUserAccessFeedback(previousProject, nextProject)
+          : null;
 
       if (accessFeedback) {
         pushNotice(accessFeedback.title, accessFeedback.detail);
@@ -707,9 +724,20 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
     try {
       await deleteProjectMember(projectId, memberUserId);
-      await reloadProjectMembers();
+      const nextMembers = await reloadProjectMembers();
+      if (affectsCurrentUser && nextMembers === PROJECT_ACCESS_FORBIDDEN) {
+        handleProjectAccessRemoved();
+        return;
+      }
       const nextProject = await reloadProject();
-      const accessFeedback = affectsCurrentUser ? buildCurrentUserAccessFeedback(previousProject, nextProject, true) : null;
+      if (affectsCurrentUser && nextProject === PROJECT_ACCESS_FORBIDDEN) {
+        handleProjectAccessRemoved();
+        return;
+      }
+      const accessFeedback =
+        affectsCurrentUser && nextProject !== PROJECT_ACCESS_FORBIDDEN
+          ? buildCurrentUserAccessFeedback(previousProject, nextProject, true)
+          : null;
 
       if (accessFeedback) {
         pushNotice(accessFeedback.title, accessFeedback.detail);
@@ -1253,6 +1281,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
     return false;
   }
+
+  function handleProjectAccessRemoved() {
+    pushNotice("Project access removed", "You no longer have access to this project. Returning to the project list.");
+    router.replace("/console/projects");
+  }
 }
 
 function formatProjectAccess(role: string | null | undefined) {
@@ -1268,6 +1301,12 @@ function formatProjectAccess(role: string | null | undefined) {
     default:
       return "Project access";
   }
+}
+
+const PROJECT_ACCESS_FORBIDDEN = Symbol("project-access-forbidden");
+
+function isProjectAccessForbidden(error: unknown) {
+  return isApiRequestError(error) && error.status === 403;
 }
 
 function buildCurrentUserAccessFeedback(

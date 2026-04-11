@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const {
+  ApiRequestError,
   mockReplace,
   fetchMe,
   fetchProject,
@@ -39,6 +40,19 @@ const {
   publishEndpointMockRelease,
   simulateEndpointMock
 } = vi.hoisted(() => ({
+  ApiRequestError: class ApiRequestError extends Error {
+    status: number;
+    errorCode?: string;
+    data?: unknown;
+
+    constructor(status: number, message: string, errorCode?: string, data?: unknown) {
+      super(message);
+      this.name = "ApiRequestError";
+      this.status = status;
+      this.errorCode = errorCode;
+      this.data = data;
+    }
+  },
   mockReplace: vi.fn(),
   fetchMe: vi.fn(),
   fetchProject: vi.fn(),
@@ -123,20 +137,8 @@ vi.mock("@api-hub/api-sdk", () => ({
   createVersion,
   publishEndpointMockRelease,
   simulateEndpointMock,
-  ApiRequestError: class ApiRequestError extends Error {
-    status: number;
-    errorCode?: string;
-    data?: unknown;
-
-    constructor(status: number, message: string, errorCode?: string, data?: unknown) {
-      super(message);
-      this.name = "ApiRequestError";
-      this.status = status;
-      this.errorCode = errorCode;
-      this.data = data;
-    }
-  },
-  isApiRequestError: () => false
+  ApiRequestError,
+  isApiRequestError: (error: unknown) => error instanceof ApiRequestError
 }));
 
 import { ProjectShell } from "./project-shell";
@@ -953,6 +955,38 @@ describe("ProjectShell", () => {
     const toast = await screen.findByRole("status");
     expect(within(toast).getByText("Your access changed")).toBeInTheDocument();
     expect(within(toast).getByText("This project is now read-only for your session.")).toBeInTheDocument();
+  });
+
+  it("redirects to the project list when the current user loses project access", async () => {
+    fetchMe.mockResolvedValueOnce({
+      data: {
+        id: 5,
+        username: "member-admin",
+        displayName: "Project Admin",
+        email: "member-admin@local.dev"
+      }
+    });
+    fetchProjectMembers
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: [
+          { userId: 1, username: "admin", displayName: "Administrator", email: "admin@local.dev", roleCode: "project_admin", owner: true },
+          { userId: 5, username: "member-admin", displayName: "Project Admin", email: "member-admin@local.dev", roleCode: "project_admin", owner: false }
+        ]
+      })
+      .mockRejectedValueOnce(new ApiRequestError(403, "Forbidden"));
+
+    render(<ProjectShell projectId={1} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Manage access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete member 5" }));
+
+    await waitFor(() => expect(deleteProjectMember).toHaveBeenCalledWith(1, 5));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/console/projects"));
+
+    const toast = await screen.findByRole("status");
+    expect(within(toast).getByText("Project access removed")).toBeInTheDocument();
+    expect(within(toast).getByText("You no longer have access to this project. Returning to the project list.")).toBeInTheDocument();
   });
 
   it("refetches and clears debug history with active filters", async () => {
