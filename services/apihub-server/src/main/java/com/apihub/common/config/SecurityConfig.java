@@ -1,5 +1,6 @@
 package com.apihub.common.config;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.security.BearerAuthenticationFilter;
 import com.apihub.auth.service.JwtTokenService;
 import org.springframework.context.annotation.Bean;
@@ -16,8 +17,8 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     @Bean
-    public BearerAuthenticationFilter bearerAuthenticationFilter(JwtTokenService jwtTokenService) {
-        return new BearerAuthenticationFilter(jwtTokenService);
+    public BearerAuthenticationFilter bearerAuthenticationFilter(JwtTokenService jwtTokenService, AuthUserRepository authUserRepository) {
+        return new BearerAuthenticationFilter(jwtTokenService, authUserRepository);
     }
 
     @Bean

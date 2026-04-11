@@ -1,5 +1,6 @@
 package com.apihub.common.config;
 
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.service.JwtTokenService;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.mock.web.MockController;
@@ -39,9 +40,15 @@ class ProjectSecurityTest {
     @MockBean
     private JwtTokenService jwtTokenService;
 
+    @MockBean
+    private AuthUserRepository authUserRepository;
+
     @Test
     void shouldAllowBearerTokenForProtectedEndpoint() throws Exception {
-        given(jwtTokenService.parseAccessToken("access-42")).willReturn(Optional.of(42L));
+        given(jwtTokenService.parseAccessTokenClaims("access-42")).willReturn(Optional.of(
+                new JwtTokenService.AuthTokenClaims(42L, "admin", 3, "access")));
+        given(authUserRepository.findActiveById(42L)).willReturn(Optional.of(
+                new AuthUserRepository.UserCredential(42L, "admin", "Administrator", "hash", "active", 3)));
         given(projectService.listProjects()).willReturn(List.of(
                 new ProjectDetail(1L, "Default Project", "default", "Seed project", List.of())));
 
@@ -49,6 +56,18 @@ class ProjectSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer access-42"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].projectKey").value("default"));
+    }
+
+    @Test
+    void shouldRejectProtectedEndpointWhenAccessTokenVersionIsStale() throws Exception {
+        given(jwtTokenService.parseAccessTokenClaims("stale-access-42")).willReturn(Optional.of(
+                new JwtTokenService.AuthTokenClaims(42L, "admin", 2, "access")));
+        given(authUserRepository.findActiveById(42L)).willReturn(Optional.of(
+                new AuthUserRepository.UserCredential(42L, "admin", "Administrator", "hash", "active", 3)));
+
+        mockMvc.perform(get("/api/v1/projects")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer stale-access-42"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.apihub.auth.web;
 import com.apihub.auth.model.AuthMeResponse;
 import com.apihub.auth.model.LoginResponse;
 import com.apihub.auth.model.RefreshTokenRequest;
+import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.service.AuthService;
 import com.apihub.auth.service.JwtTokenService;
 import com.apihub.common.config.SecurityConfig;
@@ -36,6 +37,9 @@ class AuthControllerTest {
     @MockBean
     private JwtTokenService jwtTokenService;
 
+    @MockBean
+    private AuthUserRepository authUserRepository;
+
     @Test
     void shouldLoginSuccessfully() throws Exception {
         given(authService.login(any())).willReturn(new LoginResponse("access", "refresh"));
@@ -65,7 +69,10 @@ class AuthControllerTest {
 
     @Test
     void shouldReturnCurrentUserProfile() throws Exception {
-        given(jwtTokenService.parseAccessToken("access.jwt.token")).willReturn(java.util.Optional.of(1L));
+        given(jwtTokenService.parseAccessTokenClaims("access.jwt.token")).willReturn(java.util.Optional.of(
+                new JwtTokenService.AuthTokenClaims(1L, "admin", 0, "access")));
+        given(authUserRepository.findActiveById(1L)).willReturn(java.util.Optional.of(
+                new AuthUserRepository.UserCredential(1L, "admin", "Administrator", "hash", "active", 0)));
         given(authService.me(1L)).willReturn(new AuthMeResponse(1L, "admin", "Administrator"));
 
         mockMvc.perform(get("/api/v1/auth/me")
@@ -77,7 +84,10 @@ class AuthControllerTest {
 
     @Test
     void shouldLogoutCurrentSession() throws Exception {
-        given(jwtTokenService.parseAccessToken("access.jwt.token")).willReturn(java.util.Optional.of(1L));
+        given(jwtTokenService.parseAccessTokenClaims("access.jwt.token")).willReturn(java.util.Optional.of(
+                new JwtTokenService.AuthTokenClaims(1L, "admin", 0, "access")));
+        given(authUserRepository.findActiveById(1L)).willReturn(java.util.Optional.of(
+                new AuthUserRepository.UserCredential(1L, "admin", "Administrator", "hash", "active", 0)));
 
         mockMvc.perform(post("/api/v1/auth/logout")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer access.jwt.token"))
