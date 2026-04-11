@@ -2,6 +2,7 @@ package com.apihub.mock.web;
 
 import com.apihub.auth.service.JwtTokenService;
 import com.apihub.common.config.SecurityConfig;
+import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockRuleDetail;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
@@ -49,6 +50,7 @@ class ApiMockRuleControllerTest {
                         true,
                         List.of(new MockConditionEntry("mode", "strict")),
                         List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}"
@@ -57,6 +59,8 @@ class ApiMockRuleControllerTest {
         mockMvc.perform(get("/api/v1/endpoints/31/mock-rules").with(user("tester")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].ruleName").value("unauthorized"))
+                .andExpect(jsonPath("$.data[0].bodyConditions[0].jsonPath").value("$.user.id"))
+                .andExpect(jsonPath("$.data[0].bodyConditions[0].expectedValue").value("31"))
                 .andExpect(jsonPath("$.data[0].statusCode").value(401));
     }
 
@@ -73,6 +77,7 @@ class ApiMockRuleControllerTest {
                                     "enabled": true,
                                     "queryConditions": [{ "name": "mode", "value": "strict" }],
                                     "headerConditions": [{ "name": "x-scenario", "value": "unauthorized" }],
+                                    "bodyConditions": [{ "jsonPath": "$.user.id", "expectedValue": "31" }],
                                     "statusCode": 401,
                                     "mediaType": "application/json",
                                     "body": "{\\\"error\\\":\\\"token expired\\\"}"
@@ -88,6 +93,7 @@ class ApiMockRuleControllerTest {
                         true,
                         List.of(new MockConditionEntry("mode", "strict")),
                         List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}"

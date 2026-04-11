@@ -11,6 +11,9 @@ public final class MockDtos {
     public record MockConditionEntry(String name, String value) {
     }
 
+    public record MockBodyConditionEntry(String jsonPath, String expectedValue) {
+    }
+
     public record MockRuleDetail(
             Long id,
             Long endpointId,
@@ -19,6 +22,7 @@ public final class MockDtos {
             boolean enabled,
             List<MockConditionEntry> queryConditions,
             List<MockConditionEntry> headerConditions,
+            List<MockBodyConditionEntry> bodyConditions,
             int statusCode,
             String mediaType,
             String body
@@ -31,6 +35,7 @@ public final class MockDtos {
             boolean enabled,
             List<MockConditionEntry> queryConditions,
             List<MockConditionEntry> headerConditions,
+            List<MockBodyConditionEntry> bodyConditions,
             int statusCode,
             String mediaType,
             String body

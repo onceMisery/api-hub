@@ -207,6 +207,11 @@ export type MockConditionEntry = {
   value: string;
 };
 
+export type MockBodyConditionEntry = {
+  jsonPath: string;
+  expectedValue: string;
+};
+
 export type MockRuleDetail = {
   id: number;
   endpointId: number;
@@ -215,6 +220,7 @@ export type MockRuleDetail = {
   enabled: boolean;
   queryConditions: MockConditionEntry[];
   headerConditions: MockConditionEntry[];
+  bodyConditions: MockBodyConditionEntry[];
   statusCode: number;
   mediaType: string;
   body: string;
@@ -226,6 +232,7 @@ export type MockRuleUpsertItem = {
   enabled: boolean;
   queryConditions: MockConditionEntry[];
   headerConditions: MockConditionEntry[];
+  bodyConditions: MockBodyConditionEntry[];
   statusCode: number;
   mediaType: string;
   body: string;

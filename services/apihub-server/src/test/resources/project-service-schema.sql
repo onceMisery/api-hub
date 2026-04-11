@@ -127,6 +127,7 @@ CREATE TABLE mock_rule (
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   query_conditions_json CLOB NOT NULL,
   header_conditions_json CLOB NOT NULL,
+  body_conditions_json CLOB NOT NULL,
   status_code INT NOT NULL DEFAULT 200,
   media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
   body_json CLOB NOT NULL,

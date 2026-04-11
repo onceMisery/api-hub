@@ -194,6 +194,7 @@ CREATE TABLE mock_rule (
   enabled TINYINT(1) NOT NULL DEFAULT 1,
   query_conditions_json JSON NOT NULL,
   header_conditions_json JSON NOT NULL,
+  body_conditions_json JSON NOT NULL,
   status_code INT NOT NULL DEFAULT 200,
   media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
   body_json LONGTEXT NOT NULL,

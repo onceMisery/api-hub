@@ -5,6 +5,7 @@ import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
+import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
@@ -263,6 +264,7 @@ class ProjectServiceTest {
                         true,
                         java.util.List.of(new MockConditionEntry("mode", "strict")),
                         java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        java.util.List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}")));
@@ -276,6 +278,8 @@ class ProjectServiceTest {
         assertThat(releases).extracting("releaseNo").containsExactly(2, 1);
         assertThat(releases.get(0).responseSnapshotJson()).contains("\"userId\"");
         assertThat(releases.get(0).rulesSnapshotJson()).contains("\"Unauthorized\"");
+        assertThat(releases.get(0).rulesSnapshotJson()).contains("\"bodyConditions\"");
+        assertThat(releases.get(0).rulesSnapshotJson()).contains("$.user.id");
     }
 
     @Test
@@ -297,6 +301,7 @@ class ProjectServiceTest {
                         true,
                         java.util.List.of(new MockConditionEntry("mode", "strict")),
                         java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        java.util.List.of(),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}"

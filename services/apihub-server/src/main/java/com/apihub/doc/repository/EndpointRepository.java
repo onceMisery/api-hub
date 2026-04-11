@@ -9,6 +9,7 @@ import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionDetail;
+import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockReleaseDetail;
 import com.apihub.mock.model.MockDtos.MockRuleDetail;
@@ -36,6 +37,8 @@ public class EndpointRepository {
     private static final long DEFAULT_USER_ID = 1L;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final TypeReference<List<MockConditionEntry>> MOCK_CONDITION_LIST = new TypeReference<>() {
+    };
+    private static final TypeReference<List<MockBodyConditionEntry>> MOCK_BODY_CONDITION_LIST = new TypeReference<>() {
     };
 
     private static final RowMapper<EndpointDetail> ENDPOINT_ROW_MAPPER = (rs, rowNum) -> new EndpointDetail(
@@ -82,6 +85,7 @@ public class EndpointRepository {
             rs.getBoolean("enabled"),
             parseConditionEntries(rs.getString("query_conditions_json")),
             parseConditionEntries(rs.getString("header_conditions_json")),
+            parseBodyConditionEntries(rs.getString("body_conditions_json")),
             rs.getInt("status_code"),
             rs.getString("media_type"),
             rs.getString("body_json"));
@@ -285,6 +289,7 @@ public class EndpointRepository {
                        enabled,
                        query_conditions_json,
                        header_conditions_json,
+                       body_conditions_json,
                        status_code,
                        media_type,
                        body_json
@@ -306,12 +311,13 @@ public class EndpointRepository {
                         enabled,
                         query_conditions_json,
                         header_conditions_json,
+                        body_conditions_json,
                         status_code,
                         media_type,
                         body_json,
                         created_by,
                         updated_by
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     endpointId,
                     item.ruleName(),
@@ -319,6 +325,7 @@ public class EndpointRepository {
                     item.enabled(),
                     writeConditionEntries(item.queryConditions()),
                     writeConditionEntries(item.headerConditions()),
+                    writeBodyConditionEntries(item.bodyConditions()),
                     item.statusCode(),
                     item.mediaType(),
                     item.body(),
@@ -503,11 +510,31 @@ public class EndpointRepository {
         }
     }
 
+    private static List<MockBodyConditionEntry> parseBodyConditionEntries(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return OBJECT_MAPPER.readValue(rawJson, MOCK_BODY_CONDITION_LIST);
+        } catch (JsonProcessingException exception) {
+            return List.of();
+        }
+    }
+
     private String writeConditionEntries(List<MockConditionEntry> entries) {
         try {
             return OBJECT_MAPPER.writeValueAsString(entries == null ? Collections.emptyList() : entries);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize mock conditions", exception);
+        }
+    }
+
+    private String writeBodyConditionEntries(List<MockBodyConditionEntry> entries) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(entries == null ? Collections.emptyList() : entries);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize mock body conditions", exception);
         }
     }
 }

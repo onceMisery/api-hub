@@ -273,6 +273,7 @@ public class ProjectService {
                         rule.enabled(),
                         rule.queryConditions(),
                         rule.headerConditions(),
+                        rule.bodyConditions(),
                         rule.statusCode(),
                         rule.mediaType(),
                         rule.body()))

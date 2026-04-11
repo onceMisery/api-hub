@@ -24,6 +24,7 @@ class MockRuntimeResolverTest {
                         true,
                         List.of(new MockConditionEntry("mode", "strict")),
                         List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        List.of(),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}"
@@ -58,6 +59,7 @@ class MockRuntimeResolverTest {
                         true,
                         List.of(),
                         List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                        List.of(),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}"
