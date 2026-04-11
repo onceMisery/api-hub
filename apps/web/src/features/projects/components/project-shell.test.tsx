@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const {
   mockReplace,
@@ -707,6 +707,19 @@ describe("ProjectShell", () => {
     await waitFor(() => expect(deleteEnvironment).toHaveBeenCalledWith(41));
   });
 
+  it("shows a global success notification after creating an environment", async () => {
+    render(<ProjectShell projectId={1} />);
+    expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("New environment name"), { target: { value: "Staging" } });
+    fireEvent.change(screen.getByLabelText("New environment base URL"), { target: { value: "https://staging.dev" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add environment" }));
+
+    const toast = await screen.findByRole("status");
+    expect(within(toast).getByText("Environment created")).toBeInTheDocument();
+    expect(within(toast).getByText("Staging is now available in the workbench.")).toBeInTheDocument();
+  });
+
   it("loads project detail and saves project debug policy", async () => {
     render(<ProjectShell projectId={1} />);
 
@@ -723,6 +736,20 @@ describe("ProjectShell", () => {
         debugAllowedHosts: [{ pattern: "10.10.1.8", allowPrivate: true }]
       })
     );
+  });
+
+  it("shows a global error notification when project debug policy save fails", async () => {
+    updateProject.mockRejectedValueOnce(new Error("Policy save failed"));
+
+    render(<ProjectShell projectId={1} />);
+    expect(await screen.findByDisplayValue("*.corp.example.com")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Project debug rule 1 pattern"), { target: { value: "10.10.1.8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save project debug policy" }));
+
+    const toast = await screen.findByRole("alert");
+    expect(within(toast).getByText("Policy update failed")).toBeInTheDocument();
+    expect(within(toast).getByText("Policy save failed")).toBeInTheDocument();
   });
 
   it("opens the access drawer from the summary card and hides inline member controls by default", async () => {

@@ -75,6 +75,7 @@ import {
 import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
 import { ProjectSidebar } from "./project-sidebar";
+import { WorkbenchNotificationCenter, useWorkbenchNotifications } from "./workbench-notification-center";
 
 type ProjectShellProps = {
   projectId: number;
@@ -118,6 +119,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isAccessDrawerOpen, setIsAccessDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { notifications, notify, dismissNotification } = useWorkbenchNotifications();
 
   useEffect(() => {
     void reloadProject();
@@ -279,6 +281,22 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     };
   }, [filteredModules]);
 
+  function pushSuccess(title: string, detail: string) {
+    notify({
+      detail,
+      title,
+      tone: "success"
+    });
+  }
+
+  function pushError(title: string, detail: string) {
+    notify({
+      detail,
+      title,
+      tone: "error"
+    });
+  }
+
   useEffect(() => {
     if (!searchQuery.trim()) {
       return;
@@ -292,6 +310,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6 text-slate-900">
+      <WorkbenchNotificationCenter notifications={notifications} onDismiss={dismissNotification} />
       <SessionBar />
       <section className="rounded-[2.4rem] border border-white/60 bg-white/65 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -509,12 +528,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       await createModule(projectId, payload);
       await reloadTree();
+      pushSuccess("Module created", `${payload.name} was added to the project tree.`);
     } catch (creationError) {
       if (handleUnauthorized(creationError)) {
         return;
       }
 
-      setError(creationError instanceof Error ? creationError.message : "Failed to create module");
+      const message = getErrorMessage(creationError, "Failed to create module");
+      setError(message);
+      pushError("Module create failed", message);
     }
   }
 
@@ -524,12 +546,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       const response = await createEnvironment(projectId, payload);
       await reloadEnvironments(response.data.id);
+      pushSuccess("Environment created", `${response.data.name} is now available in the workbench.`);
     } catch (creationError) {
       if (handleUnauthorized(creationError)) {
         return;
       }
 
-      setError(creationError instanceof Error ? creationError.message : "Failed to create environment");
+      const message = getErrorMessage(creationError, "Failed to create environment");
+      setError(message);
+      pushError("Environment create failed", message);
     }
   }
 
@@ -539,12 +564,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       const response = await updateEnvironment(environmentId, payload);
       await reloadEnvironments(response.data.id);
+      pushSuccess("Environment saved", `${response.data.name} is ready for debug runs.`);
     } catch (updateError) {
       if (handleUnauthorized(updateError)) {
         return;
       }
 
-      setError(updateError instanceof Error ? updateError.message : "Failed to update environment");
+      const message = getErrorMessage(updateError, "Failed to update environment");
+      setError(message);
+      pushError("Environment update failed", message);
     }
   }
 
@@ -562,12 +590,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         name: project.name
       });
       setProject(response.data);
+      pushSuccess("Project policy saved", "Debug target guardrails were updated.");
     } catch (updateError) {
       if (handleUnauthorized(updateError)) {
         return;
       }
 
-      setError(updateError instanceof Error ? updateError.message : "Failed to update project debug policy");
+      const message = getErrorMessage(updateError, "Failed to update project debug policy");
+      setError(message);
+      pushError("Policy update failed", message);
     }
   }
 
@@ -578,45 +609,62 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       await saveProjectMember(projectId, payload);
       await reloadProjectMembers();
       await reloadProject();
+      pushSuccess("Member access saved", `${payload.username} now has ${formatRoleCode(payload.roleCode)} access.`);
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : "Failed to save project member");
+      const message = getErrorMessage(saveError, "Failed to save project member");
+      setError(message);
+      pushError("Member update failed", message);
       throw saveError;
     }
   }
 
   async function handleDeleteProjectMember(memberUserId: number) {
     setError(null);
+    const memberName = projectMembers.find((member) => member.userId === memberUserId)?.username;
 
     try {
       await deleteProjectMember(projectId, memberUserId);
       await reloadProjectMembers();
       await reloadProject();
+      pushSuccess(
+        "Member removed",
+        memberName ? `${memberName} was removed from project access.` : "The member was removed from project access."
+      );
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete project member");
+      const message = getErrorMessage(deleteError, "Failed to delete project member");
+      setError(message);
+      pushError("Member removal failed", message);
       throw deleteError;
     }
   }
 
   async function handleDeleteEnvironment(environmentId: number) {
     setError(null);
+    const environmentName = environments.find((environment) => environment.id === environmentId)?.name;
 
     try {
       await deleteEnvironment(environmentId);
       await reloadEnvironments(selectedEnvironmentId === environmentId ? null : selectedEnvironmentId);
+      pushSuccess(
+        "Environment deleted",
+        environmentName ? `${environmentName} was removed from the workbench.` : "The environment was removed from the workbench."
+      );
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete environment");
+      const message = getErrorMessage(deleteError, "Failed to delete environment");
+      setError(message);
+      pushError("Environment delete failed", message);
     }
   }
 
@@ -626,27 +674,37 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       await updateModule(moduleId, payload);
       await reloadTree(selectedEndpointId);
+      pushSuccess("Module renamed", `${payload.name} is now live in the workbench tree.`);
     } catch (updateError) {
       if (handleUnauthorized(updateError)) {
         return;
       }
 
-      setError(updateError instanceof Error ? updateError.message : "Failed to rename module");
+      const message = getErrorMessage(updateError, "Failed to rename module");
+      setError(message);
+      pushError("Module update failed", message);
     }
   }
 
   async function handleDeleteModule(moduleId: number) {
     setError(null);
+    const moduleName = modules.find((module) => module.id === moduleId)?.name;
 
     try {
       await deleteModule(moduleId);
       await reloadTree();
+      pushSuccess(
+        "Module deleted",
+        moduleName ? `${moduleName} and its groups were removed.` : "The module and its groups were removed."
+      );
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete module");
+      const message = getErrorMessage(deleteError, "Failed to delete module");
+      setError(message);
+      pushError("Module delete failed", message);
     }
   }
 
@@ -656,12 +714,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       await createGroup(moduleId, payload);
       await reloadTree(selectedEndpointId);
+      pushSuccess("Group created", `${payload.name} was added to the workbench tree.`);
     } catch (creationError) {
       if (handleUnauthorized(creationError)) {
         return;
       }
 
-      setError(creationError instanceof Error ? creationError.message : "Failed to create group");
+      const message = getErrorMessage(creationError, "Failed to create group");
+      setError(message);
+      pushError("Group create failed", message);
     }
   }
 
@@ -671,27 +732,37 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       await updateGroup(groupId, payload);
       await reloadTree(selectedEndpointId);
+      pushSuccess("Group renamed", `${payload.name} is now live in the workbench tree.`);
     } catch (updateError) {
       if (handleUnauthorized(updateError)) {
         return;
       }
 
-      setError(updateError instanceof Error ? updateError.message : "Failed to rename group");
+      const message = getErrorMessage(updateError, "Failed to rename group");
+      setError(message);
+      pushError("Group update failed", message);
     }
   }
 
   async function handleDeleteGroup(groupId: number) {
     setError(null);
+    const groupName = findGroupName(modules, groupId);
 
     try {
       await deleteGroup(groupId);
       await reloadTree();
+      pushSuccess(
+        "Group deleted",
+        groupName ? `${groupName} and its endpoints were removed.` : "The group and its endpoints were removed."
+      );
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete group");
+      const message = getErrorMessage(deleteError, "Failed to delete group");
+      setError(message);
+      pushError("Group delete failed", message);
     }
   }
 
@@ -704,12 +775,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     try {
       const response = await createEndpoint(groupId, { ...payload, mockEnabled: false });
       await reloadTree(response.data.id);
+      pushSuccess("Endpoint created", `${response.data.name} is ready for editing.`);
     } catch (creationError) {
       if (handleUnauthorized(creationError)) {
         return;
       }
 
-      setError(creationError instanceof Error ? creationError.message : "Failed to create endpoint");
+      const message = getErrorMessage(creationError, "Failed to create endpoint");
+      setError(message);
+      pushError("Endpoint create failed", message);
     }
   }
 
@@ -724,12 +798,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       const response = await updateEndpoint(selectedEndpointId, payload);
       setEndpoint(response.data);
       await reloadTree(response.data.id);
+      pushSuccess("Endpoint saved", `${response.data.method} ${response.data.path} was updated.`);
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : "Failed to save endpoint");
+      const message = getErrorMessage(saveError, "Failed to save endpoint");
+      setError(message);
+      pushError("Endpoint save failed", message);
       throw saveError;
     }
   }
@@ -739,18 +816,21 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
     try {
       const description = endpointId === selectedEndpointId ? endpoint?.description ?? payload.description : payload.description;
-      await updateEndpoint(endpointId, {
+      const response = await updateEndpoint(endpointId, {
         ...payload,
         description: description ?? "",
         ...(endpointId === selectedEndpointId && endpoint ? { mockEnabled: endpoint.mockEnabled } : {})
       });
       await reloadTree(endpointId);
+      pushSuccess("Endpoint renamed", `${response.data.name} is now live in the workbench tree.`);
     } catch (updateError) {
       if (handleUnauthorized(updateError)) {
         return;
       }
 
-      setError(updateError instanceof Error ? updateError.message : "Failed to rename endpoint");
+      const message = getErrorMessage(updateError, "Failed to rename endpoint");
+      setError(message);
+      pushError("Endpoint update failed", message);
     }
   }
 
@@ -760,37 +840,50 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
 
     setError(null);
+    const endpointName = endpoint?.name;
 
     try {
       await deleteEndpoint(selectedEndpointId);
       await reloadTree();
+      pushSuccess(
+        "Endpoint deleted",
+        endpointName ? `${endpointName} was removed from the workspace.` : "The endpoint was removed from the workspace."
+      );
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete endpoint");
+      const message = getErrorMessage(deleteError, "Failed to delete endpoint");
+      setError(message);
+      pushError("Endpoint delete failed", message);
       throw deleteError;
     }
   }
 
   async function handleDeleteEndpointFromTree(endpointId: number) {
     setError(null);
+    const endpointName = findEndpointName(modules, endpointId);
 
     try {
       await deleteEndpoint(endpointId);
       if (endpointId === selectedEndpointId) {
         await reloadTree();
-        return;
+      } else {
+        await reloadTree(selectedEndpointId);
       }
-
-      await reloadTree(selectedEndpointId);
+      pushSuccess(
+        "Endpoint deleted",
+        endpointName ? `${endpointName} was removed from the workspace.` : "The endpoint was removed from the workspace."
+      );
     } catch (deleteError) {
       if (handleUnauthorized(deleteError)) {
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete endpoint");
+      const message = getErrorMessage(deleteError, "Failed to delete endpoint");
+      setError(message);
+      pushError("Endpoint delete failed", message);
     }
   }
 
@@ -805,12 +898,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       await replaceEndpointParameters(selectedEndpointId, payload);
       const response = await fetchEndpointParameters(selectedEndpointId);
       setParameters(response.data);
+      pushSuccess("Parameters saved", `${endpoint?.name ?? "Endpoint"} request fields were updated.`);
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : "Failed to save parameters");
+      const message = getErrorMessage(saveError, "Failed to save parameters");
+      setError(message);
+      pushError("Parameter save failed", message);
       throw saveError;
     }
   }
@@ -826,12 +922,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       await replaceEndpointResponses(selectedEndpointId, payload);
       const response = await fetchEndpointResponses(selectedEndpointId);
       setResponses(response.data);
+      pushSuccess("Responses saved", `${endpoint?.name ?? "Endpoint"} response drafts were updated.`);
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : "Failed to save responses");
+      const message = getErrorMessage(saveError, "Failed to save responses");
+      setError(message);
+      pushError("Response save failed", message);
       throw saveError;
     }
   }
@@ -847,12 +946,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       await replaceEndpointMockRules(selectedEndpointId, payload);
       const response = await fetchEndpointMockRules(selectedEndpointId);
       setMockRules(response.data);
+      pushSuccess("Mock rules saved", `${endpoint?.name ?? "Endpoint"} mock rules are ready for publish.`);
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : "Failed to save mock rules");
+      const message = getErrorMessage(saveError, "Failed to save mock rules");
+      setError(message);
+      pushError("Mock rule save failed", message);
       throw saveError;
     }
   }
@@ -865,15 +967,21 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     setError(null);
 
     try {
-      await publishEndpointMockRelease(selectedEndpointId);
+      const releaseResponse = await publishEndpointMockRelease(selectedEndpointId);
       const response = await fetchEndpointMockReleases(selectedEndpointId);
       setMockReleases(response.data);
+      pushSuccess(
+        "Mock release published",
+        `Release #${releaseResponse.data.releaseNo} is now available for inspection.`
+      );
     } catch (publishError) {
       if (handleUnauthorized(publishError)) {
         return;
       }
 
-      setError(publishError instanceof Error ? publishError.message : "Failed to publish mock release");
+      const message = getErrorMessage(publishError, "Failed to publish mock release");
+      setError(message);
+      pushError("Mock publish failed", message);
       throw publishError;
     }
   }
@@ -906,7 +1014,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     setError(null);
 
     try {
-      await createVersion(selectedEndpointId, {
+      const createVersionResponse = await createVersion(selectedEndpointId, {
         changeSummary: payload.changeSummary,
         snapshotJson: JSON.stringify(
           {
@@ -921,12 +1029,18 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       });
       const response = await fetchEndpointVersions(selectedEndpointId);
       setVersions(response.data);
+      pushSuccess(
+        "Version snapshot saved",
+        `${createVersionResponse.data.version} was captured from the current draft.`
+      );
     } catch (saveError) {
       if (handleUnauthorized(saveError)) {
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : "Failed to save version snapshot");
+      const message = getErrorMessage(saveError, "Failed to save version snapshot");
+      setError(message);
+      pushError("Version save failed", message);
       throw saveError;
     }
   }
@@ -953,14 +1067,15 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setParameters(parameterResponse.data);
       setResponses(responseResponse.data);
       await reloadTree(selectedEndpointId);
+      pushSuccess("Version restored", `Draft content now matches ${version.version}.`);
     } catch (restoreError) {
       if (handleUnauthorized(restoreError)) {
         return;
       }
 
-      setError(
-        restoreError instanceof Error ? restoreError.message : `Failed to restore version snapshot ${version.version}`
-      );
+      const message = getErrorMessage(restoreError, `Failed to restore version snapshot ${version.version}`);
+      setError(message);
+      pushError("Version restore failed", message);
       throw restoreError;
     }
   }
@@ -1027,15 +1142,21 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     setError(null);
 
     try {
-      await clearDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters, false));
+      const response = await clearDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters, false));
       const historyResponse = await fetchDebugHistory(projectId, buildDebugHistoryFilters(selectedEndpointId, historyFilters));
       setDebugHistory(historyResponse.data);
+      pushSuccess(
+        "Debug history cleared",
+        response.data.deletedCount === 1 ? "1 request record was removed." : `${response.data.deletedCount} request records were removed.`
+      );
     } catch (clearError) {
       if (handleUnauthorized(clearError)) {
         return;
       }
 
-      setError(clearError instanceof Error ? clearError.message : "Failed to clear debug history");
+      const message = getErrorMessage(clearError, "Failed to clear debug history");
+      setError(message);
+      pushError("Debug history clear failed", message);
     }
   }
 
@@ -1064,6 +1185,25 @@ function formatProjectAccess(role: string | null | undefined) {
   }
 }
 
+function formatRoleCode(roleCode: ProjectMemberDetail["roleCode"]) {
+  switch (roleCode) {
+    case "project_admin":
+      return "project admin";
+    case "editor":
+      return "editor";
+    case "tester":
+      return "tester";
+    case "viewer":
+      return "viewer";
+    default:
+      return "member";
+  }
+}
+
+function getErrorMessage(cause: unknown, fallback: string) {
+  return cause instanceof Error ? cause.message : fallback;
+}
+
 function extractQueryString(finalUrl: string) {
   try {
     const url = new URL(finalUrl);
@@ -1076,6 +1216,32 @@ function extractQueryString(finalUrl: string) {
 
 function formatHeaderText(headers: { name: string; value: string }[]) {
   return headers.map((header) => `${header.name}: ${header.value}`.trimEnd()).join("\n");
+}
+
+function findGroupName(modules: ModuleTreeItem[], groupId: number) {
+  for (const module of modules) {
+    for (const group of module.groups) {
+      if (group.id === groupId) {
+        return group.name;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findEndpointName(modules: ModuleTreeItem[], endpointId: number) {
+  for (const module of modules) {
+    for (const group of module.groups) {
+      for (const endpoint of group.endpoints) {
+        if (endpoint.id === endpointId) {
+          return endpoint.name;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 function buildDebugHistoryFilters(
