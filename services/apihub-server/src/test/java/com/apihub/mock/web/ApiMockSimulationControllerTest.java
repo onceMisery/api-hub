@@ -14,9 +14,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -56,11 +58,15 @@ class ApiMockSimulationControllerTest {
                                   "draftRules": [],
                                   "draftResponses": [],
                                   "querySamples": [{"name":"mode","value":"strict"}],
-                                  "headerSamples": []
+                                  "headerSamples": [],
+                                  "bodySample": "{\\\"user\\\":{\\\"id\\\":31}}"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.source").value("rule"))
                 .andExpect(jsonPath("$.data.statusCode").value(401));
+
+        then(projectService).should().simulateMock(eq(31L), argThat(request ->
+                "{\"user\":{\"id\":31}}".equals(request.bodySample())));
     }
 }

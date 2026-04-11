@@ -7,7 +7,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
@@ -34,7 +36,8 @@ public class MockController {
                 request.getMethod(),
                 requestPath,
                 extractQueryParameters(request),
-                extractHeaders(request));
+                extractHeaders(request),
+                extractRequestBody(request));
 
         HttpHeaders headers = new HttpHeaders();
         response.headers().forEach(header -> headers.add(header.name(), header.value()));
@@ -66,5 +69,13 @@ public class MockController {
             headers.put(name, request.getHeader(name));
         }
         return headers;
+    }
+
+    private String extractRequestBody(HttpServletRequest request) {
+        try {
+            return request.getReader().lines().reduce("", (current, line) -> current + line);
+        } catch (IOException exception) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Failed to read mock request body", exception);
+        }
     }
 }

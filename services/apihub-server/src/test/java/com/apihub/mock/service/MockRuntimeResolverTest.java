@@ -1,5 +1,6 @@
 package com.apihub.mock.service;
 
+import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
@@ -39,7 +40,8 @@ class MockRuntimeResolverTest {
                         "u_1001"
                 )),
                 List.of(new MockConditionEntry("mode", "strict")),
-                List.of(new MockConditionEntry("x-scenario", "unauthorized"))
+                List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                ""
         ));
 
         assertThat(result.source()).isEqualTo("rule");
@@ -74,7 +76,8 @@ class MockRuntimeResolverTest {
                         "u_1001"
                 )),
                 List.of(),
-                List.of()
+                List.of(),
+                ""
         ));
 
         assertThat(result.source()).isEqualTo("default-response");
@@ -86,5 +89,31 @@ class MockRuntimeResolverTest {
                 "Rule Unauthorized skipped: missing header x-scenario=unauthorized",
                 "No rule matched; fallback to draft default response"
         );
+    }
+
+    @Test
+    void shouldMatchRuleByBodyJsonPath() {
+        MockSimulationResult result = resolver.resolveDraft(new MockSimulationRequest(
+                List.of(new MockRuleUpsertItem(
+                        "Match request body",
+                        120,
+                        true,
+                        List.of(),
+                        List.of(),
+                        List.of(new MockBodyConditionEntry("$.user.id", "31")),
+                        202,
+                        "application/json",
+                        "{\"matched\":true}"
+                )),
+                List.of(),
+                List.of(),
+                List.of(),
+                "{\"user\":{\"id\":31}}"
+        ));
+
+        assertThat(result.source()).isEqualTo("rule");
+        assertThat(result.matchedRuleName()).isEqualTo("Match request body");
+        assertThat(result.statusCode()).isEqualTo(202);
+        assertThat(result.explanations()).contains("Matched body $.user.id=31");
     }
 }

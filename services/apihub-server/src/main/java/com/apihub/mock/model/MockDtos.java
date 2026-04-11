@@ -67,7 +67,8 @@ public final class MockDtos {
             List<MockRuleUpsertItem> draftRules,
             List<MockSimulationResponseItem> draftResponses,
             List<MockConditionEntry> querySamples,
-            List<MockConditionEntry> headerSamples
+            List<MockConditionEntry> headerSamples,
+            String bodySample
     ) {
     }
 

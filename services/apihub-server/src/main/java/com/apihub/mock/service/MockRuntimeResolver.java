@@ -1,12 +1,15 @@
 package com.apihub.mock.service;
 
+import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,12 +27,13 @@ public class MockRuntimeResolver {
     public MockSimulationResult resolveDraft(MockSimulationRequest request) {
         Map<String, String> querySamples = toMap(request.querySamples(), false);
         Map<String, String> headerSamples = toMap(request.headerSamples(), true);
+        JsonNode bodyNode = readBodyNode(request.bodySample());
 
         for (MockRuleUpsertItem rule : request.draftRules().stream()
                 .filter(MockRuleUpsertItem::enabled)
                 .sorted(Comparator.comparingInt(MockRuleUpsertItem::priority).reversed().thenComparing(MockRuleUpsertItem::ruleName))
                 .toList()) {
-            RuleMatchResult matchResult = tryMatch(rule, querySamples, headerSamples);
+            RuleMatchResult matchResult = tryMatch(rule, querySamples, headerSamples, bodyNode);
             if (matchResult.matched()) {
                 return new MockSimulationResult(
                         "rule",
@@ -43,7 +47,7 @@ public class MockRuntimeResolver {
             }
         }
 
-        List<String> explanations = buildFallbackExplanations(request.draftRules(), querySamples, headerSamples);
+        List<String> explanations = buildFallbackExplanations(request.draftRules(), querySamples, headerSamples, bodyNode);
         ResponseGroup responseGroup = selectResponseGroup(request.draftResponses());
         return new MockSimulationResult(
                 "default-response",
@@ -56,7 +60,10 @@ public class MockRuntimeResolver {
         );
     }
 
-    private RuleMatchResult tryMatch(MockRuleUpsertItem rule, Map<String, String> querySamples, Map<String, String> headerSamples) {
+    private RuleMatchResult tryMatch(MockRuleUpsertItem rule,
+                                     Map<String, String> querySamples,
+                                     Map<String, String> headerSamples,
+                                     JsonNode bodyNode) {
         List<String> explanations = new ArrayList<>();
 
         for (MockConditionEntry condition : safeConditions(rule.queryConditions())) {
@@ -79,6 +86,16 @@ public class MockRuntimeResolver {
             explanations.add("Matched header " + condition.name() + "=" + condition.value());
         }
 
+        for (MockBodyConditionEntry condition : safeBodyConditions(rule.bodyConditions())) {
+            String requestValue = resolveJsonPath(bodyNode, condition.jsonPath());
+            if (!normalizeBodyValue(condition.expectedValue()).equals(requestValue)) {
+                return new RuleMatchResult(false, List.of(
+                        "Rule " + rule.ruleName() + " skipped: missing body " + condition.jsonPath() + "=" + condition.expectedValue()
+                ));
+            }
+            explanations.add("Matched body " + condition.jsonPath() + "=" + condition.expectedValue());
+        }
+
         if (explanations.isEmpty()) {
             explanations.add("Rule " + rule.ruleName() + " matched without extra conditions");
         }
@@ -88,10 +105,11 @@ public class MockRuntimeResolver {
 
     private List<String> buildFallbackExplanations(List<MockRuleUpsertItem> rules,
                                                    Map<String, String> querySamples,
-                                                   Map<String, String> headerSamples) {
+                                                   Map<String, String> headerSamples,
+                                                   JsonNode bodyNode) {
         List<String> explanations = new ArrayList<>();
         for (MockRuleUpsertItem rule : rules) {
-            RuleMatchResult result = tryMatch(rule, querySamples, headerSamples);
+            RuleMatchResult result = tryMatch(rule, querySamples, headerSamples, bodyNode);
             if (!result.matched()) {
                 explanations.addAll(result.explanations());
             }
@@ -179,6 +197,98 @@ public class MockRuntimeResolver {
 
     private List<MockConditionEntry> safeConditions(List<MockConditionEntry> conditions) {
         return conditions == null ? List.of() : conditions;
+    }
+
+    private List<MockBodyConditionEntry> safeBodyConditions(List<MockBodyConditionEntry> conditions) {
+        return conditions == null ? List.of() : conditions;
+    }
+
+    private JsonNode readBodyNode(String bodySample) {
+        if (isBlank(bodySample)) {
+            return MissingNode.getInstance();
+        }
+
+        try {
+            return OBJECT_MAPPER.readTree(bodySample);
+        } catch (JsonProcessingException exception) {
+            return MissingNode.getInstance();
+        }
+    }
+
+    private String resolveJsonPath(JsonNode bodyNode, String jsonPath) {
+        if (bodyNode == null || bodyNode.isMissingNode() || isBlank(jsonPath) || !jsonPath.startsWith("$")) {
+            return null;
+        }
+
+        JsonNode current = bodyNode;
+        int index = 1;
+        while (index < jsonPath.length()) {
+            char token = jsonPath.charAt(index);
+            if (token == '.') {
+                int nextBoundary = findNextBoundary(jsonPath, index + 1);
+                String fieldName = jsonPath.substring(index + 1, nextBoundary);
+                if (fieldName.isBlank() || current == null) {
+                    return null;
+                }
+                current = current.get(fieldName);
+                index = nextBoundary;
+                continue;
+            }
+
+            if (token == '[') {
+                int closingIndex = jsonPath.indexOf(']', index);
+                if (closingIndex == -1 || current == null || !current.isArray()) {
+                    return null;
+                }
+
+                String rawIndex = jsonPath.substring(index + 1, closingIndex).trim();
+                int arrayIndex;
+                try {
+                    arrayIndex = Integer.parseInt(rawIndex);
+                } catch (NumberFormatException exception) {
+                    return null;
+                }
+                current = current.get(arrayIndex);
+                index = closingIndex + 1;
+                continue;
+            }
+
+            return null;
+        }
+
+        return normalizeResolvedBodyValue(current);
+    }
+
+    private int findNextBoundary(String jsonPath, int start) {
+        int index = start;
+        while (index < jsonPath.length()) {
+            char token = jsonPath.charAt(index);
+            if (token == '.' || token == '[') {
+                break;
+            }
+            index++;
+        }
+        return index;
+    }
+
+    private String normalizeResolvedBodyValue(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+
+        if (node.isContainerNode()) {
+            try {
+                return OBJECT_MAPPER.writeValueAsString(node);
+            } catch (JsonProcessingException exception) {
+                return null;
+            }
+        }
+
+        return node.asText();
+    }
+
+    private String normalizeBodyValue(String expectedValue) {
+        return expectedValue == null ? "" : expectedValue.trim();
     }
 
     private String normalizeMediaType(String mediaType) {

@@ -316,7 +316,8 @@ class ProjectServiceTest {
                         "u_1001"
                 )),
                 java.util.List.of(new MockConditionEntry("mode", "strict")),
-                java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized"))
+                java.util.List.of(new MockConditionEntry("x-scenario", "unauthorized")),
+                ""
         ));
 
         assertThat(result.source()).isEqualTo("rule");

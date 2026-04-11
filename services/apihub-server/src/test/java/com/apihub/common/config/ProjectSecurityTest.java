@@ -59,7 +59,7 @@ class ProjectSecurityTest {
 
     @Test
     void shouldAllowPublicMockEndpointWithoutBearerToken() throws Exception {
-        given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of()))
+        given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of(), ""))
                 .willReturn(new com.apihub.mock.service.MockService.MockResponse(
                         200,
                         List.of(new DebugHeader("Content-Type", "application/json")),
