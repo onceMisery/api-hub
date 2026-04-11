@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { EndpointEditor } from "./endpoint-editor";
 
@@ -504,6 +504,7 @@ describe("EndpointEditor", () => {
       matchedRuleName: "Unauthorized",
       matchedRulePriority: 100,
       explanations: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
+      ruleTraces: [],
       statusCode: 401,
       mediaType: "application/json",
       body: "{\"error\":\"token expired\"}"
@@ -615,6 +616,93 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("Matched header x-scenario=unauthorized")).toBeInTheDocument();
     const simulationBody = screen.getByText("Simulation Body").parentElement?.querySelector("pre");
     expect(simulationBody).toHaveTextContent('"error":"token expired"');
+  });
+
+  it("renders a mock matchboard with rule states and trace evidence", async () => {
+    const onSimulateMock = vi.fn().mockResolvedValue({
+      source: "rule",
+      matchedRuleName: "Matched rule",
+      matchedRulePriority: 120,
+      explanations: ["Matched query mode=strict", "Matched body $.user.id=31"],
+      ruleTraces: [
+        {
+          ruleName: "Disabled rule",
+          priority: 300,
+          status: "disabled",
+          checks: [],
+          summary: "Rule is disabled and skipped from draft runtime."
+        },
+        {
+          ruleName: "Skipped rule",
+          priority: 220,
+          status: "skipped",
+          checks: ["Matched query mode=strict"],
+          summary: "Rule skipped: missing header x-scenario=blocked"
+        },
+        {
+          ruleName: "Matched rule",
+          priority: 120,
+          status: "matched",
+          checks: ["Matched query mode=strict", "Matched body $.user.id=31"],
+          summary: "Rule matched and produced the simulated response."
+        },
+        {
+          ruleName: "Not evaluated rule",
+          priority: 80,
+          status: "not_evaluated",
+          checks: [],
+          summary: "Rule not evaluated because a higher-priority rule already matched."
+        }
+      ],
+      statusCode: 202,
+      mediaType: "application/json",
+      body: "{\"matched\":true}"
+    });
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Matched rule",
+            priority: 120,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [],
+            bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
+            statusCode: 202,
+            mediaType: "application/json",
+            body: "{\"matched\":true}"
+          }
+        ]}
+        onSimulateMock={onSimulateMock}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Simulator request body"), { target: { value: "{\"user\":{\"id\":31}}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run mock simulation" }));
+
+    const matchboard = await screen.findByRole("region", { name: "Rule Matchboard" });
+    expect(within(matchboard).getAllByText("Matched").length).toBeGreaterThan(0);
+    expect(within(matchboard).getAllByText("Skipped").length).toBeGreaterThan(0);
+    expect(within(matchboard).getAllByText("Disabled").length).toBeGreaterThan(0);
+    expect(within(matchboard).getAllByText("Not evaluated").length).toBeGreaterThan(0);
+    expect(within(matchboard).getByText("Matched rule")).toBeInTheDocument();
+    expect(within(matchboard).getByText("Rule skipped: missing header x-scenario=blocked")).toBeInTheDocument();
+    expect(within(matchboard).getByText("Rule not evaluated because a higher-priority rule already matched.")).toBeInTheDocument();
   });
 
   it("shows published runtime status and triggers mock publish", async () => {

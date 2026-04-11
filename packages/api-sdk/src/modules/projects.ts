@@ -298,9 +298,18 @@ export type MockSimulationResult = {
   matchedRuleName: string | null;
   matchedRulePriority: number | null;
   explanations: string[];
+  ruleTraces: MockRuleTrace[];
   statusCode: number;
   mediaType: string;
   body: string;
+};
+
+export type MockRuleTrace = {
+  ruleName: string;
+  priority: number;
+  status: "matched" | "skipped" | "not_evaluated" | "disabled";
+  checks: string[];
+  summary: string;
 };
 
 export type CreateVersionPayload = {

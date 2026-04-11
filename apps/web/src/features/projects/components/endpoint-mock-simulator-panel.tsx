@@ -1,6 +1,7 @@
 import type { MockSimulationResult } from "@api-hub/api-sdk";
 
 import { EditorPanel, Field, PreviewMetric } from "./endpoint-editor-shared";
+import { MockRuleMatchboard } from "./mock-rule-matchboard";
 
 type EndpointMockSimulatorPanelProps = {
   simulationQueryText: string;
@@ -107,6 +108,8 @@ export function EndpointMockSimulatorPanel({
                 ))}
               </div>
             </div>
+
+            <MockRuleMatchboard ruleTraces={simulationResult.ruleTraces} />
 
             <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation Body</p>

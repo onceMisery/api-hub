@@ -315,6 +315,7 @@ describe("ProjectShell", () => {
         matchedRuleName: null,
         matchedRulePriority: null,
         explanations: ["No rule matched; fallback to draft default response"],
+        ruleTraces: [],
         statusCode: 200,
         mediaType: "application/json",
         body: "{\"ok\":true}"
@@ -1129,17 +1130,26 @@ describe("ProjectShell", () => {
           }
         ]
       });
-    simulateEndpointMock.mockResolvedValueOnce({
-      data: {
-        source: "rule",
-        matchedRuleName: "Unauthorized",
-        matchedRulePriority: 100,
-        explanations: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
-        statusCode: 401,
-        mediaType: "application/json",
-        body: "{\"error\":\"token expired\"}"
-      }
-    });
+      simulateEndpointMock.mockResolvedValueOnce({
+        data: {
+          source: "rule",
+          matchedRuleName: "Unauthorized",
+          matchedRulePriority: 100,
+          explanations: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
+          ruleTraces: [
+            {
+              ruleName: "Unauthorized",
+              priority: 100,
+              status: "matched",
+              checks: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
+              summary: "Rule matched and produced the simulated response."
+            }
+          ],
+          statusCode: 401,
+          mediaType: "application/json",
+          body: "{\"error\":\"token expired\"}"
+        }
+      });
 
     render(<ProjectShell projectId={1} />);
 
@@ -1188,6 +1198,8 @@ describe("ProjectShell", () => {
       })
     );
 
-    expect(await screen.findByText("Matched header x-scenario=unauthorized")).toBeInTheDocument();
+    const matchboard = await screen.findByRole("region", { name: "Rule Matchboard" });
+    expect(within(matchboard).getByText("Unauthorized")).toBeInTheDocument();
+    expect(within(matchboard).getAllByText("Matched header x-scenario=unauthorized").length).toBeGreaterThan(0);
   });
 });

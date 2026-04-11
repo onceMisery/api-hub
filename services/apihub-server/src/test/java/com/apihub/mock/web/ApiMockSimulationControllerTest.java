@@ -50,6 +50,7 @@ class ApiMockSimulationControllerTest {
                         "Unauthorized",
                         100,
                         List.of("Matched query mode=strict"),
+                        List.of(),
                         401,
                         "application/json",
                         "{\"error\":\"token expired\"}"

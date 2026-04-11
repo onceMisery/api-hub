@@ -72,11 +72,21 @@ public final class MockDtos {
     ) {
     }
 
+    public record MockRuleTraceItem(
+            String ruleName,
+            int priority,
+            String status,
+            List<String> checks,
+            String summary
+    ) {
+    }
+
     public record MockSimulationResult(
             String source,
             String matchedRuleName,
             Integer matchedRulePriority,
             List<String> explanations,
+            List<MockRuleTraceItem> ruleTraces,
             int statusCode,
             String mediaType,
             String body

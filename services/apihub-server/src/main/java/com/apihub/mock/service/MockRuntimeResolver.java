@@ -2,6 +2,7 @@ package com.apihub.mock.service;
 
 import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
+import com.apihub.mock.model.MockDtos.MockRuleTraceItem;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
@@ -28,94 +29,155 @@ public class MockRuntimeResolver {
         Map<String, String> querySamples = toMap(request.querySamples(), false);
         Map<String, String> headerSamples = toMap(request.headerSamples(), true);
         JsonNode bodyNode = readBodyNode(request.bodySample());
+        List<MockRuleUpsertItem> sortedRules = sortRules(request.draftRules());
+        List<MockRuleTraceItem> ruleTraces = new ArrayList<>();
+        MatchOutcome winner = null;
 
-        for (MockRuleUpsertItem rule : request.draftRules().stream()
-                .filter(MockRuleUpsertItem::enabled)
-                .sorted(Comparator.comparingInt(MockRuleUpsertItem::priority).reversed().thenComparing(MockRuleUpsertItem::ruleName))
-                .toList()) {
-            RuleMatchResult matchResult = tryMatch(rule, querySamples, headerSamples, bodyNode);
-            if (matchResult.matched()) {
-                return new MockSimulationResult(
-                        "rule",
-                        rule.ruleName(),
+        for (MockRuleUpsertItem rule : sortedRules) {
+            if (!rule.enabled()) {
+                ruleTraces.add(new MockRuleTraceItem(
+                        normalizeRuleName(rule.ruleName()),
                         rule.priority(),
-                        matchResult.explanations(),
-                        rule.statusCode(),
-                        normalizeMediaType(rule.mediaType()),
-                        normalizeRuleBody(rule.body())
-                );
+                        "disabled",
+                        List.of(),
+                        "Rule is disabled and skipped from draft runtime."
+                ));
+                continue;
             }
+
+            if (winner != null) {
+                ruleTraces.add(new MockRuleTraceItem(
+                        normalizeRuleName(rule.ruleName()),
+                        rule.priority(),
+                        "not_evaluated",
+                        List.of(),
+                        "Rule not evaluated because a higher-priority rule already matched."
+                ));
+                continue;
+            }
+
+            RuleEvaluationResult evaluationResult = evaluateRule(rule, querySamples, headerSamples, bodyNode);
+            if (evaluationResult.matched()) {
+                winner = new MatchOutcome(rule, evaluationResult.matchedChecks());
+                ruleTraces.add(new MockRuleTraceItem(
+                        normalizeRuleName(rule.ruleName()),
+                        rule.priority(),
+                        "matched",
+                        evaluationResult.matchedChecks(),
+                        "Rule matched and produced the simulated response."
+                ));
+                continue;
+            }
+
+            ruleTraces.add(new MockRuleTraceItem(
+                    normalizeRuleName(rule.ruleName()),
+                    rule.priority(),
+                    "skipped",
+                    evaluationResult.matchedChecks(),
+                    evaluationResult.summary()
+            ));
         }
 
-        List<String> explanations = buildFallbackExplanations(request.draftRules(), querySamples, headerSamples, bodyNode);
+        if (winner != null) {
+            return new MockSimulationResult(
+                    "rule",
+                    winner.rule().ruleName(),
+                    winner.rule().priority(),
+                    winner.explanations().isEmpty()
+                            ? List.of("Rule " + normalizeRuleName(winner.rule().ruleName()) + " matched without extra conditions")
+                            : winner.explanations(),
+                    List.copyOf(ruleTraces),
+                    winner.rule().statusCode(),
+                    normalizeMediaType(winner.rule().mediaType()),
+                    normalizeRuleBody(winner.rule().body())
+            );
+        }
+
+        List<String> explanations = buildFallbackExplanations(ruleTraces);
         ResponseGroup responseGroup = selectResponseGroup(request.draftResponses());
         return new MockSimulationResult(
                 "default-response",
                 null,
                 null,
                 explanations,
+                List.copyOf(ruleTraces),
                 responseGroup.statusCode(),
                 responseGroup.mediaType(),
                 buildJsonBody(responseGroup.responses())
         );
     }
 
-    private RuleMatchResult tryMatch(MockRuleUpsertItem rule,
-                                     Map<String, String> querySamples,
-                                     Map<String, String> headerSamples,
-                                     JsonNode bodyNode) {
-        List<String> explanations = new ArrayList<>();
+    private RuleEvaluationResult evaluateRule(MockRuleUpsertItem rule,
+                                              Map<String, String> querySamples,
+                                              Map<String, String> headerSamples,
+                                              JsonNode bodyNode) {
+        List<String> matchedChecks = new ArrayList<>();
 
         for (MockConditionEntry condition : safeConditions(rule.queryConditions())) {
             String requestValue = querySamples.get(condition.name());
             if (!condition.value().equals(requestValue)) {
-                return new RuleMatchResult(false, List.of(
-                        "Rule " + rule.ruleName() + " skipped: missing query " + condition.name() + "=" + condition.value()
-                ));
+                return new RuleEvaluationResult(
+                        false,
+                        List.copyOf(matchedChecks),
+                        "Rule skipped: missing query " + condition.name() + "=" + condition.value()
+                );
             }
-            explanations.add("Matched query " + condition.name() + "=" + condition.value());
+            matchedChecks.add("Matched query " + condition.name() + "=" + condition.value());
         }
 
         for (MockConditionEntry condition : safeConditions(rule.headerConditions())) {
             String requestValue = headerSamples.get(condition.name().toLowerCase(Locale.ROOT));
             if (!condition.value().equals(requestValue)) {
-                return new RuleMatchResult(false, List.of(
-                        "Rule " + rule.ruleName() + " skipped: missing header " + condition.name() + "=" + condition.value()
-                ));
+                return new RuleEvaluationResult(
+                        false,
+                        List.copyOf(matchedChecks),
+                        "Rule skipped: missing header " + condition.name() + "=" + condition.value()
+                );
             }
-            explanations.add("Matched header " + condition.name() + "=" + condition.value());
+            matchedChecks.add("Matched header " + condition.name() + "=" + condition.value());
         }
 
         for (MockBodyConditionEntry condition : safeBodyConditions(rule.bodyConditions())) {
             String requestValue = resolveJsonPath(bodyNode, condition.jsonPath());
             if (!normalizeBodyValue(condition.expectedValue()).equals(requestValue)) {
-                return new RuleMatchResult(false, List.of(
-                        "Rule " + rule.ruleName() + " skipped: missing body " + condition.jsonPath() + "=" + condition.expectedValue()
-                ));
+                return new RuleEvaluationResult(
+                        false,
+                        List.copyOf(matchedChecks),
+                        "Rule skipped: missing body " + condition.jsonPath() + "=" + condition.expectedValue()
+                );
             }
-            explanations.add("Matched body " + condition.jsonPath() + "=" + condition.expectedValue());
+            matchedChecks.add("Matched body " + condition.jsonPath() + "=" + condition.expectedValue());
         }
 
-        if (explanations.isEmpty()) {
-            explanations.add("Rule " + rule.ruleName() + " matched without extra conditions");
+        if (matchedChecks.isEmpty()) {
+            matchedChecks.add("Rule " + normalizeRuleName(rule.ruleName()) + " matched without extra conditions");
         }
 
-        return new RuleMatchResult(true, explanations);
+        return new RuleEvaluationResult(true, List.copyOf(matchedChecks), "Rule matched and produced the simulated response.");
     }
 
-    private List<String> buildFallbackExplanations(List<MockRuleUpsertItem> rules,
-                                                   Map<String, String> querySamples,
-                                                   Map<String, String> headerSamples,
-                                                   JsonNode bodyNode) {
+    private List<String> buildFallbackExplanations(List<MockRuleTraceItem> ruleTraces) {
         List<String> explanations = new ArrayList<>();
-        for (MockRuleUpsertItem rule : rules) {
-            RuleMatchResult result = tryMatch(rule, querySamples, headerSamples, bodyNode);
-            if (!result.matched()) {
-                explanations.addAll(result.explanations());
-            }
-        }
+        ruleTraces.stream()
+                .filter(trace -> "skipped".equals(trace.status()))
+                .map(MockRuleTraceItem::summary)
+                .forEach(explanations::add);
         explanations.add("No rule matched; fallback to draft default response");
         return explanations;
+    }
+
+    private List<MockRuleUpsertItem> sortRules(List<MockRuleUpsertItem> draftRules) {
+        return (draftRules == null ? List.<MockRuleUpsertItem>of() : draftRules).stream()
+                .sorted(
+                        Comparator.comparingInt(MockRuleUpsertItem::priority)
+                                .reversed()
+                                .thenComparing(rule -> normalizeRuleName(rule.ruleName()))
+                )
+                .toList();
+    }
+
+    private String normalizeRuleName(String ruleName) {
+        return isBlank(ruleName) ? "Untitled rule" : ruleName;
     }
 
     private ResponseGroup selectResponseGroup(List<MockSimulationResponseItem> draftResponses) {
@@ -307,7 +369,10 @@ public class MockRuntimeResolver {
         return value == null || value.isBlank();
     }
 
-    private record RuleMatchResult(boolean matched, List<String> explanations) {
+    private record RuleEvaluationResult(boolean matched, List<String> matchedChecks, String summary) {
+    }
+
+    private record MatchOutcome(MockRuleUpsertItem rule, List<String> explanations) {
     }
 
     private record ResponseGroup(int statusCode, String mediaType, List<MockSimulationResponseItem> responses) {
