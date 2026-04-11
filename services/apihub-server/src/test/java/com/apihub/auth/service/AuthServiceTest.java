@@ -32,7 +32,7 @@ class AuthServiceTest {
         AuthService authService = new AuthService(authUserRepository, jwtTokenService);
 
         given(authUserRepository.findActiveByUsername("admin"))
-                .willReturn(Optional.of(new UserCredential(1L, "admin", PASSWORD_HASH, "active", 0)));
+                .willReturn(Optional.of(new UserCredential(1L, "admin", "Administrator", PASSWORD_HASH, "active", 0)));
 
         LoginResponse response = authService.login(new LoginRequest("admin", "123456"));
 

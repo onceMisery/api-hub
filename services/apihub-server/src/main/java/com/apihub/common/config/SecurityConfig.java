@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint((request, response, authException) ->
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/**", "/api/health", "/mock/**").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/health", "/mock/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(bearerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

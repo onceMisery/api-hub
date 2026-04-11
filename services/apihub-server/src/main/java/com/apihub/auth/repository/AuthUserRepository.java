@@ -17,7 +17,7 @@ public class AuthUserRepository {
     public Optional<UserCredential> findActiveByUsername(String username) {
         return jdbcTemplate.query(
                 """
-                select id, username, password_hash, status, token_version
+                select id, username, display_name, password_hash, status, token_version
                 from sys_user
                 where username = ? and status = 'active'
                 """,
@@ -25,6 +25,7 @@ public class AuthUserRepository {
                         ? Optional.of(new UserCredential(
                         rs.getLong("id"),
                         rs.getString("username"),
+                        rs.getString("display_name"),
                         rs.getString("password_hash"),
                         rs.getString("status"),
                         rs.getInt("token_version")))
@@ -36,7 +37,7 @@ public class AuthUserRepository {
     public Optional<UserCredential> findActiveById(Long userId) {
         return jdbcTemplate.query(
                 """
-                select id, username, password_hash, status, token_version
+                select id, username, display_name, password_hash, status, token_version
                 from sys_user
                 where id = ? and status = 'active'
                 """,
@@ -44,6 +45,7 @@ public class AuthUserRepository {
                         ? Optional.of(new UserCredential(
                         rs.getLong("id"),
                         rs.getString("username"),
+                        rs.getString("display_name"),
                         rs.getString("password_hash"),
                         rs.getString("status"),
                         rs.getInt("token_version")))
@@ -70,6 +72,6 @@ public class AuthUserRepository {
         return tokenVersion == null ? 0 : tokenVersion;
     }
 
-    public record UserCredential(Long id, String username, String passwordHash, String status, int tokenVersion) {
+    public record UserCredential(Long id, String username, String displayName, String passwordHash, String status, int tokenVersion) {
     }
 }
