@@ -16,6 +16,8 @@ import type {
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { EditorPanel, Field, PreviewMetric } from "./endpoint-editor-shared";
+import { EndpointMockRulesPanel } from "./endpoint-mock-rules-panel";
+import { EndpointMockSimulatorPanel } from "./endpoint-mock-simulator-panel";
 import { EndpointVersionPanel } from "./endpoint-version-panel";
 import { PublishedRuntimePanel } from "./published-runtime-panel";
 
@@ -584,220 +586,29 @@ export function EndpointEditor(props: EndpointEditorProps) {
         </div>
       </EditorPanel>
 
-      <EditorPanel title="Mock Rules">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Match exact query or header values before falling back to the default mock preview.</p>
-            <button
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              onClick={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
-              type="button"
-            >
-              Add mock rule
-            </button>
-          </div>
+      <EndpointMockRulesPanel
+        buildRuleSummary={buildRuleSummary}
+        canSave={Boolean(onSaveMockRules)}
+        formatRulePreviewBody={formatRulePreviewBody}
+        mockRuleMessage={mockRuleMessage}
+        mockRuleRows={mockRuleRows}
+        onAddRule={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
+        onRemoveRule={(index) => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+        onSaveRules={() => void handleSaveMockRules()}
+        onUpdateRule={updateMockRuleRow}
+      />
 
-          <div className="space-y-3">
-            {mockRuleRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
-                No conditional mock rules yet.
-              </p>
-            ) : (
-              mockRuleRows.map((rule, index) => (
-                <div key={`mock-rule-${index}`} className="space-y-3 rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <Field label={`Mock rule ${index + 1} name`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "ruleName", event.target.value)}
-                        value={rule.ruleName}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} priority`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "priority", Number(event.target.value) || 0)}
-                        value={rule.priority}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} response status`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "statusCode", Number(event.target.value) || 200)}
-                        value={rule.statusCode}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} media type`}>
-                      <input
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "mediaType", event.target.value)}
-                        value={rule.mediaType}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <Field label={`Mock rule ${index + 1} query conditions`}>
-                      <textarea
-                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "queryConditionsText", event.target.value)}
-                        placeholder="mode=strict"
-                        value={rule.queryConditionsText}
-                      />
-                    </Field>
-                    <Field label={`Mock rule ${index + 1} header conditions`}>
-                      <textarea
-                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "headerConditionsText", event.target.value)}
-                        placeholder="x-scenario=unauthorized"
-                        value={rule.headerConditionsText}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-                    <Field label={`Mock rule ${index + 1} body`}>
-                      <textarea
-                        className="min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                        onChange={(event) => updateMockRuleRow(index, "body", event.target.value)}
-                        value={rule.body}
-                      />
-                    </Field>
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                        <input
-                          checked={rule.enabled}
-                          onChange={(event) => updateMockRuleRow(index, "enabled", event.target.checked)}
-                          type="checkbox"
-                        />
-                        Enabled
-                      </label>
-                      <button
-                        className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                        onClick={() => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-                        type="button"
-                      >
-                        Remove mock rule {index + 1}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Match summary</p>
-                      <div className="mt-3 space-y-2 text-sm text-slate-600">
-                        {buildRuleSummary(rule).map((item, itemIndex) => (
-                          <p key={`${item}-${itemIndex}`}>{item}</p>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Rule response preview</p>
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                        <span className="rounded-full border border-slate-200 px-3 py-1">{rule.statusCode}</span>
-                        <span className="rounded-full border border-slate-200 px-3 py-1">{rule.mediaType}</span>
-                      </div>
-                      <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
-                        {formatRulePreviewBody(rule.body)}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveMockRules}
-              onClick={() => void handleSaveMockRules()}
-              type="button"
-            >
-              Save mock rules
-            </button>
-            {mockRuleMessage ? <p className="text-sm text-emerald-600">{mockRuleMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Mock Simulator">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">
-            Send query and header samples to the backend resolver. This only simulates exact `query/header` matches against the current draft.
-          </p>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Simulator query samples">
-              <textarea
-                aria-label="Simulator query samples"
-                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setSimulationQueryText(event.target.value)}
-                placeholder="mode=strict"
-                value={simulationQueryText}
-              />
-            </Field>
-            <Field label="Simulator header samples">
-              <textarea
-                aria-label="Simulator header samples"
-                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setSimulationHeaderText(event.target.value)}
-                placeholder="x-scenario=unauthorized"
-                value={simulationHeaderText}
-              />
-            </Field>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSimulateMock || isSimulating}
-              onClick={() => void handleRunSimulation()}
-              type="button"
-            >
-              {isSimulating ? "Running..." : "Run mock simulation"}
-            </button>
-            {simulationMessage ? <p className="text-sm text-emerald-600">{simulationMessage}</p> : null}
-          </div>
-
-          {simulationResult ? (
-            <>
-              <div className="grid gap-4 md:grid-cols-3">
-                <PreviewMetric label="Source" value={simulationResult.source} />
-                <PreviewMetric label="Status" value={String(simulationResult.statusCode)} />
-                <PreviewMetric label="Content-Type" value={simulationResult.mediaType} />
-              </div>
-
-              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation details</p>
-                  {simulationResult.matchedRuleName ? (
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
-                      {simulationResult.matchedRuleName}
-                    </span>
-                  ) : null}
-                  {simulationResult.matchedRulePriority !== null ? (
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
-                      Priority {simulationResult.matchedRulePriority}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
-                  {simulationResult.explanations.map((line, index) => (
-                    <p key={`${line}-${index}`}>{line}</p>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Simulation Body</p>
-                <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{simulationResult.body}</pre>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </EditorPanel>
+      <EndpointMockSimulatorPanel
+        canRun={Boolean(onSimulateMock)}
+        isSimulating={isSimulating}
+        onHeaderTextChange={setSimulationHeaderText}
+        onQueryTextChange={setSimulationQueryText}
+        onRun={() => void handleRunSimulation()}
+        simulationHeaderText={simulationHeaderText}
+        simulationMessage={simulationMessage}
+        simulationQueryText={simulationQueryText}
+        simulationResult={simulationResult}
+      />
 
       <PublishedRuntimePanel
         draftRuntimeSummary={draftRuntimeSummary}
