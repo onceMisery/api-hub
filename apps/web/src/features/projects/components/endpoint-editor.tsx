@@ -13,7 +13,11 @@ import type {
   UpdateEndpointPayload,
   VersionDetail
 } from "@api-hub/api-sdk";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+
+import { EditorPanel, Field, PreviewMetric } from "./endpoint-editor-shared";
+import { EndpointVersionPanel } from "./endpoint-version-panel";
+import { PublishedRuntimePanel } from "./published-runtime-panel";
 
 type EndpointEditorProps = {
   endpoint: EndpointDetail | null;
@@ -795,210 +799,31 @@ export function EndpointEditor(props: EndpointEditorProps) {
         </div>
       </EditorPanel>
 
-      <EditorPanel title="Published Runtime">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">
-            Runtime requests to `{buildMockUrl(projectId, formState.path)}` only read the latest published mock release.
-          </p>
+      <PublishedRuntimePanel
+        draftRuntimeSummary={draftRuntimeSummary}
+        isPublishing={isPublishing}
+        latestRelease={latestRelease}
+        mockUrl={buildMockUrl(projectId, formState.path)}
+        onPublish={onPublishMockRelease ? () => void handlePublishMock() : undefined}
+        publishMessage={publishMessage}
+        publishedResponseGroups={publishedResponseGroups}
+        publishedRuleItems={publishedRuleItems}
+        publishedRuntimeSummary={publishedRuntimeSummary}
+        runtimeDiffItems={runtimeDiffItems}
+      />
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <PreviewMetric label="Mock URL" value={buildMockUrl(projectId, formState.path)} mono />
-            <PreviewMetric label="Latest Release" value={latestRelease ? `Release #${latestRelease.releaseNo}` : "Not published"} />
-            <PreviewMetric label="Created At" value={latestRelease?.createdAt ?? "N/A"} mono />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <PreviewMetric label="Published response fields" value={formatMockResponseSummary(publishedRuntimeSummary)} />
-            <PreviewMetric label="Published rules" value={formatMockRuleSummary(publishedRuntimeSummary)} />
-            <PreviewMetric label="Draft response fields" value={formatMockResponseSummary(draftRuntimeSummary)} />
-            <PreviewMetric label="Draft rules" value={formatMockRuleSummary(draftRuntimeSummary)} />
-          </div>
-
-          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-            {latestRelease ? (
-              <div className="space-y-3">
-                <p>Release #{latestRelease.releaseNo} is the only snapshot served by runtime.</p>
-                {runtimeDiffItems.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="font-medium text-slate-900">Draft has unpublished mock changes.</p>
-                    {runtimeDiffItems.map((item) => (
-                      <p key={item}>{item}</p>
-                    ))}
-                  </div>
-                ) : (
-                  <p>Draft mock rules and responses currently match the published runtime snapshot.</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p>No published release yet.</p>
-                <p>Draft simulation can preview changes here, but runtime will not serve them until you publish.</p>
-              </div>
-            )}
-          </div>
-
-          {latestRelease ? (
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Published response groups</p>
-                {publishedResponseGroups.length > 0 ? (
-                  <div className="mt-4 space-y-3">
-                    {publishedResponseGroups.map((group) => (
-                      <div key={group.key} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                        <p className="text-sm font-semibold text-slate-900">{group.label}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {group.fieldCount} {pluralize(group.fieldCount, "field")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-slate-500">No published response groups in this release.</p>
-                )}
-              </div>
-
-              <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Published rules</p>
-                {publishedRuleItems.length > 0 ? (
-                  <div className="mt-4 space-y-3">
-                    {publishedRuleItems.map((rule) => (
-                      <div key={rule.key} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-slate-900">{rule.ruleName}</p>
-                          <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
-                            {rule.priorityLabel}
-                          </span>
-                        </div>
-                        <div className="mt-3 space-y-2 text-sm text-slate-500">
-                          {rule.conditions.map((condition) => (
-                            <p key={`${rule.key}-${condition}`}>{condition}</p>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-slate-500">No published rules in this release.</p>
-                )}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onPublishMockRelease || isPublishing}
-              onClick={() => void handlePublishMock()}
-              type="button"
-            >
-              {isPublishing ? "Publishing..." : "Publish mock"}
-            </button>
-            {publishMessage ? <p className="text-sm text-emerald-600">{publishMessage}</p> : null}
-          </div>
-        </div>
-      </EditorPanel>
-
-      <EditorPanel title="Versions">
-        <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-            <Field label="Compare against version">
-              <select
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setCompareVersionId(event.target.value)}
-                value={compareVersionId}
-              >
-                <option value="">Current draft only</option>
-                {versions.map((version) => (
-                  <option key={version.id} value={String(version.id)}>
-                    {version.version}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Version Diff</p>
-                {compareVersion ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{compareVersion.version}</span>
-                ) : null}
-              </div>
-
-              {compareVersion ? (
-                diffItems.length > 0 ? (
-                  <div className="mt-4 space-y-3">
-                    {diffItems.map((item, index) => (
-                      <div key={`${item.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                        <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                        <p className="mt-1 text-sm text-slate-500">{item.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-slate-500">No visible changes between the selected version and the current draft.</p>
-                )
-              ) : (
-                <p className="mt-4 text-sm text-slate-500">Choose a historical snapshot to compare against the current draft.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Version label">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setVersionForm((current) => ({ ...current, version: event.target.value }))}
-                value={versionForm.version}
-              />
-            </Field>
-            <Field label="Version summary">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setVersionForm((current) => ({ ...current, changeSummary: event.target.value }))}
-                value={versionForm.changeSummary}
-              />
-            </Field>
-          </div>
-
-          <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Generated Snapshot</p>
-            <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">{latestSnapshot}</pre>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={!onSaveVersion}
-              onClick={() => void handleSaveVersion()}
-              type="button"
-            >
-              Save version snapshot
-            </button>
-            {versionMessage ? <p className="text-sm text-emerald-600">{versionMessage}</p> : null}
-          </div>
-
-          {versions.length === 0 ? (
-            <p className="text-sm text-slate-500">No version snapshots yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {versions.map((version) => (
-                <div key={version.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{version.version}</p>
-                      <p className="mt-1 text-sm text-slate-500">{version.changeSummary || "No change summary."}</p>
-                    </div>
-                    <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">v#{version.id}</span>
-                  </div>
-                  <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
-                    {version.snapshotJson || "{}"}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </EditorPanel>
+      <EndpointVersionPanel
+        compareVersion={compareVersion}
+        compareVersionId={compareVersionId}
+        diffItems={diffItems}
+        latestSnapshot={latestSnapshot}
+        onCompareVersionChange={setCompareVersionId}
+        onSaveVersion={onSaveVersion ? () => void handleSaveVersion() : undefined}
+        onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
+        versionForm={versionForm}
+        versionMessage={versionMessage}
+        versions={versions}
+      />
     </section>
   );
 
@@ -1692,18 +1517,6 @@ function buildRuntimeDiffItems(
   return items;
 }
 
-function formatMockResponseSummary(summary: MockRuntimeSummary) {
-  return `${summary.responseFieldCount} ${pluralize(summary.responseFieldCount, "field")} across ${summary.responseGroupCount} status ${pluralize(summary.responseGroupCount, "group")}`;
-}
-
-function formatMockRuleSummary(summary: MockRuntimeSummary) {
-  return `${summary.enabledRuleCount} enabled of ${summary.totalRuleCount} total`;
-}
-
-function pluralize(value: number, noun: string) {
-  return value === 1 ? noun : `${noun}s`;
-}
-
 function emptyMockRuntimeSummary(): MockRuntimeSummary {
   return {
     enabledRuleCount: 0,
@@ -1762,33 +1575,4 @@ function buildPublishedRuleConditions(rule: MockReleaseRuleSnapshot) {
   }
 
   return [`Returns ${rule.statusCode} ${rule.mediaType}`];
-}
-
-function EditorPanel({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <div className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{title}</p>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Field({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function PreviewMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className={`mt-3 text-sm text-slate-700 ${mono ? "break-all font-mono" : ""}`}>{value}</p>
-    </div>
-  );
 }
