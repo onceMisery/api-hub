@@ -21,6 +21,10 @@ const environment = {
 } as const;
 
 describe("DebugConsole", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("shows the selected environment policy summary", () => {
     render(
       <DebugConsole
@@ -222,5 +226,105 @@ describe("DebugConsole", () => {
       createdTo: ""
     });
     await waitFor(() => expect(onClearHistory).toHaveBeenCalled());
+  });
+
+  it("saves a named preset locally and re-applies it to the draft", async () => {
+    render(
+      <DebugConsole
+        endpoint={endpoint}
+        environment={environment}
+        environmentOptions={[environment]}
+        history={[]}
+        historyFilters={{
+          environmentId: null,
+          statusCode: null,
+          createdFrom: "",
+          createdTo: ""
+        }}
+        isLoadingHistory={false}
+        onChangeHistoryFilters={vi.fn()}
+        onClearHistory={vi.fn().mockResolvedValue(undefined)}
+        onExecute={vi.fn().mockResolvedValue({
+          method: "GET",
+          finalUrl: "https://local.dev/users/31",
+          statusCode: 200,
+          responseHeaders: [],
+          responseBody: "{\"ok\":true}",
+          durationMs: 20
+        })}
+        onReplayHistory={vi.fn()}
+        onRunHistory={vi.fn()}
+        projectDebugAllowedHosts={[]}
+        replayDraft={null}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Query string"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Headers"), { target: { value: "X-Trace: abc" } });
+    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "{\"user\":31}" } });
+    fireEvent.change(screen.getByLabelText("Preset name"), { target: { value: "Strict user trace" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save preset" }));
+
+    expect(await screen.findByText("Strict user trace")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Query string"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Headers"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply preset Strict user trace" }));
+
+    expect(screen.getByLabelText("Query string")).toHaveValue("mode=strict");
+    expect(screen.getByLabelText("Headers")).toHaveValue("X-Trace: abc");
+    expect(screen.getByLabelText("Body")).toHaveValue("{\"user\":31}");
+  });
+
+  it("exports the current request as cURL and imports a pasted cURL command", () => {
+    render(
+      <DebugConsole
+        endpoint={endpoint}
+        environment={environment}
+        environmentOptions={[environment]}
+        history={[]}
+        historyFilters={{
+          environmentId: null,
+          statusCode: null,
+          createdFrom: "",
+          createdTo: ""
+        }}
+        isLoadingHistory={false}
+        onChangeHistoryFilters={vi.fn()}
+        onClearHistory={vi.fn().mockResolvedValue(undefined)}
+        onExecute={vi.fn().mockResolvedValue({
+          method: "GET",
+          finalUrl: "https://local.dev/users/31",
+          statusCode: 200,
+          responseHeaders: [],
+          responseBody: "{\"ok\":true}",
+          durationMs: 20
+        })}
+        onReplayHistory={vi.fn()}
+        onRunHistory={vi.fn()}
+        projectDebugAllowedHosts={[]}
+        replayDraft={null}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Query string"), { target: { value: "verbose=true" } });
+    fireEvent.change(screen.getByLabelText("Headers"), { target: { value: "Authorization: Bearer token" } });
+    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "{\"name\":\"Alice\"}" } });
+
+    const generatedCurl = screen.getByLabelText("Generated cURL") as HTMLTextAreaElement;
+    expect(generatedCurl.value).toContain("curl");
+    expect(generatedCurl.value).toContain("verbose=true");
+
+    fireEvent.change(screen.getByLabelText("Import cURL"), {
+      target: {
+        value: "curl 'https://local.dev/users/{id}?mode=compact' -X GET -H 'X-Trace: imported' --data-raw '{\"from\":\"curl\"}'"
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import cURL" }));
+
+    expect(screen.getByLabelText("Query string")).toHaveValue("mode=compact");
+    expect(screen.getByLabelText("Headers")).toHaveValue("X-Trace: imported");
+    expect(screen.getByLabelText("Body")).toHaveValue("{\"from\":\"curl\"}");
   });
 });

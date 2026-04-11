@@ -10,6 +10,16 @@ import type {
 } from "@api-hub/api-sdk";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  deleteDebugPreset,
+  describeDebugPreset,
+  generateDebugCurlCommand,
+  parseDebugCurlCommand,
+  readDebugPresets,
+  saveDebugPreset,
+  type DebugRequestPreset
+} from "./debug-console-utils";
+
 type DebugHistoryFiltersState = {
   environmentId: number | null;
   statusCode: number | null;
@@ -67,6 +77,14 @@ export function DebugConsole({
     matchedPatterns: string[];
   } | null>(null);
   const [result, setResult] = useState<DebugExecutionResult | null>(null);
+  const [presetName, setPresetName] = useState("");
+  const [presets, setPresets] = useState<DebugRequestPreset[]>([]);
+  const [presetMessage, setPresetMessage] = useState<string | null>(null);
+  const [presetError, setPresetError] = useState<string | null>(null);
+  const [curlImportText, setCurlImportText] = useState("");
+  const [curlMessage, setCurlMessage] = useState<string | null>(null);
+  const [curlError, setCurlError] = useState<string | null>(null);
+  const [curlWarning, setCurlWarning] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
@@ -76,6 +94,23 @@ export function DebugConsole({
     setQueryString("");
     setBody("");
   }, [endpoint?.id, environment?.id]);
+
+  useEffect(() => {
+    setPresetName("");
+    setPresetMessage(null);
+    setPresetError(null);
+    setCurlImportText("");
+    setCurlMessage(null);
+    setCurlError(null);
+    setCurlWarning(null);
+
+    if (!environment?.projectId || !endpoint?.id) {
+      setPresets([]);
+      return;
+    }
+
+    setPresets(readDebugPresets(environment.projectId, endpoint.id));
+  }, [endpoint?.id, environment?.projectId]);
 
   useEffect(() => {
     if (!replayDraft) {
@@ -106,7 +141,104 @@ export function DebugConsole({
       effectiveSummary: describeDebugPolicyMode(environment.debugHostMode)
     };
   }, [environment, projectDebugAllowedHosts]);
+  const generatedCurl = useMemo(
+    () =>
+      generateDebugCurlCommand({
+        method: endpoint?.method ?? "GET",
+        url: previewUrl,
+        headersText,
+        body
+      }),
+    [body, endpoint?.method, headersText, previewUrl]
+  );
   const canExecute = Boolean(endpoint && environment);
+
+  function handleSavePreset() {
+    try {
+      const nextPresets = saveDebugPreset(environment?.projectId, endpoint?.id, {
+        name: presetName,
+        queryString,
+        headersText,
+        body
+      });
+
+      setPresets(nextPresets);
+      setPresetName("");
+      setPresetError(null);
+      setPresetMessage(`Saved preset ${presetName.trim()}.`);
+    } catch (presetSaveError) {
+      setPresetMessage(null);
+      setPresetError(presetSaveError instanceof Error ? presetSaveError.message : "Failed to save preset.");
+    }
+  }
+
+  function handleApplyPreset(preset: DebugRequestPreset) {
+    setQueryString(preset.queryString);
+    setHeadersText(preset.headersText);
+    setBody(preset.body);
+    setResult(null);
+    setError(null);
+    setPolicyError(null);
+    setPresetError(null);
+    setPresetMessage(`Applied preset ${preset.name}.`);
+  }
+
+  function handleDeletePreset(preset: DebugRequestPreset) {
+    const nextPresets = deleteDebugPreset(environment?.projectId, endpoint?.id, preset.id);
+    setPresets(nextPresets);
+    setPresetError(null);
+    setPresetMessage(`Deleted preset ${preset.name}.`);
+
+    if (presetName.trim().toLowerCase() === preset.name.trim().toLowerCase()) {
+      setPresetName("");
+    }
+  }
+
+  async function handleCopyCurl() {
+    if (!generatedCurl) {
+      setCurlMessage(null);
+      setCurlError("No cURL command is available yet.");
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      setCurlMessage(null);
+      setCurlError("Clipboard is unavailable in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(generatedCurl);
+      setCurlError(null);
+      setCurlMessage("Copied cURL command.");
+    } catch {
+      setCurlMessage(null);
+      setCurlError("Failed to copy cURL command.");
+    }
+  }
+
+  function handleImportCurl() {
+    try {
+      const parsedCommand = parseDebugCurlCommand(curlImportText);
+      setQueryString(parsedCommand.queryString);
+      setHeadersText(parsedCommand.headersText);
+      setBody(parsedCommand.body);
+      setResult(null);
+      setError(null);
+      setPolicyError(null);
+      setCurlError(null);
+      setCurlMessage("Imported cURL into the current draft.");
+      setCurlWarning(
+        endpoint && parsedCommand.method.toUpperCase() !== endpoint.method.toUpperCase()
+          ? `Imported method ${parsedCommand.method.toUpperCase()} differs from endpoint ${endpoint.method}.`
+          : null
+      );
+    } catch (curlImportError) {
+      setCurlMessage(null);
+      setCurlWarning(null);
+      setCurlError(curlImportError instanceof Error ? curlImportError.message : "Failed to import cURL command.");
+    }
+  }
 
   return (
     <section className="rounded-[2rem] border border-white/60 bg-white/78 p-6 shadow-[0_24px_64px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -169,6 +301,138 @@ export function DebugConsole({
                 <div className="mt-1 font-mono text-xs text-slate-500">{endpoint?.path}</div>
               </div>
             </Field>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className="rounded-[1.8rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_rgba(244,239,228,0.92)_44%,_rgba(226,232,240,0.74)_100%)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
+              <div className="flex flex-col gap-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Request presets</p>
+                  <p className="mt-3 text-base font-semibold text-slate-950">Keep your best debug drafts one click away.</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Saved locally in this browser and scoped to the current endpoint.</p>
+                </div>
+
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                  <Field label="Preset name">
+                    <input
+                      aria-label="Preset name"
+                      className="w-full rounded-2xl border border-white/80 bg-white/88 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                      onChange={(event) => {
+                        setPresetName(event.target.value);
+                        setPresetError(null);
+                        setPresetMessage(null);
+                      }}
+                      placeholder="Strict user trace"
+                      value={presetName}
+                    />
+                  </Field>
+                  <button
+                    className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+                    onClick={() => handleSavePreset()}
+                    type="button"
+                  >
+                    Save preset
+                  </button>
+                </div>
+
+                {presetError ? <MessageBanner message={presetError} tone="rose" /> : null}
+                {!presetError && presetMessage ? <MessageBanner message={presetMessage} tone="emerald" /> : null}
+
+                {presets.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white/70 px-4 py-5 text-sm text-slate-500">
+                    No presets yet. Save a draft you want to reuse across repeated debugging runs.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {presets.map((preset) => (
+                      <div className="rounded-[1.5rem] border border-white/75 bg-white/82 px-4 py-4 shadow-[0_14px_35px_rgba(15,23,42,0.05)]" key={preset.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-950">{preset.name}</p>
+                            <p className="mt-2 text-xs leading-5 text-slate-500">{describeDebugPreset(preset)}</p>
+                          </div>
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+                            Saved
+                          </span>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            aria-label={`Apply preset ${preset.name}`}
+                            className="rounded-2xl bg-slate-950 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
+                            onClick={() => handleApplyPreset(preset)}
+                            type="button"
+                          >
+                            Apply
+                          </button>
+                          <button
+                            aria-label={`Delete preset ${preset.name}`}
+                            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                            onClick={() => handleDeletePreset(preset)}
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[1.8rem] border border-slate-900/85 bg-[radial-gradient(circle_at_top_left,_rgba(226,232,240,0.16),_rgba(15,23,42,0.97)_58%)] p-5 text-white shadow-[0_22px_60px_rgba(15,23,42,0.24)]">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">cURL bridge</p>
+                <p className="mt-3 text-base font-semibold tracking-tight">Move the current draft in and out of terminal flows.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Export the exact request you are about to run, or paste a cURL command back into this console.</p>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <DarkField label="Generated cURL">
+                  <textarea
+                    aria-label="Generated cURL"
+                    className="min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-3 font-mono text-sm text-slate-100 outline-none"
+                    readOnly
+                    value={generatedCurl}
+                  />
+                </DarkField>
+
+                <button
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!generatedCurl}
+                  onClick={() => void handleCopyCurl()}
+                  type="button"
+                >
+                  Copy cURL
+                </button>
+
+                <DarkField label="Import cURL">
+                  <textarea
+                    aria-label="Import cURL"
+                    className="min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-3 font-mono text-sm text-slate-100 outline-none transition focus:border-white/25"
+                    onChange={(event) => {
+                      setCurlImportText(event.target.value);
+                      setCurlError(null);
+                      setCurlMessage(null);
+                    }}
+                    placeholder="curl 'https://local.dev/users/{id}?mode=compact' -H 'X-Trace: imported'"
+                    value={curlImportText}
+                  />
+                </DarkField>
+
+                {curlError ? <DarkMessageBanner message={curlError} tone="rose" /> : null}
+                {curlWarning ? <DarkMessageBanner message={curlWarning} tone="amber" /> : null}
+                {!curlError && curlMessage ? <DarkMessageBanner message={curlMessage} tone="emerald" /> : null}
+
+                <button
+                  className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-slate-100"
+                  onClick={() => handleImportCurl()}
+                  type="button"
+                >
+                  Import cURL
+                </button>
+              </div>
+            </div>
           </div>
 
           <Field label="Query string">
@@ -406,6 +670,47 @@ export function DebugConsole({
         </div>
       </div>
     </section>
+  );
+}
+
+function MessageBanner({
+  message,
+  tone
+}: {
+  message: string;
+  tone: "emerald" | "rose";
+}) {
+  if (tone === "rose") {
+    return <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{message}</div>;
+  }
+
+  return <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div>;
+}
+
+function DarkMessageBanner({
+  message,
+  tone
+}: {
+  message: string;
+  tone: "amber" | "emerald" | "rose";
+}) {
+  if (tone === "amber") {
+    return <div className="rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">{message}</div>;
+  }
+
+  if (tone === "rose") {
+    return <div className="rounded-2xl border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">{message}</div>;
+  }
+
+  return <div className="rounded-2xl border border-emerald-300/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{message}</div>;
+}
+
+function DarkField({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">{label}</span>
+      {children}
+    </label>
   );
 }
 
