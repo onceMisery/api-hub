@@ -2,7 +2,169 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-background: radial-gradient(circle at top, #f8fafc 0%, #eef2ff 42%, #e2e8f0 100%);
+  --app-border: rgba(148, 163, 184, 0.26);
+  --app-foreground: #0f172a;
+  --app-input: rgba(255, 255, 255, 0.88);
+  --app-muted: #475569;
+  --app-soft: #64748b;
+  --app-surface: rgba(255, 255, 255, 0.78);
+  --app-surface-strong: rgba(255, 255, 255, 0.92);
+  --app-surface-subtle: rgba(248, 250, 252, 0.88);
+  --app-shadow: 0 24px 64px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="dark"] {
+  --app-background: radial-gradient(circle at top, #0f172a 0%, #111827 42%, #020617 100%);
+  --app-border: rgba(148, 163, 184, 0.18);
+  --app-foreground: #e2e8f0;
+  --app-input: rgba(15, 23, 42, 0.82);
+  --app-muted: #cbd5e1;
+  --app-soft: #94a3b8;
+  --app-surface: rgba(15, 23, 42, 0.76);
+  --app-surface-strong: rgba(15, 23, 42, 0.9);
+  --app-surface-subtle: rgba(15, 23, 42, 0.62);
+  --app-shadow: 0 28px 80px rgba(2, 6, 23, 0.34);
+}
+
+html,
 body {
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  min-height: 100%;
+}
+
+body.app-body {
+  background: var(--app-background);
+  color: var(--app-foreground);
+  font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+}
+
+::selection {
+  background: rgba(14, 165, 233, 0.25);
+}
+
+* {
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-shell-card {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.app-shell-card-strong {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-strong);
+  box-shadow: var(--app-shadow);
+}
+
+.app-shell-card-subtle {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-subtle);
+}
+
+.app-input {
+  border: 1px solid var(--app-border);
+  background: var(--app-input);
+  color: var(--app-foreground);
+}
+
+.app-input::placeholder {
+  color: var(--app-soft);
+}
+
+.app-button-primary {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .app-button-primary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.app-button-secondary {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-strong);
+  color: var(--app-foreground);
+}
+
+.app-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.app-tab {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-strong);
+  color: var(--app-muted);
+}
+
+.app-tab[data-active="true"] {
+  background: #0f172a;
+  border-color: transparent;
+  color: #f8fafc;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+}
+
+html[data-theme="dark"] .app-tab[data-active="true"] {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+html[data-theme="dark"] [class*="bg-white"] {
+  background-color: rgba(15, 23, 42, 0.78) !important;
+}
+
+html[data-theme="dark"] [class*="bg-slate-50"] {
+  background-color: rgba(15, 23, 42, 0.62) !important;
+}
+
+html[data-theme="dark"] [class*="bg-slate-100"] {
+  background-color: rgba(30, 41, 59, 0.9) !important;
+}
+
+html[data-theme="dark"] [class*="border-slate-200"],
+html[data-theme="dark"] [class*="border-white"] {
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+html[data-theme="dark"] [class*="text-slate-950"],
+html[data-theme="dark"] [class*="text-slate-900"],
+html[data-theme="dark"] [class*="text-slate-800"],
+html[data-theme="dark"] [class*="text-slate-700"] {
+  color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] [class*="text-slate-600"],
+html[data-theme="dark"] [class*="text-slate-500"],
+html[data-theme="dark"] [class*="text-slate-400"] {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] [class*="bg-slate-950"] {
+  background-color: rgba(2, 6, 23, 0.92) !important;
+}
+
+html[data-theme="dark"] [class*="placeholder:text-slate"] {
+  color: #94a3b8 !important;
 }
 

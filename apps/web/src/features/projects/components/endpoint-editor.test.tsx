@@ -37,6 +37,31 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("Initial release")).toBeInTheDocument();
   });
 
+  it("renders only the requested editor sections", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        visibleSections={["basics", "mockRules", "mockRuntime"]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Endpoint basics")).toBeInTheDocument();
+    expect(screen.getByText("Mock Rules")).toBeInTheDocument();
+    expect(screen.getByText("Published Runtime")).toBeInTheDocument();
+    expect(screen.queryByText("Request Parameters")).not.toBeInTheDocument();
+    expect(screen.queryByText("Versions")).not.toBeInTheDocument();
+  });
+
   it("submits updated endpoint basics", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
 

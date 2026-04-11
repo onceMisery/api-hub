@@ -27,6 +27,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class ProjectRepository {
@@ -221,8 +222,18 @@ public class ProjectRepository {
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
-                    insert into project (space_id, name, project_key, description, owner_id, status, debug_allowed_hosts_json)
-                    values (?, ?, ?, ?, ?, 'active', ?)
+                    insert into project (
+                        space_id,
+                        name,
+                        project_key,
+                        description,
+                        owner_id,
+                        status,
+                        debug_allowed_hosts_json,
+                        mock_access_mode,
+                        mock_access_token
+                    )
+                    values (?, ?, ?, ?, ?, 'active', ?, 'private', ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, DEFAULT_SPACE_ID);
             statement.setString(2, request.name());
@@ -230,6 +241,7 @@ public class ProjectRepository {
             statement.setString(4, request.description());
             statement.setLong(5, userId);
             statement.setString(6, serializeDebugRules(request.debugAllowedHosts()));
+            statement.setString(7, UUID.randomUUID().toString().replace("-", ""));
             return statement;
         }, keyHolder);
         long projectId = requireGeneratedId(keyHolder);

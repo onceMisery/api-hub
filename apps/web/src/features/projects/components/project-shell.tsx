@@ -63,10 +63,12 @@ import {
   type UpdateEnvironmentPayload,
   type VersionDetail
 } from "@api-hub/api-sdk";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { SessionBar } from "../../auth/components/session-bar";
+import { useI18n } from "../../../lib/ui-preferences";
 import { ProjectAccessDrawer } from "./project-access-drawer";
 import { ProjectAccessSummaryCard } from "./project-access-summary-card";
 import { EndpointEditor } from "./endpoint-editor";
@@ -78,6 +80,7 @@ import {
 } from "./endpoint-editor-utils";
 import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
+import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectSidebar } from "./project-sidebar";
 import { WorkbenchNotificationCenter, useWorkbenchNotifications } from "./workbench-notification-center";
 
@@ -85,8 +88,11 @@ type ProjectShellProps = {
   projectId: number;
 };
 
+type WorkbenchTab = "overview" | "documentation" | "environments" | "debug" | "mock" | "members";
+
 export function ProjectShell({ projectId }: ProjectShellProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthMe | null>(null);
@@ -123,6 +129,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [isLoadingEndpoint, setIsLoadingEndpoint] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isAccessDrawerOpen, setIsAccessDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<WorkbenchTab>("documentation");
   const [error, setError] = useState<string | null>(null);
   const { notifications, notify, dismissNotification } = useWorkbenchNotifications();
 
@@ -305,6 +312,17 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       moduleCount: filteredModules.length
     };
   }, [filteredModules]);
+  const workbenchTabs = useMemo<Array<{ id: WorkbenchTab; label: string }>>(
+    () => [
+      { id: "overview", label: t("workbench.tab.overview") },
+      { id: "documentation", label: t("workbench.tab.documentation") },
+      { id: "environments", label: t("workbench.tab.environments") },
+      { id: "debug", label: t("workbench.tab.debug") },
+      { id: "mock", label: t("workbench.tab.mock") },
+      { id: "members", label: t("workbench.tab.members") }
+    ],
+    [t]
+  );
 
   function pushSuccess(title: string, detail: string) {
     notify({
@@ -344,52 +362,105 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   return (
     <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6 text-slate-900">
       <WorkbenchNotificationCenter notifications={notifications} onDismiss={dismissNotification} />
-      <SessionBar />
+      <SessionBar backHref="/console/projects" />
       <section className="rounded-[2.4rem] border border-white/60 bg-white/65 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Project Workbench</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Project #{projectId}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              Card-based workspace for modules, grouped endpoints, and version snapshots backed by the phase 1 MySQL data model.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                {accessLabel}
-              </span>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
-                  canWrite ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                {canWrite ? "Writable" : "Read-only"}
-              </span>
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Project Workbench</p>
+              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
+                {project?.name ?? `Project #${projectId}`}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                Compact lanes for documentation, runtime debugging, environments, and collaborator control.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                  {accessLabel}
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+                    canWrite ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {canWrite ? "Writable" : "Read-only"}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-xs font-medium text-slate-500">
+                  {project?.projectKey ?? `project-${projectId}`}
+                </span>
+              </div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link
+                  className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  href={`/console/projects/${projectId}/browse`}
+                >
+                  Browse docs
+                </Link>
+                <Link
+                  className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  href={`/console/projects/${projectId}/share`}
+                >
+                  Share docs
+                </Link>
+                <Link
+                  className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  href={`/console/projects/${projectId}/mock-center`}
+                >
+                  Mock center
+                </Link>
+              </div>
             </div>
-            <label className="mt-5 block max-w-md space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Search tree</span>
-              <input
-                aria-label="Search tree"
-                className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm outline-none transition focus:border-slate-400"
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search modules, groups, endpoints, or paths"
-                value={searchQuery}
+            <div className="grid gap-3 lg:w-[460px]">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatCard label="Modules" value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
+                <StatCard label="Groups" value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
+                <StatCard label="Endpoints" value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount} />
+              </div>
+              <ProjectAccessSummaryCard
+                canManageMembers={canManageMembers}
+                canWrite={canWrite}
+                currentUserRole={project?.currentUserRole ?? null}
+                memberCount={projectMembers.length}
+                onOpen={() => setIsAccessDrawerOpen(true)}
+                projectAdminCount={projectAdminCount}
               />
-            </label>
-          </div>
-          <div className="grid gap-3 lg:w-[460px]">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <StatCard label="Modules" value={searchQuery.trim() ? filteredStats.moduleCount : treeStats.moduleCount} />
-              <StatCard label="Groups" value={searchQuery.trim() ? filteredStats.groupCount : treeStats.groupCount} />
-              <StatCard label="Endpoints" value={searchQuery.trim() ? filteredStats.endpointCount : treeStats.endpointCount} />
             </div>
-            <ProjectAccessSummaryCard
-              canManageMembers={canManageMembers}
-              canWrite={canWrite}
-              currentUserRole={project?.currentUserRole ?? null}
-              memberCount={projectMembers.length}
-              onOpen={() => setIsAccessDrawerOpen(true)}
-              projectAdminCount={projectAdminCount}
-            />
+          </div>
+
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="app-shell-card-strong rounded-[2rem] bg-slate-950/95 px-4 py-4 text-white xl:min-w-[420px]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workbench Lanes</p>
+              <div className="app-tablist mt-4" role="tablist" aria-label="Project workbench tabs">
+                {workbenchTabs.map((tab) => (
+                  <button
+                    aria-controls={`workbench-panel-${tab.id}`}
+                    aria-selected={activeTab === tab.id}
+                    className="app-tab rounded-2xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
+                    data-active={activeTab === tab.id}
+                    id={`workbench-tab-${tab.id}`}
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    role="tab"
+                    type="button"
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {(activeTab === "documentation" || activeTab === "mock") && !isLoadingTree ? (
+              <label className="block min-w-0 flex-1 space-y-2 xl:max-w-md">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Search tree</span>
+                <input
+                  aria-label="Search tree"
+                  className="app-input w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search modules, groups, endpoints, or paths"
+                  value={searchQuery}
+                />
+              </label>
+            ) : null}
           </div>
         </div>
       </section>
@@ -398,45 +469,142 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         <div className="rounded-[2rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-        {isLoadingTree ? (
-          <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 text-sm text-slate-500 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-            Loading project tree...
-          </aside>
-        ) : (
-          <ProjectSidebar
-            allModules={modules}
+      {activeTab === "overview" ? (
+        <section
+          aria-labelledby="workbench-tab-overview"
+          className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]"
+          id="workbench-panel-overview"
+          role="tabpanel"
+        >
+          <section className="app-shell-card rounded-[2rem] p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Focus</p>
+            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Project rhythm at a glance</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              Use documentation for contract editing, mock for runtime shaping, debug for live requests, and members for project governance.
+            </p>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <WorkbenchOverviewCard
+                eyebrow="Documentation"
+                title={`${treeStats.moduleCount} modules across ${treeStats.groupCount} groups`}
+                detail="Keep endpoint structure compact and searchable instead of scrolling through every panel at once."
+              />
+              <WorkbenchOverviewCard
+                eyebrow="Runtime"
+                title={`${environments.length} environments and ${debugHistory.length} recent debug records`}
+                detail="Separate runtime validation from contract editing so each lane stays focused."
+              />
+              <WorkbenchOverviewCard
+                eyebrow="Members"
+                title={`${projectMembers.length} collaborators, ${projectAdminCount} admin seats`}
+                detail="Open the members lane when you need to rebalance roles or review ownership."
+              />
+              <WorkbenchOverviewCard
+                eyebrow="Mock"
+                title={`${mockReleases.length} published mock releases`}
+                detail="Pin mock work into its own lane so draft rules and published runtime stay easy to compare."
+              />
+            </div>
+          </section>
+          <section className="space-y-6">
+            <ProjectAccessSummaryCard
+              canManageMembers={canManageMembers}
+              canWrite={canWrite}
+              currentUserRole={project?.currentUserRole ?? null}
+              memberCount={projectMembers.length}
+              onOpen={() => {
+                setActiveTab("members");
+                setIsAccessDrawerOpen(true);
+              }}
+              projectAdminCount={projectAdminCount}
+            />
+            <div className="app-shell-card rounded-[2rem] p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Active Endpoint</p>
+              <h3 className="mt-3 text-xl font-semibold text-slate-950">{endpoint?.name ?? "No endpoint selected"}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {endpoint ? `${endpoint.method} ${endpoint.path}` : "Open the documentation lane to select an endpoint."}
+              </p>
+            </div>
+          </section>
+        </section>
+      ) : null}
+
+      {activeTab === "documentation" ? (
+        <section
+          aria-labelledby="workbench-tab-documentation"
+          className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]"
+          id="workbench-panel-documentation"
+          role="tabpanel"
+        >
+          {isLoadingTree ? (
+            <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 text-sm text-slate-500 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+              Loading project tree...
+            </aside>
+          ) : (
+            <ProjectSidebar
+              allModules={modules}
+              canWrite={canWrite}
+              emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
+              modules={filteredModules}
+              onCreateEndpoint={handleCreateEndpoint}
+              onCreateGroup={handleCreateGroup}
+              onCreateModule={handleCreateModule}
+              onDeleteEndpoint={handleDeleteEndpointFromTree}
+              onDeleteGroup={handleDeleteGroup}
+              onDeleteModule={handleDeleteModule}
+              onRenameEndpoint={handleRenameEndpoint}
+              onRenameGroup={handleRenameGroup}
+              onRenameModule={handleRenameModule}
+              onSelectEndpoint={setSelectedEndpointId}
+              projectId={projectId}
+              searchQuery={searchQuery}
+              selectedEndpointId={selectedEndpointId}
+            />
+          )}
+          <EndpointEditor
             canWrite={canWrite}
-            emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
-            modules={filteredModules}
-            onCreateEndpoint={handleCreateEndpoint}
-            onCreateGroup={handleCreateGroup}
-            onCreateModule={handleCreateModule}
-            onDeleteEndpoint={handleDeleteEndpointFromTree}
-            onDeleteGroup={handleDeleteGroup}
-            onDeleteModule={handleDeleteModule}
-            onRenameEndpoint={handleRenameEndpoint}
-            onRenameGroup={handleRenameGroup}
-            onRenameModule={handleRenameModule}
-            onSelectEndpoint={setSelectedEndpointId}
+            endpoint={endpoint}
+            isLoading={isLoadingEndpoint}
+            mockReleases={mockReleases}
+            mockRules={mockRules}
+            onClearReleasedVersion={handleClearEndpointRelease}
+            onDelete={handleDeleteEndpoint}
+            onPublishMockRelease={handlePublishMockRelease}
+            onReleaseVersion={handleReleaseVersion}
+            onRestoreVersion={handleRestoreVersion}
+            onSave={handleSaveEndpoint}
+            onSaveMockRules={handleSaveMockRules}
+            onSaveParameters={handleSaveParameters}
+            onSaveResponses={handleSaveResponses}
+            onSaveVersion={handleSaveVersion}
+            onSimulateMock={handleSimulateMock}
+            parameters={parameters}
             projectId={projectId}
-            searchQuery={searchQuery}
-            selectedEndpointId={selectedEndpointId}
+            responses={responses}
+            versions={versions}
+            visibleSections={["basics", "parameters", "responses", "versions"]}
           />
-        )}
-        <div className="space-y-6">
+        </section>
+      ) : null}
+
+      {activeTab === "environments" ? (
+        <section aria-labelledby="workbench-tab-environments" id="workbench-panel-environments" role="tabpanel">
           <EnvironmentPanel
             canWrite={canWrite}
             environments={environments}
-            projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             onCreateEnvironment={handleCreateEnvironment}
             onDeleteEnvironment={handleDeleteEnvironment}
             onImportEnvironmentBundle={handleImportEnvironmentBundle}
             onSelectEnvironment={setSelectedEnvironmentId}
-            onUpdateProjectDebugPolicy={handleUpdateProjectPolicy}
             onUpdateEnvironment={handleUpdateEnvironment}
+            onUpdateProjectDebugPolicy={handleUpdateProjectPolicy}
+            projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             selectedEnvironmentId={selectedEnvironmentId}
           />
+        </section>
+      ) : null}
+
+      {activeTab === "debug" ? (
+        <section aria-labelledby="workbench-tab-debug" id="workbench-panel-debug" role="tabpanel">
           <DebugConsole
             canClearHistory={canWrite}
             endpoint={endpoint}
@@ -453,11 +621,48 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             replayDraft={replayDraft}
           />
+        </section>
+      ) : null}
+
+      {activeTab === "mock" ? (
+        <section
+          aria-labelledby="workbench-tab-mock"
+          className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]"
+          id="workbench-panel-mock"
+          role="tabpanel"
+        >
+          {isLoadingTree ? (
+            <aside className="rounded-[2rem] border border-white/60 bg-white/75 p-5 text-sm text-slate-500 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+              Loading project tree...
+            </aside>
+          ) : (
+            <ProjectSidebar
+              allModules={modules}
+              canWrite={canWrite}
+              emptyStateMessage={searchQuery.trim() ? "No matching nodes." : null}
+              modules={filteredModules}
+              onCreateEndpoint={handleCreateEndpoint}
+              onCreateGroup={handleCreateGroup}
+              onCreateModule={handleCreateModule}
+              onDeleteEndpoint={handleDeleteEndpointFromTree}
+              onDeleteGroup={handleDeleteGroup}
+              onDeleteModule={handleDeleteModule}
+              onRenameEndpoint={handleRenameEndpoint}
+              onRenameGroup={handleRenameGroup}
+              onRenameModule={handleRenameModule}
+              onSelectEndpoint={setSelectedEndpointId}
+              projectId={projectId}
+              searchQuery={searchQuery}
+              selectedEndpointId={selectedEndpointId}
+            />
+          )}
           <EndpointEditor
             canWrite={canWrite}
             endpoint={endpoint}
-            onClearReleasedVersion={handleClearEndpointRelease}
             isLoading={isLoadingEndpoint}
+            mockReleases={mockReleases}
+            mockRules={mockRules}
+            onClearReleasedVersion={handleClearEndpointRelease}
             onDelete={handleDeleteEndpoint}
             onPublishMockRelease={handlePublishMockRelease}
             onReleaseVersion={handleReleaseVersion}
@@ -466,17 +671,27 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             onSaveMockRules={handleSaveMockRules}
             onSaveParameters={handleSaveParameters}
             onSaveResponses={handleSaveResponses}
-            onSimulateMock={handleSimulateMock}
             onSaveVersion={handleSaveVersion}
-            mockReleases={mockReleases}
-            mockRules={mockRules}
+            onSimulateMock={handleSimulateMock}
             parameters={parameters}
             projectId={projectId}
             responses={responses}
             versions={versions}
+            visibleSections={["basics", "mockRules", "mockRuntime"]}
           />
-        </div>
-      </section>
+        </section>
+      ) : null}
+
+      {activeTab === "members" ? (
+        <section aria-labelledby="workbench-tab-members" id="workbench-panel-members" role="tabpanel">
+          <ProjectMembersPanel
+            canManageMembers={canManageMembers}
+            members={projectMembers}
+            onDeleteMember={handleDeleteProjectMember}
+            onSaveMember={handleSaveProjectMember}
+          />
+        </section>
+      ) : null}
       <ProjectAccessDrawer
         canManageMembers={canManageMembers}
         canWrite={canWrite}
@@ -1557,6 +1772,24 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
+  );
+}
+
+function WorkbenchOverviewCard({
+  detail,
+  eyebrow,
+  title
+}: {
+  detail: string;
+  eyebrow: string;
+  title: string;
+}) {
+  return (
+    <article className="rounded-[1.6rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_14px_32px_rgba(15,23,42,0.06)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{eyebrow}</p>
+      <h3 className="mt-3 text-lg font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+    </article>
   );
 }
 

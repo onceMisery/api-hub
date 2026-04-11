@@ -383,10 +383,17 @@ describe("ProjectShell", () => {
     });
   });
 
+  async function openWorkbenchTab(name: "Documentation" | "Environments" | "Debug" | "Mock" | "Members") {
+    fireEvent.click(await screen.findByRole("tab", { name }));
+  }
+
   it("refreshes the tree and focuses the created endpoint", async () => {
     render(<ProjectShell projectId={1} />);
 
     expect(await screen.findByText("Get User")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse docs" })).toHaveAttribute("href", "/console/projects/1/browse");
+    expect(screen.getByRole("link", { name: "Share docs" })).toHaveAttribute("href", "/console/projects/1/share");
+    expect(screen.getByRole("link", { name: "Mock center" })).toHaveAttribute("href", "/console/projects/1/mock-center");
 
     fireEvent.change(screen.getByLabelText("New endpoint name"), { target: { value: "Create User" } });
     fireEvent.change(screen.getByLabelText("New endpoint method"), { target: { value: "POST" } });
@@ -406,6 +413,23 @@ describe("ProjectShell", () => {
     await waitFor(() => expect(fetchProjectTree).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("button", { name: "Create User POST /users" })).toBeInTheDocument();
     await waitFor(() => expect(fetchEndpoint).toHaveBeenLastCalledWith(99));
+  });
+
+  it("renders the integrated workbench surfaces alongside the new external access entry points", async () => {
+    render(<ProjectShell projectId={1} />);
+
+    expect(await screen.findByText("Modules and endpoints")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse docs" })).toHaveAttribute("href", "/console/projects/1/browse");
+    expect(screen.getByRole("link", { name: "Share docs" })).toHaveAttribute("href", "/console/projects/1/share");
+    expect(screen.getByRole("link", { name: "Mock center" })).toHaveAttribute("href", "/console/projects/1/mock-center");
+
+    await openWorkbenchTab("Environments");
+    expect(await screen.findByText("Target environments")).toBeInTheDocument();
+
+    await openWorkbenchTab("Debug");
+    expect(await screen.findByText("Live request console")).toBeInTheDocument();
+
+    expect(screen.getByText("Access & Roles")).toBeInTheDocument();
   });
 
   it("renames and deletes an endpoint from the tree", async () => {
@@ -675,8 +699,11 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Mock");
     expect(await screen.findByText("No published release yet.")).toBeInTheDocument();
     expect((await screen.findAllByText("Draft lane")).length).toBeGreaterThan(0);
+
+    await openWorkbenchTab("Documentation");
     fireEvent.click(await screen.findByRole("button", { name: "Compare snapshot v1" }));
     expect((await screen.findAllByText("1 total changes")).length).toBeGreaterThan(0);
   });
@@ -741,6 +768,7 @@ describe("ProjectShell", () => {
   it("loads and manages project environments", async () => {
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Environments");
     expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("New environment name"), { target: { value: "Staging" } });
@@ -791,6 +819,7 @@ describe("ProjectShell", () => {
 
   it("shows a global success notification after creating an environment", async () => {
     render(<ProjectShell projectId={1} />);
+    await openWorkbenchTab("Environments");
     expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("New environment name"), { target: { value: "Staging" } });
@@ -804,6 +833,7 @@ describe("ProjectShell", () => {
 
   it("imports environment bundles as non-default copies and shows a summary notification", async () => {
     render(<ProjectShell projectId={1} />);
+    await openWorkbenchTab("Environments");
     expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Open environment import" }));
@@ -849,6 +879,7 @@ describe("ProjectShell", () => {
 
   it("clones an environment into a non-default copy", async () => {
     render(<ProjectShell projectId={1} />);
+    await openWorkbenchTab("Environments");
     expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Clone environment 41" }));
@@ -869,6 +900,7 @@ describe("ProjectShell", () => {
   it("loads project detail and saves project debug policy", async () => {
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Environments");
     expect(await screen.findByDisplayValue("*.corp.example.com")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Project debug rule 1 pattern"), { target: { value: "10.10.1.8" } });
@@ -888,6 +920,7 @@ describe("ProjectShell", () => {
     updateProject.mockRejectedValueOnce(new Error("Policy save failed"));
 
     render(<ProjectShell projectId={1} />);
+    await openWorkbenchTab("Environments");
     expect(await screen.findByDisplayValue("*.corp.example.com")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Project debug rule 1 pattern"), { target: { value: "10.10.1.8" } });
@@ -929,7 +962,11 @@ describe("ProjectShell", () => {
     expect((await screen.findAllByText("Viewer access")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Read-only").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Add module" })).toBeDisabled();
+
+    await openWorkbenchTab("Environments");
     expect(screen.getByRole("button", { name: "Save project debug policy" })).toBeDisabled();
+
+    await openWorkbenchTab("Debug");
     expect(screen.getByRole("button", { name: "Clear debug history" })).toBeDisabled();
 
     expect(screen.queryByRole("button", { name: "Add project member" })).not.toBeInTheDocument();
@@ -1082,6 +1119,7 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Debug");
     expect((await screen.findAllByText("https://local.dev/users/{id}")).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("Debug history environment filter"), { target: { value: "41" } });
@@ -1153,16 +1191,19 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Debug");
     expect(await screen.findByRole("button", { name: "Replay history 101" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Replay history 101" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Use environment 42" })).toBeInTheDocument();
       expect(screen.getByLabelText("Query string")).toHaveValue("cached=true");
       expect(screen.getByLabelText("Headers")).toHaveValue("Authorization: Bearer history-token");
       expect(screen.getByLabelText("Body")).toHaveValue("{\"user\":\"31\"}");
     });
+
+    await openWorkbenchTab("Environments");
+    expect(screen.getByRole("button", { name: "Use environment 42" })).toBeInTheDocument();
   });
 
   it("runs a debug history item again through the execute pipeline", async () => {
@@ -1252,6 +1293,7 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Debug");
     expect(await screen.findByRole("button", { name: "Run history 101" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Run history 101" }));
@@ -1349,6 +1391,7 @@ describe("ProjectShell", () => {
 
     render(<ProjectShell projectId={1} />);
 
+    await openWorkbenchTab("Mock");
     expect((await screen.findAllByText("Release #2")).length).toBeGreaterThan(0);
     expect(await screen.findByText("Inspecting Release #2")).toBeInTheDocument();
 

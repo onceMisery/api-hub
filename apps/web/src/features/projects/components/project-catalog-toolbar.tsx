@@ -1,10 +1,12 @@
 "use client";
 
-import type { ProjectCatalogFilter } from "./project-catalog-utils";
+import { useI18n } from "../../../lib/ui-preferences";
+import type { ProjectCatalogFilter, ProjectCatalogGroup } from "./project-catalog-utils";
 
 type ProjectCatalogToolbarProps = {
   activeFilter: ProjectCatalogFilter;
   editableCount: number;
+  groups: ProjectCatalogGroup[];
   manageCount: number;
   onCreate: () => void;
   onFilterChange: (filter: ProjectCatalogFilter) => void;
@@ -14,16 +16,10 @@ type ProjectCatalogToolbarProps = {
   searchQuery: string;
 };
 
-const FILTER_OPTIONS: Array<{ filter: ProjectCatalogFilter; label: string }> = [
-  { filter: "all", label: "All" },
-  { filter: "editable", label: "Editable" },
-  { filter: "review", label: "Review only" },
-  { filter: "manage", label: "Can manage" }
-];
-
 export function ProjectCatalogToolbar({
   activeFilter,
   editableCount,
+  groups,
   manageCount,
   onCreate,
   onFilterChange,
@@ -32,70 +28,88 @@ export function ProjectCatalogToolbar({
   reviewCount,
   searchQuery
 }: ProjectCatalogToolbarProps) {
+  const { t } = useI18n();
+
   return (
-    <section className="overflow-hidden rounded-[2.5rem] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.85),_rgba(244,239,228,0.92)_44%,_rgba(226,232,240,0.72)_100%)] p-6 shadow-[0_32px_90px_rgba(15,23,42,0.10)] backdrop-blur">
-      <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Projects</p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">Project command center</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Search your API workspaces, separate editable and review-only surfaces, and create the next project without leaving the console.
-          </p>
-
-          <label className="mt-6 block max-w-xl space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Search projects</span>
-            <input
-              aria-label="Search projects"
-              className="w-full rounded-[1.6rem] border border-white/70 bg-white/85 px-4 py-3 text-sm text-slate-900 outline-none shadow-[0_12px_28px_rgba(15,23,42,0.05)] transition focus:border-slate-300"
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search by project name, key, or description"
-              value={searchQuery}
-            />
-          </label>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {FILTER_OPTIONS.map((option) => (
-              <button
-                aria-pressed={activeFilter === option.filter}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                  activeFilter === option.filter
-                    ? "border-slate-950 bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)]"
-                    : "border-white/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                }`}
-                key={option.filter}
-                onClick={() => onFilterChange(option.filter)}
-                type="button"
-              >
-                {option.label}
-              </button>
-            ))}
+    <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="overflow-hidden rounded-[2rem] border border-slate-900/80 bg-[linear-gradient(180deg,#1f1f22_0%,#0b0b0d_100%)] p-4 text-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+        <div className="rounded-[1.4rem] bg-white/8 p-3">
+          <div className="flex items-center justify-between gap-3 rounded-[1rem] bg-white/8 px-4 py-3">
+            <span className="text-lg font-semibold">{t("catalog.title")}</span>
+            <span className="text-sm text-slate-300">Dynamic</span>
           </div>
         </div>
 
-        <div className="grid gap-3 lg:w-[430px]">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <MetricCard label="Projects" value={projectCount} />
-            <MetricCard label="Editable" value={editableCount} />
-            <MetricCard label="Review" value={reviewCount} />
-          </div>
-          <div className="rounded-[1.8rem] border border-slate-900/85 bg-[radial-gradient(circle_at_top_left,_rgba(226,232,240,0.16),_rgba(15,23,42,0.97)_58%)] p-5 text-white shadow-[0_22px_60px_rgba(15,23,42,0.26)]">
-            <div className="flex items-start justify-between gap-4">
+        <div className="mt-4 space-y-2">
+          {groups.map((group) => (
+            <button
+              aria-pressed={activeFilter === group.filter}
+              className={`flex w-full items-center justify-between gap-4 rounded-[1.2rem] px-4 py-4 text-left transition ${
+                activeFilter === group.filter ? "bg-white/12 text-white" : "bg-transparent text-slate-200 hover:bg-white/8"
+              }`}
+              key={group.filter}
+              onClick={() => onFilterChange(group.filter)}
+              type="button"
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Create and route</p>
-                <p className="mt-3 text-xl font-semibold tracking-tight">Open the next workspace in one move.</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  {manageCount} project{manageCount === 1 ? "" : "s"} already let you manage collaborators. New workspaces start with you as project admin.
-                </p>
+                <p className="text-base font-semibold">{group.label}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{group.description}</p>
               </div>
-              <button
-                className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
-                onClick={onCreate}
-                type="button"
-              >
-                Create project
-              </button>
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs font-semibold text-slate-300">
+                {group.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <button
+            className="flex w-full items-center justify-between rounded-[1.2rem] px-4 py-4 text-left text-slate-200 transition hover:bg-white/8"
+            onClick={onCreate}
+            type="button"
+          >
+            <span className="text-base font-semibold">{t("catalog.createProject")}</span>
+            <span className="text-xl leading-none text-slate-400">+</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        <div className="app-shell-card rounded-[2rem] p-6">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("catalog.heading")}</p>
+              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">{t("catalog.subtitle")}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                Start from a project group, then move into the exact workspace you want to edit, review, or govern.
+              </p>
             </div>
+            <button
+              className="app-button-primary rounded-2xl px-5 py-3 text-sm font-semibold transition hover:opacity-90"
+              onClick={onCreate}
+              type="button"
+            >
+              {t("catalog.createProject")}
+            </button>
           </div>
+
+          <label className="mt-6 block space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("catalog.search")}</span>
+            <input
+              aria-label={t("catalog.search")}
+              className="app-input w-full rounded-[1.6rem] px-4 py-3 text-sm outline-none transition focus:border-slate-400"
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder={t("catalog.searchPlaceholder")}
+              value={searchQuery}
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-4">
+          <MetricCard label={t("catalog.group.all")} value={projectCount} />
+          <MetricCard label={t("catalog.group.manage")} value={manageCount} />
+          <MetricCard label={t("catalog.group.editable")} value={editableCount} />
+          <MetricCard label={t("catalog.group.review")} value={reviewCount} />
         </div>
       </div>
     </section>
@@ -104,7 +118,7 @@ export function ProjectCatalogToolbar({
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/70 bg-white/82 px-5 py-4 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
+    <div className="app-shell-card-strong rounded-[1.5rem] px-5 py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
     </div>

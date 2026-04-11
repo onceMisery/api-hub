@@ -67,7 +67,7 @@ describe("ProjectsPage", () => {
     expect(screen.queryByText("Default Project")).not.toBeInTheDocument();
     expect(screen.getByText("Docs Review")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Editable" }));
+    fireEvent.click(screen.getByRole("button", { name: /可编辑/ }));
     expect(screen.queryByText("Docs Review")).not.toBeInTheDocument();
     expect(fetchProjects).toHaveBeenCalledTimes(1);
   });

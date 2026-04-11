@@ -25,5 +25,6 @@ describe("ProjectCard", () => {
     expect(screen.getByText("Editor access")).toBeInTheDocument();
     expect(screen.getByText("Writable")).toBeInTheDocument();
     expect(screen.getByText("1 debug rule")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse docs" })).toHaveAttribute("href", "/console/projects/1/browse");
   });
 });

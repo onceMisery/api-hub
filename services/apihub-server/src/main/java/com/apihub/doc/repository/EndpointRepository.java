@@ -294,6 +294,30 @@ public class EndpointRepository {
                 """, ENDPOINT_ROW_MAPPER, projectId, method.toUpperCase());
     }
 
+    public List<ProjectMockCenterCandidate> listProjectMockCenterCandidates(Long projectId) {
+        return jdbcTemplate.query("""
+                select endpoint.id,
+                       endpoint.name,
+                       endpoint.http_method,
+                       endpoint.path,
+                       endpoint.mock_enabled,
+                       module.name as module_name,
+                       coalesce(api_group.name, '') as group_name
+                from api_endpoint endpoint
+                join module on module.id = endpoint.module_id
+                left join api_group on api_group.id = endpoint.group_id
+                where endpoint.project_id = ?
+                order by module.sort_order, module.id, api_group.sort_order, api_group.id, endpoint.sort_order, endpoint.id
+                """, (rs, rowNum) -> new ProjectMockCenterCandidate(
+                rs.getLong("id"),
+                rs.getString("name"),
+                rs.getString("http_method"),
+                rs.getString("path"),
+                rs.getString("module_name"),
+                rs.getString("group_name"),
+                rs.getBoolean("mock_enabled")), projectId);
+    }
+
     public List<ResponseDetail> listResponses(Long endpointId) {
         return jdbcTemplate.query("""
                 select id, http_status_code, media_type, name, data_type, required, description, example_value, sort_order
@@ -607,6 +631,17 @@ public class EndpointRepository {
     }
 
     public record EndpointReference(Long id, Long groupId, Long projectId) {
+    }
+
+    public record ProjectMockCenterCandidate(
+            Long endpointId,
+            String endpointName,
+            String method,
+            String path,
+            String moduleName,
+            String groupName,
+            boolean mockEnabled
+    ) {
     }
 
     private static List<MockConditionEntry> parseConditionEntries(String rawJson) {

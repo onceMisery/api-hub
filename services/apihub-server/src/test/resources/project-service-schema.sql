@@ -33,6 +33,8 @@ CREATE TABLE project (
   project_key VARCHAR(64) NOT NULL,
   description TEXT,
   debug_allowed_hosts_json CLOB NOT NULL,
+  mock_access_mode VARCHAR(16) NOT NULL DEFAULT 'private',
+  mock_access_token VARCHAR(96) NOT NULL,
   owner_id BIGINT NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
@@ -171,6 +173,22 @@ CREATE TABLE mock_release (
 
 CREATE INDEX idx_mock_release_endpoint_created ON mock_release (endpoint_id, created_at DESC, id DESC);
 CREATE INDEX idx_mock_release_created_by ON mock_release (created_by);
+
+CREATE TABLE project_share_link (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  share_code VARCHAR(96) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  expires_at TIMESTAMP NULL,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX uk_project_share_link_share_code ON project_share_link (share_code);
+CREATE INDEX idx_project_share_link_project_created ON project_share_link (project_id, created_at DESC, id DESC);
 
 CREATE TABLE debug_history (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,

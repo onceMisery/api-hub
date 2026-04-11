@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -66,7 +67,7 @@ public class MockController {
         Enumeration<String> names = request.getHeaderNames();
         while (names.hasMoreElements()) {
             String name = names.nextElement();
-            headers.put(name, request.getHeader(name));
+            headers.put(name.toLowerCase(Locale.ROOT), request.getHeader(name));
         }
         return headers;
     }

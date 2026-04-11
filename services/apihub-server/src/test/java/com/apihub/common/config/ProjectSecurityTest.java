@@ -2,10 +2,7 @@ package com.apihub.common.config;
 
 import com.apihub.auth.repository.AuthUserRepository;
 import com.apihub.auth.service.JwtTokenService;
-import com.apihub.debug.model.DebugDtos.DebugHeader;
-import com.apihub.mock.web.MockController;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
-import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.service.ProjectService;
 import com.apihub.project.web.ProjectController;
 import org.junit.jupiter.api.Test;
@@ -19,7 +16,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.BDDMockito.given;
@@ -27,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({ProjectController.class, MockController.class})
+@WebMvcTest(ProjectController.class)
 @Import(SecurityConfig.class)
 class ProjectSecurityTest {
 
@@ -36,9 +32,6 @@ class ProjectSecurityTest {
 
     @MockBean
     private ProjectService projectService;
-
-    @MockBean
-    private com.apihub.mock.service.MockService mockService;
 
     @MockBean
     private JwtTokenService jwtTokenService;
@@ -91,17 +84,5 @@ class ProjectSecurityTest {
     void shouldRejectProtectedEndpointWithoutBearerToken() throws Exception {
         mockMvc.perform(get("/api/v1/projects"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void shouldAllowPublicMockEndpointWithoutBearerToken() throws Exception {
-        given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of(), ""))
-                .willReturn(new com.apihub.mock.service.MockService.MockResponse(
-                        200,
-                        List.of(new DebugHeader("Content-Type", "application/json")),
-                        "{\"ok\":true}"));
-
-        mockMvc.perform(get("/mock/1/users/31"))
-                .andExpect(status().isOk());
     }
 }

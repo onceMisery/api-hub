@@ -63,8 +63,17 @@ type EndpointEditorProps = {
   mockRules?: MockRuleDetail[];
   parameters?: ParameterDetail[];
   responses?: ResponseDetail[];
+  visibleSections?: EndpointEditorSection[];
   versions: VersionDetail[];
 };
+
+export type EndpointEditorSection =
+  | "basics"
+  | "parameters"
+  | "responses"
+  | "mockRules"
+  | "mockRuntime"
+  | "versions";
 
 const EMPTY_PARAMETERS: ParameterDetail[] = [];
 const EMPTY_RESPONSES: ResponseDetail[] = [];
@@ -92,6 +101,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     mockRules = EMPTY_MOCK_RULES,
     parameters = EMPTY_PARAMETERS,
     responses = EMPTY_RESPONSES,
+    visibleSections,
     versions
   } = props;
   const [formState, setFormState] = useState<UpdateEndpointPayload>({
@@ -259,6 +269,13 @@ export function EndpointEditor(props: EndpointEditorProps) {
   );
   const publishedResponseGroups = useMemo(() => buildPublishedResponseGroups(inspectedRelease), [inspectedRelease]);
   const publishedRuleItems = useMemo(() => buildPublishedRuleItems(inspectedRelease), [inspectedRelease]);
+  const sectionSet = useMemo(
+    () =>
+      new Set<EndpointEditorSection>(
+        visibleSections ?? ["basics", "parameters", "responses", "mockRules", "mockRuntime", "versions"]
+      ),
+    [visibleSections]
+  );
 
   if (isLoading) {
     return (
@@ -282,112 +299,126 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
   return (
     <section className="space-y-6">
-      <EndpointBasicsPanel
-        canDelete={canWrite && Boolean(onDelete)}
-        canSave={canWrite && Boolean(onSave)}
-        endpointId={endpoint.id}
-        formState={formState}
-        isSaving={isSaving}
-        mockUrl={buildMockUrl(projectId, formState.path)}
-        releaseState={{
-          releasedAt: endpoint.releasedAt ?? null,
-          releasedVersionLabel: endpoint.releasedVersionLabel ?? null,
-          status: endpoint.status ?? "draft"
-        }}
-        onDelete={() => void onDelete?.()}
-        onFieldChange={updateField}
-        onSubmit={(event) => void handleSubmit(event)}
-        saveMessage={saveMessage}
-      />
+      {sectionSet.has("basics") ? (
+        <EndpointBasicsPanel
+          canDelete={canWrite && Boolean(onDelete)}
+          canSave={canWrite && Boolean(onSave)}
+          endpointId={endpoint.id}
+          formState={formState}
+          isSaving={isSaving}
+          mockUrl={buildMockUrl(projectId, formState.path)}
+          releaseState={{
+            releasedAt: endpoint.releasedAt ?? null,
+            releasedVersionLabel: endpoint.releasedVersionLabel ?? null,
+            status: endpoint.status ?? "draft"
+          }}
+          onDelete={() => void onDelete?.()}
+          onFieldChange={updateField}
+          onSubmit={(event) => void handleSubmit(event)}
+          saveMessage={saveMessage}
+        />
+      ) : null}
 
-      <EndpointParametersPanel
-        canSave={canWrite && Boolean(onSaveParameters)}
-        onAddRow={() => setParameterRows((current) => [...current, createParameterDraft()])}
-        onRemoveRow={(index) => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-        onSave={() => void handleSaveParameters()}
-        onUpdateRow={updateParameterRow}
-        parameterMessage={parameterMessage}
-        parameterRows={parameterRows}
-      />
+      {sectionSet.has("parameters") ? (
+        <EndpointParametersPanel
+          canSave={canWrite && Boolean(onSaveParameters)}
+          onAddRow={() => setParameterRows((current) => [...current, createParameterDraft()])}
+          onRemoveRow={(index) => setParameterRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+          onSave={() => void handleSaveParameters()}
+          onUpdateRow={updateParameterRow}
+          parameterMessage={parameterMessage}
+          parameterRows={parameterRows}
+        />
+      ) : null}
 
-      <EndpointResponsesPanel
-        canSave={canWrite && Boolean(onSaveResponses)}
-        onAddRow={() => setResponseRows((current) => [...current, createResponseDraft()])}
-        onRemoveRow={(index) => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-        onSave={() => void handleSaveResponses()}
-        onUpdateRow={updateResponseRow}
-        responseMessage={responseMessage}
-        responseRows={responseRows}
-      />
+      {sectionSet.has("responses") ? (
+        <EndpointResponsesPanel
+          canSave={canWrite && Boolean(onSaveResponses)}
+          onAddRow={() => setResponseRows((current) => [...current, createResponseDraft()])}
+          onRemoveRow={(index) => setResponseRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+          onSave={() => void handleSaveResponses()}
+          onUpdateRow={updateResponseRow}
+          responseMessage={responseMessage}
+          responseRows={responseRows}
+        />
+      ) : null}
 
-      <EndpointMockRulesPanel
-        buildRuleSummary={buildRuleSummary}
-        canSave={canWrite && Boolean(onSaveMockRules)}
-        formatRulePreviewBody={formatRulePreviewBody}
-        mockRuleMessage={mockRuleMessage}
-        mockRuleRows={mockRuleRows}
-        onAddRule={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
-        onRemoveRule={(index) => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
-        onSaveRules={() => void handleSaveMockRules()}
-        onUpdateRule={updateMockRuleRow}
-      />
+      {sectionSet.has("mockRules") ? (
+        <EndpointMockRulesPanel
+          buildRuleSummary={buildRuleSummary}
+          canSave={canWrite && Boolean(onSaveMockRules)}
+          formatRulePreviewBody={formatRulePreviewBody}
+          mockRuleMessage={mockRuleMessage}
+          mockRuleRows={mockRuleRows}
+          onAddRule={() => setMockRuleRows((current) => [...current, createMockRuleDraft()])}
+          onRemoveRule={(index) => setMockRuleRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+          onSaveRules={() => void handleSaveMockRules()}
+          onUpdateRule={updateMockRuleRow}
+        />
+      ) : null}
 
-      <EndpointMockSimulatorPanel
-        canRun={Boolean(onSimulateMock)}
-        isSimulating={isSimulating}
-        onBodyTextChange={setSimulationBodyText}
-        onHeaderTextChange={setSimulationHeaderText}
-        onQueryTextChange={setSimulationQueryText}
-        onRun={() => void handleRunSimulation()}
-        simulationBodyText={simulationBodyText}
-        simulationHeaderText={simulationHeaderText}
-        simulationMessage={simulationMessage}
-        simulationQueryText={simulationQueryText}
-        simulationResult={simulationResult}
-      />
+      {sectionSet.has("mockRuntime") ? (
+        <>
+          <EndpointMockSimulatorPanel
+            canRun={Boolean(onSimulateMock)}
+            isSimulating={isSimulating}
+            onBodyTextChange={setSimulationBodyText}
+            onHeaderTextChange={setSimulationHeaderText}
+            onQueryTextChange={setSimulationQueryText}
+            onRun={() => void handleRunSimulation()}
+            simulationBodyText={simulationBodyText}
+            simulationHeaderText={simulationHeaderText}
+            simulationMessage={simulationMessage}
+            simulationQueryText={simulationQueryText}
+            simulationResult={simulationResult}
+          />
 
-      <PublishedRuntimePanel
-        draftRuntimeSummary={draftRuntimeSummary}
-        inspectedRelease={inspectedRelease}
-        inspectedReleaseId={inspectedRelease ? String(inspectedRelease.id) : ""}
-        isPublishing={isPublishing}
-        latestRelease={latestRelease}
-        mockUrl={buildMockUrl(projectId, formState.path)}
-        mockReleases={mockReleases}
-        onInspectedReleaseChange={setInspectedReleaseId}
-        onPublish={canWrite && onPublishMockRelease ? () => void handlePublishMock() : undefined}
-        publishMessage={publishMessage}
-        publishedResponseGroups={publishedResponseGroups}
-        publishedRuleItems={publishedRuleItems}
-        publishedRuntimeSummary={publishedRuntimeSummary}
-        runtimeDiffItems={runtimeDiffItems}
-      />
+          <PublishedRuntimePanel
+            draftRuntimeSummary={draftRuntimeSummary}
+            inspectedRelease={inspectedRelease}
+            inspectedReleaseId={inspectedRelease ? String(inspectedRelease.id) : ""}
+            isPublishing={isPublishing}
+            latestRelease={latestRelease}
+            mockUrl={buildMockUrl(projectId, formState.path)}
+            mockReleases={mockReleases}
+            onInspectedReleaseChange={setInspectedReleaseId}
+            onPublish={canWrite && onPublishMockRelease ? () => void handlePublishMock() : undefined}
+            publishMessage={publishMessage}
+            publishedResponseGroups={publishedResponseGroups}
+            publishedRuleItems={publishedRuleItems}
+            publishedRuntimeSummary={publishedRuntimeSummary}
+            runtimeDiffItems={runtimeDiffItems}
+          />
+        </>
+      ) : null}
 
-      <EndpointVersionPanel
-        compareVersion={compareVersion}
-        compareVersionId={compareVersionId}
-        diffResult={diffResult}
-        endpointStatus={endpoint.status ?? "draft"}
-        isRestoring={isRestoring}
-        isManagingRelease={isManagingRelease}
-        latestSnapshot={latestSnapshot}
-        onClearReleasedVersion={canWrite && onClearReleasedVersion ? () => void handleClearReleasedVersion() : undefined}
-        onCompareVersionChange={setCompareVersionId}
-        onReleaseVersion={canWrite && onReleaseVersion ? (version) => void handleReleaseVersion(version) : undefined}
-        onRestoreVersion={canWrite && onRestoreVersion ? (version) => void handleRestoreVersion(version) : undefined}
-        onSaveVersion={canWrite && onSaveVersion ? () => void handleSaveVersion() : undefined}
-        onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
-        releaseError={releaseError}
-        releasedVersionId={endpoint.releasedVersionId ?? null}
-        releasedVersionLabel={endpoint.releasedVersionLabel ?? null}
-        releasedAt={endpoint.releasedAt ?? null}
-        releaseMessage={releaseMessage}
-        restoreError={restoreError}
-        restoreMessage={restoreMessage}
-        versionForm={versionForm}
-        versionMessage={versionMessage}
-        versions={versions}
-      />
+      {sectionSet.has("versions") ? (
+        <EndpointVersionPanel
+          compareVersion={compareVersion}
+          compareVersionId={compareVersionId}
+          diffResult={diffResult}
+          endpointStatus={endpoint.status ?? "draft"}
+          isRestoring={isRestoring}
+          isManagingRelease={isManagingRelease}
+          latestSnapshot={latestSnapshot}
+          onClearReleasedVersion={canWrite && onClearReleasedVersion ? () => void handleClearReleasedVersion() : undefined}
+          onCompareVersionChange={setCompareVersionId}
+          onReleaseVersion={canWrite && onReleaseVersion ? (version) => void handleReleaseVersion(version) : undefined}
+          onRestoreVersion={canWrite && onRestoreVersion ? (version) => void handleRestoreVersion(version) : undefined}
+          onSaveVersion={canWrite && onSaveVersion ? () => void handleSaveVersion() : undefined}
+          onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
+          releaseError={releaseError}
+          releasedVersionId={endpoint.releasedVersionId ?? null}
+          releasedVersionLabel={endpoint.releasedVersionLabel ?? null}
+          releasedAt={endpoint.releasedAt ?? null}
+          releaseMessage={releaseMessage}
+          restoreError={restoreError}
+          restoreMessage={restoreMessage}
+          versionForm={versionForm}
+          versionMessage={versionMessage}
+          versions={versions}
+        />
+      ) : null}
     </section>
   );
 

@@ -6,18 +6,21 @@ import { useEffect, useMemo, useState } from "react";
 
 import { SessionBar } from "../../../features/auth/components/session-bar";
 import { ProjectCatalogToolbar } from "../../../features/projects/components/project-catalog-toolbar";
-import { ProjectCard } from "../../../features/projects/components/project-card";
-import { ProjectCreateDrawer } from "../../../features/projects/components/project-create-drawer";
 import {
+  buildProjectCatalogGroups,
   filterProjects,
   normalizeProjectKey,
   type ProjectCatalogFilter,
   type ProjectCreateDraft,
   validateProjectDraft
 } from "../../../features/projects/components/project-catalog-utils";
+import { ProjectCard } from "../../../features/projects/components/project-card";
+import { ProjectCreateDrawer } from "../../../features/projects/components/project-create-drawer";
+import { useI18n } from "../../../lib/ui-preferences";
 
 export default function ProjectsPage() {
   const { push, replace } = useRouter();
+  const { t } = useI18n();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ProjectCatalogFilter>("all");
@@ -84,17 +87,20 @@ export default function ProjectsPage() {
   }, [replace]);
 
   const visibleProjects = useMemo(() => filterProjects(projects, searchQuery, activeFilter), [activeFilter, projects, searchQuery]);
+  const groups = useMemo(() => buildProjectCatalogGroups(projects), [projects]);
   const editableCount = useMemo(() => projects.filter((project) => project.canWrite).length, [projects]);
   const manageCount = useMemo(() => projects.filter((project) => project.canManageMembers).length, [projects]);
   const reviewCount = useMemo(() => projects.filter((project) => !project.canWrite).length, [projects]);
+  const activeGroup = useMemo(() => groups.find((group) => group.filter === activeFilter) ?? groups[0] ?? null, [activeFilter, groups]);
   const draftErrors = useMemo(() => validateProjectDraft(createDraft), [createDraft]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1320px] flex-col gap-8 p-6 text-slate-900">
+    <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 p-6 text-slate-900">
       <SessionBar />
       <ProjectCatalogToolbar
         activeFilter={activeFilter}
         editableCount={editableCount}
+        groups={groups}
         manageCount={manageCount}
         onCreate={() => {
           setCreateError(null);
@@ -111,38 +117,51 @@ export default function ProjectsPage() {
         <div className="rounded-[2rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div>
       ) : null}
 
-      {isLoading ? (
-        <div className="rounded-[2rem] border border-white/60 bg-white/75 px-6 py-10 text-sm text-slate-500 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-          Loading projects...
+      <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="app-shell-card rounded-[2rem] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Active Group</p>
+          <h2 className="mt-3 text-2xl font-semibold text-slate-950">{activeGroup?.label ?? t("catalog.group.all")}</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{activeGroup?.description ?? t("catalog.group.all.description")}</p>
+          <div className="mt-5 rounded-[1.5rem] bg-slate-950 px-4 py-4 text-white">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Visible Projects</p>
+            <p className="mt-2 text-3xl font-semibold">{visibleProjects.length}</p>
+            <p className="mt-2 text-sm text-slate-300">
+              {searchQuery.trim() ? `Filtered by "${searchQuery.trim()}"` : "Ready to open the next workspace."}
+            </p>
+          </div>
+        </aside>
+
+        <div className="space-y-5">
+          {isLoading ? (
+            <div className="app-shell-card rounded-[2rem] px-6 py-10 text-sm text-slate-500">Loading projects...</div>
+          ) : projects.length === 0 ? (
+            <section className="app-shell-card rounded-[2rem] px-6 py-12 text-center">
+              <p className="text-base font-semibold text-slate-950">{t("catalog.emptyAll")}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-500">{t("catalog.emptyAllDetail")}</p>
+              <button
+                className="app-button-primary mt-6 rounded-2xl px-4 py-3 text-sm font-medium transition hover:opacity-90"
+                onClick={() => {
+                  setCreateError(null);
+                  setIsCreateDrawerOpen(true);
+                }}
+                type="button"
+              >
+                {t("catalog.createProject")}
+              </button>
+            </section>
+          ) : visibleProjects.length === 0 ? (
+            <section className="app-shell-card rounded-[2rem] px-6 py-10 text-center text-sm text-slate-500">
+              {t("catalog.empty")}
+            </section>
+          ) : (
+            <section className="grid gap-5 md:grid-cols-2">
+              {visibleProjects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
+            </section>
+          )}
         </div>
-      ) : projects.length === 0 ? (
-        <section className="rounded-[2rem] border border-dashed border-slate-200 bg-white/75 px-6 py-12 text-center shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-          <p className="text-base font-semibold text-slate-950">No workspaces yet</p>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            Create the first project to start shaping grouped endpoints, debug policies, and mock runtime snapshots.
-          </p>
-          <button
-            className="mt-6 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
-            onClick={() => {
-              setCreateError(null);
-              setIsCreateDrawerOpen(true);
-            }}
-            type="button"
-          >
-            Create project
-          </button>
-        </section>
-      ) : visibleProjects.length === 0 ? (
-        <section className="rounded-[2rem] border border-dashed border-slate-200 bg-white/75 px-6 py-10 text-center text-sm text-slate-500 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-          No matching projects. Adjust the search query or access filter.
-        </section>
-      ) : (
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {visibleProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </section>
-      )}
+      </section>
 
       <ProjectCreateDrawer
         draft={createDraft}

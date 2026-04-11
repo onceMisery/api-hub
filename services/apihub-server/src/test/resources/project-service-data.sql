@@ -19,8 +19,8 @@ VALUES (1, 'Default Space', 'default', 1, 'active');
 INSERT INTO space_member (id, space_id, user_id, role_code, member_status)
 VALUES (1, 1, 1, 'space_admin', 'active');
 
-INSERT INTO project (id, space_id, name, project_key, description, debug_allowed_hosts_json, owner_id, status)
-VALUES (1, 1, 'Default Project', 'default', 'Seed project', '[]', 1, 'active');
+INSERT INTO project (id, space_id, name, project_key, description, debug_allowed_hosts_json, mock_access_mode, mock_access_token, owner_id, status)
+VALUES (1, 1, 'Default Project', 'default', 'Seed project', '[]', 'private', 'seed-private-token', 1, 'active');
 
 INSERT INTO project_member (id, project_id, user_id, role_code, member_status)
 VALUES (1, 1, 1, 'project_admin', 'active');
@@ -53,8 +53,18 @@ VALUES (1, 1, 1, 1, 'Get User', 'Seed endpoint', 'GET:/users/{id}', 'GET', '/use
 INSERT INTO api_version (id, endpoint_id, revision_no, version_label, snapshot_json, change_summary, created_by)
 VALUES (1, 1, 1, 'v1', '{"endpoint":{"path":"/users/{id}"},"responses":[{"httpStatusCode":200,"mediaType":"application/json","name":"userId","dataType":"string","required":true,"description":"","exampleValue":"u_1001"}]}', 'Initial seed version', 1);
 
+INSERT INTO project_share_link (id, project_id, share_code, name, description, enabled, expires_at, created_by, created_at, updated_at)
+VALUES (1, 1, 'active-share-code', 'Public Docs', 'Seed active share', TRUE, TIMESTAMP '2099-01-01 00:00:00', 1, TIMESTAMP '2026-04-11 10:00:00', TIMESTAMP '2026-04-11 10:00:00');
+
+INSERT INTO project_share_link (id, project_id, share_code, name, description, enabled, expires_at, created_by, created_at, updated_at)
+VALUES (2, 1, 'disabled-share-code', 'Disabled Docs', 'Seed disabled share', FALSE, TIMESTAMP '2099-01-01 00:00:00', 1, TIMESTAMP '2026-04-11 10:05:00', TIMESTAMP '2026-04-11 10:05:00');
+
+INSERT INTO project_share_link (id, project_id, share_code, name, description, enabled, expires_at, created_by, created_at, updated_at)
+VALUES (3, 1, 'expired-share-code', 'Expired Docs', 'Seed expired share', TRUE, TIMESTAMP '2020-01-01 00:00:00', 1, TIMESTAMP '2026-04-11 10:10:00', TIMESTAMP '2026-04-11 10:10:00');
+
 ALTER TABLE environment ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE module ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_group ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_endpoint ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_version ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE project_share_link ALTER COLUMN id RESTART WITH 4;

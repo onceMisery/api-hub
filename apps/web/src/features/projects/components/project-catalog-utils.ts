@@ -2,6 +2,13 @@ import type { ProjectSummary } from "@api-hub/api-sdk";
 
 export type ProjectCatalogFilter = "all" | "editable" | "review" | "manage";
 
+export type ProjectCatalogGroup = {
+  count: number;
+  description: string;
+  filter: ProjectCatalogFilter;
+  label: string;
+};
+
 export type ProjectCreateDraft = {
   name: string;
   projectKey: string;
@@ -43,6 +50,35 @@ export function filterProjects(projects: ProjectSummary[], search: string, filte
         return true;
     }
   });
+}
+
+export function buildProjectCatalogGroups(projects: ProjectSummary[]): ProjectCatalogGroup[] {
+  return [
+    {
+      filter: "all",
+      label: "全部项目",
+      description: "查看你在当前控制台可访问的全部项目。",
+      count: filterProjects(projects, "", "all").length
+    },
+    {
+      filter: "manage",
+      label: "成员管理",
+      description: "你可以调整成员和权限席位的项目。",
+      count: filterProjects(projects, "", "manage").length
+    },
+    {
+      filter: "editable",
+      label: "可编辑",
+      description: "你可以直接维护 API 的项目。",
+      count: filterProjects(projects, "", "editable").length
+    },
+    {
+      filter: "review",
+      label: "只读评审",
+      description: "用于查阅和验证的只读项目。",
+      count: filterProjects(projects, "", "review").length
+    }
+  ];
 }
 
 export function formatProjectAccess(role: string | null | undefined) {
