@@ -6,6 +6,7 @@ CREATE TABLE sys_user (
   display_name VARCHAR(128) NOT NULL,
   email VARCHAR(128) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  token_version INT NOT NULL DEFAULT 0,
   status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 

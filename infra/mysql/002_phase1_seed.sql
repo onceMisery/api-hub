@@ -6,6 +6,7 @@ INSERT INTO sys_user (
   display_name,
   email,
   password_hash,
+  token_version,
   status
 ) VALUES (
   1,
@@ -13,6 +14,7 @@ INSERT INTO sys_user (
   'Administrator',
   'admin@local.dev',
   '$2a$10$QnVh6b3y4f1DgYI2TgQeMeD2f0t4lRj4D0u8D6RAV8w0Q6N3F4WkK',
+  0,
   'active'
 );
 

@@ -30,6 +30,6 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Bad credentials");
         }
 
-        return jwtTokenService.issueTokens(String.valueOf(user.id()));
+        return jwtTokenService.issueTokens(user.id(), user.username(), user.tokenVersion());
     }
 }

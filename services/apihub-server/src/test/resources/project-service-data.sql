@@ -1,5 +1,5 @@
-INSERT INTO sys_user (id, username, display_name, email, password_hash, status)
-VALUES (1, 'admin', 'Administrator', 'admin@local.dev', 'hash', 'active');
+INSERT INTO sys_user (id, username, display_name, email, password_hash, token_version, status)
+VALUES (1, 'admin', 'Administrator', 'admin@local.dev', 'hash', 0, 'active');
 
 INSERT INTO space (id, name, space_key, owner_id, status)
 VALUES (1, 'Default Space', 'default', 1, 'active');

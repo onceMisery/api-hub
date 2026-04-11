@@ -8,6 +8,12 @@ spring:
     password: ${APIHUB_DB_PASSWORD:root}
 
 apihub:
+  auth:
+    jwt:
+      issuer: ${APIHUB_JWT_ISSUER:apihub}
+      secret: ${APIHUB_JWT_SECRET:dev-secret-change-me}
+      access-expires-seconds: ${APIHUB_JWT_ACCESS_EXPIRES_SECONDS:900}
+      refresh-expires-seconds: ${APIHUB_JWT_REFRESH_EXPIRES_SECONDS:604800}
   debug:
     security:
       connect-timeout-ms: 5000
