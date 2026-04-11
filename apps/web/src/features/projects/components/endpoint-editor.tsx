@@ -26,6 +26,7 @@ import {
   formatConditions,
   formatRulePreviewBody,
   normalizeSnapshot,
+  parseRestorableSnapshot,
   parseBodyConditions,
   parseConditions,
   summarizeDraftRuntime,
@@ -53,6 +54,7 @@ type EndpointEditorProps = {
   onSaveMockRules?: (payload: MockRuleUpsertItem[]) => Promise<void>;
   onSaveParameters?: (payload: ParameterUpsertItem[]) => Promise<void>;
   onSaveResponses?: (payload: ResponseUpsertItem[]) => Promise<void>;
+  onRestoreVersion?: (version: VersionDetail, snapshot: SnapshotShape) => Promise<void>;
   onSimulateMock?: (payload: MockSimulationPayload) => Promise<MockSimulationResult>;
   onSaveVersion?: (payload: { version: string; changeSummary: string }) => Promise<void>;
   mockReleases?: MockReleaseDetail[];
@@ -79,6 +81,7 @@ export function EndpointEditor(props: EndpointEditorProps) {
     onSaveMockRules,
     onSaveParameters,
     onSaveResponses,
+    onRestoreVersion,
     onSimulateMock,
     onSaveVersion,
     mockReleases = EMPTY_MOCK_RELEASES,
@@ -106,12 +109,15 @@ export function EndpointEditor(props: EndpointEditorProps) {
   const [simulationResult, setSimulationResult] = useState<MockSimulationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [mockRuleMessage, setMockRuleMessage] = useState<string | null>(null);
   const [parameterMessage, setParameterMessage] = useState<string | null>(null);
   const [responseMessage, setResponseMessage] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [simulationMessage, setSimulationMessage] = useState<string | null>(null);
   const [versionMessage, setVersionMessage] = useState<string | null>(null);
 
@@ -138,6 +144,8 @@ export function EndpointEditor(props: EndpointEditorProps) {
     setMockRuleMessage(null);
     setParameterMessage(null);
     setResponseMessage(null);
+    setRestoreError(null);
+    setRestoreMessage(null);
     setSimulationMessage(null);
     setVersionMessage(null);
   }, [endpoint]);
@@ -345,10 +353,14 @@ export function EndpointEditor(props: EndpointEditorProps) {
         compareVersion={compareVersion}
         compareVersionId={compareVersionId}
         diffItems={diffItems}
+        isRestoring={isRestoring}
         latestSnapshot={latestSnapshot}
         onCompareVersionChange={setCompareVersionId}
+        onRestoreVersion={canWrite && onRestoreVersion ? (version) => void handleRestoreVersion(version) : undefined}
         onSaveVersion={canWrite && onSaveVersion ? () => void handleSaveVersion() : undefined}
         onVersionFieldChange={(field, value) => setVersionForm((current) => ({ ...current, [field]: value }))}
+        restoreError={restoreError}
+        restoreMessage={restoreMessage}
         versionForm={versionForm}
         versionMessage={versionMessage}
         versions={versions}
@@ -440,6 +452,27 @@ export function EndpointEditor(props: EndpointEditorProps) {
 
     await onSaveVersion(versionForm);
     setVersionMessage("Saved");
+  }
+
+  async function handleRestoreVersion(version: VersionDetail) {
+    if (!onRestoreVersion) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreError(null);
+    setRestoreMessage(null);
+
+    try {
+      const snapshot = parseRestorableSnapshot(version.snapshotJson);
+      await onRestoreVersion(version, snapshot);
+      setCompareVersionId(String(version.id));
+      setRestoreMessage(`Restored snapshot from ${version.version}. Save a new version if you want to record this rollback.`);
+    } catch (error) {
+      setRestoreError(error instanceof Error ? error.message : "Version snapshot cannot be restored.");
+    } finally {
+      setIsRestoring(false);
+    }
   }
 
   function updateField<K extends keyof UpdateEndpointPayload>(field: K, value: UpdateEndpointPayload[K]) {

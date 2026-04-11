@@ -330,6 +330,112 @@ describe("EndpointEditor", () => {
     expect(screen.getByText("200 application/json userId: u_1001 -> u_2002")).toBeInTheDocument();
   });
 
+  it("restores a selected version snapshot through the restore callback", async () => {
+    const onRestoreVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: false
+        }}
+        projectId={1}
+        onRestoreVersion={onRestoreVersion}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User Legacy",
+                method: "POST",
+                path: "/legacy/users",
+                description: "Legacy"
+              },
+              parameters: [
+                {
+                  sectionType: "query",
+                  name: "expand",
+                  dataType: "string",
+                  required: false,
+                  description: "",
+                  exampleValue: ""
+                }
+              ],
+              responses: [
+                {
+                  httpStatusCode: 202,
+                  mediaType: "application/json",
+                  name: "jobId",
+                  dataType: "string",
+                  required: true,
+                  description: "",
+                  exampleValue: "job_1"
+                }
+              ]
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore snapshot v1" }));
+
+    await waitFor(() =>
+      expect(onRestoreVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ version: "v1" }),
+        expect.objectContaining({
+          endpoint: expect.objectContaining({
+            name: "Get User Legacy",
+            method: "POST",
+            path: "/legacy/users"
+          })
+        })
+      )
+    );
+  });
+
+  it("shows a restore error for malformed version snapshots", async () => {
+    const onRestoreVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: false
+        }}
+        projectId={1}
+        onRestoreVersion={onRestoreVersion}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Broken snapshot",
+            snapshotJson: "{\"endpoint\":{}}"
+          }
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore snapshot v1" }));
+
+    expect(await screen.findByText("Version snapshot cannot be restored.")).toBeInTheDocument();
+    expect(onRestoreVersion).not.toHaveBeenCalled();
+  });
+
   it("runs a draft mock simulation and renders the resolved result", async () => {
     const onSimulateMock = vi.fn().mockResolvedValue({
       source: "rule",

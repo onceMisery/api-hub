@@ -451,6 +451,154 @@ describe("ProjectShell", () => {
     expect(screen.getByText("Pick an endpoint")).toBeInTheDocument();
   });
 
+  it("restores a historical version into the current endpoint workspace", async () => {
+    fetchEndpoint.mockReset();
+    fetchEndpoint
+      .mockResolvedValueOnce({
+        data: {
+          id: 31,
+          groupId: 21,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Endpoint detail",
+          mockEnabled: false
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 31,
+          groupId: 21,
+          name: "Get User Legacy",
+          method: "POST",
+          path: "/legacy/users",
+          description: "Legacy",
+          mockEnabled: false
+        }
+      });
+    fetchEndpointParameters
+      .mockReset()
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 77,
+            sectionType: "query",
+            name: "expand",
+            dataType: "string",
+            required: false,
+            description: "",
+            exampleValue: "team",
+            sortOrder: 0
+          }
+        ]
+      });
+    fetchEndpointResponses
+      .mockReset()
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 88,
+            httpStatusCode: 202,
+            mediaType: "application/json",
+            name: "jobId",
+            dataType: "string",
+            required: true,
+            description: "",
+            exampleValue: "job_1",
+            sortOrder: 0
+          }
+        ]
+      });
+    fetchEndpointVersions.mockResolvedValueOnce({
+      data: [
+        {
+          id: 2,
+          endpointId: 31,
+          version: "v2",
+          changeSummary: "Latest",
+          snapshotJson: "{}"
+        },
+        {
+          id: 1,
+          endpointId: 31,
+          version: "v1",
+          changeSummary: "Rollback target",
+          snapshotJson: JSON.stringify({
+            endpoint: {
+              name: "Get User Legacy",
+              method: "POST",
+              path: "/legacy/users",
+              description: "Legacy"
+            },
+            parameters: [
+              {
+                sectionType: "query",
+                name: "expand",
+                dataType: "string",
+                required: false,
+                description: "",
+                exampleValue: "team"
+              }
+            ],
+            responses: [
+              {
+                httpStatusCode: 202,
+                mediaType: "application/json",
+                name: "jobId",
+                dataType: "string",
+                required: true,
+                description: "",
+                exampleValue: "job_1"
+              }
+            ]
+          })
+        }
+      ]
+    });
+
+    render(<ProjectShell projectId={1} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Restore snapshot v1" }));
+
+    await waitFor(() =>
+      expect(updateEndpoint).toHaveBeenCalledWith(31, {
+        description: "Legacy",
+        method: "POST",
+        mockEnabled: false,
+        name: "Get User Legacy",
+        path: "/legacy/users"
+      })
+    );
+    await waitFor(() =>
+      expect(replaceEndpointParameters).toHaveBeenCalledWith(31, [
+        {
+          sectionType: "query",
+          name: "expand",
+          dataType: "string",
+          required: false,
+          description: "",
+          exampleValue: "team"
+        }
+      ])
+    );
+    await waitFor(() =>
+      expect(replaceEndpointResponses).toHaveBeenCalledWith(31, [
+        {
+          httpStatusCode: 202,
+          mediaType: "application/json",
+          name: "jobId",
+          dataType: "string",
+          required: true,
+          description: "",
+          exampleValue: "job_1"
+        }
+      ])
+    );
+    expect(await screen.findByDisplayValue("Get User Legacy")).toBeInTheDocument();
+  });
+
   it("filters modules, groups, and endpoints from the tree search", async () => {
     fetchProjectTree.mockReset().mockResolvedValueOnce({
       data: {

@@ -1,4 +1,11 @@
-import type { MockBodyConditionEntry, MockConditionEntry, MockReleaseDetail } from "@api-hub/api-sdk";
+import type {
+  MockBodyConditionEntry,
+  MockConditionEntry,
+  MockReleaseDetail,
+  ParameterUpsertItem,
+  ResponseUpsertItem,
+  UpdateEndpointPayload
+} from "@api-hub/api-sdk";
 
 export type ParameterDraft = {
   sectionType: string;
@@ -184,6 +191,38 @@ export function normalizeSnapshot(snapshotJson: string | null): SnapshotShape {
   } catch {
     return emptySnapshot();
   }
+}
+
+export function parseRestorableSnapshot(snapshotJson: string | null): SnapshotShape {
+  if (!snapshotJson) {
+    throw new Error("Version snapshot cannot be restored.");
+  }
+
+  const normalized = normalizeSnapshot(snapshotJson);
+
+  if (!normalized.endpoint.name.trim() || !normalized.endpoint.method.trim() || !normalized.endpoint.path.trim()) {
+    throw new Error("Version snapshot cannot be restored.");
+  }
+
+  return normalized;
+}
+
+export function buildEndpointRestorePayload(snapshot: SnapshotShape, currentMockEnabled: boolean): UpdateEndpointPayload {
+  return {
+    description: snapshot.endpoint.description,
+    method: snapshot.endpoint.method,
+    mockEnabled: currentMockEnabled,
+    name: snapshot.endpoint.name,
+    path: snapshot.endpoint.path
+  };
+}
+
+export function buildParameterRestorePayload(snapshot: SnapshotShape): ParameterUpsertItem[] {
+  return snapshot.parameters.map((parameter) => ({ ...parameter }));
+}
+
+export function buildResponseRestorePayload(snapshot: SnapshotShape): ResponseUpsertItem[] {
+  return snapshot.responses.map((response) => ({ ...response }));
 }
 
 export function normalizeParameterDraft(parameter: Partial<ParameterDraft>): ParameterDraft {

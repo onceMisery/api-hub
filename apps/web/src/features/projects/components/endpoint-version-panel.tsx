@@ -7,13 +7,17 @@ type EndpointVersionPanelProps = {
   versions: VersionDetail[];
   compareVersion: VersionDetail | null;
   diffItems: Array<{ title: string; detail: string }>;
+  isRestoring: boolean;
   versionForm: {
     version: string;
     changeSummary: string;
   };
   latestSnapshot: string;
+  restoreError: string | null;
+  restoreMessage: string | null;
   versionMessage: string | null;
   onCompareVersionChange: (value: string) => void;
+  onRestoreVersion?: (version: VersionDetail) => void;
   onVersionFieldChange: (field: "version" | "changeSummary", value: string) => void;
   onSaveVersion?: () => void;
 };
@@ -23,10 +27,14 @@ export function EndpointVersionPanel({
   versions,
   compareVersion,
   diffItems,
+  isRestoring,
   versionForm,
   latestSnapshot,
+  restoreError,
+  restoreMessage,
   versionMessage,
   onCompareVersionChange,
+  onRestoreVersion,
   onVersionFieldChange,
   onSaveVersion
 }: EndpointVersionPanelProps) {
@@ -50,11 +58,28 @@ export function EndpointVersionPanel({
           </Field>
 
           <div className="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Version Diff</p>
-              {compareVersion ? (
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{compareVersion.version}</span>
-              ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Version Diff</p>
+                {compareVersion ? (
+                  <p className="mt-2 text-sm text-slate-500">Inspect drift against {compareVersion.version} before rolling back.</p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {compareVersion ? (
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">{compareVersion.version}</span>
+                ) : null}
+                {compareVersion && onRestoreVersion ? (
+                  <button
+                    className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isRestoring}
+                    onClick={() => onRestoreVersion(compareVersion)}
+                    type="button"
+                  >
+                    {isRestoring ? "Restoring..." : "Restore selected snapshot"}
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {compareVersion ? (
@@ -73,6 +98,9 @@ export function EndpointVersionPanel({
             ) : (
               <p className="mt-4 text-sm text-slate-500">Choose a historical snapshot to compare against the current draft.</p>
             )}
+
+            {restoreMessage ? <p className="mt-4 text-sm text-emerald-600">{restoreMessage}</p> : null}
+            {restoreError ? <p className="mt-4 text-sm text-rose-600">{restoreError}</p> : null}
           </div>
         </div>
 
@@ -117,13 +145,41 @@ export function EndpointVersionPanel({
         ) : (
           <div className="space-y-3">
             {versions.map((version) => (
-              <div key={version.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
+              <div
+                key={version.id}
+                className={`rounded-[1.7rem] border px-4 py-4 transition ${
+                  compareVersionId === String(version.id)
+                    ? "border-slate-900 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.10)]"
+                    : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{version.version}</p>
                     <p className="mt-1 text-sm text-slate-500">{version.changeSummary || "No change summary."}</p>
                   </div>
-                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">v#{version.id}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">v#{version.id}</span>
+                    <button
+                      aria-label={`Compare snapshot ${version.version}`}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                      onClick={() => onCompareVersionChange(String(version.id))}
+                      type="button"
+                    >
+                      Compare snapshot
+                    </button>
+                    {onRestoreVersion ? (
+                      <button
+                        aria-label={`Restore snapshot ${version.version}`}
+                        className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isRestoring}
+                        onClick={() => onRestoreVersion(version)}
+                        type="button"
+                      >
+                        {isRestoring && compareVersionId === String(version.id) ? "Restoring..." : "Restore snapshot"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <pre className="mt-3 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
                   {version.snapshotJson || "{}"}

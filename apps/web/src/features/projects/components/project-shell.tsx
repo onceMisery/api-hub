@@ -66,6 +66,12 @@ import { SessionBar } from "../../auth/components/session-bar";
 import { ProjectAccessDrawer } from "./project-access-drawer";
 import { ProjectAccessSummaryCard } from "./project-access-summary-card";
 import { EndpointEditor } from "./endpoint-editor";
+import {
+  buildEndpointRestorePayload,
+  buildParameterRestorePayload,
+  buildResponseRestorePayload,
+  type SnapshotShape
+} from "./endpoint-editor-utils";
 import { DebugConsole } from "./debug-console";
 import { EnvironmentPanel } from "./environment-panel";
 import { ProjectSidebar } from "./project-sidebar";
@@ -397,6 +403,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             isLoading={isLoadingEndpoint}
             onDelete={handleDeleteEndpoint}
             onPublishMockRelease={handlePublishMockRelease}
+            onRestoreVersion={handleRestoreVersion}
             onSave={handleSaveEndpoint}
             onSaveMockRules={handleSaveMockRules}
             onSaveParameters={handleSaveParameters}
@@ -921,6 +928,40 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
       setError(saveError instanceof Error ? saveError.message : "Failed to save version snapshot");
       throw saveError;
+    }
+  }
+
+  async function handleRestoreVersion(version: VersionDetail, snapshot: SnapshotShape) {
+    if (!selectedEndpointId || !endpoint) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await updateEndpoint(selectedEndpointId, buildEndpointRestorePayload(snapshot, endpoint.mockEnabled));
+      await replaceEndpointParameters(selectedEndpointId, buildParameterRestorePayload(snapshot));
+      await replaceEndpointResponses(selectedEndpointId, buildResponseRestorePayload(snapshot));
+
+      const [endpointResponse, parameterResponse, responseResponse] = await Promise.all([
+        fetchEndpoint(selectedEndpointId),
+        fetchEndpointParameters(selectedEndpointId),
+        fetchEndpointResponses(selectedEndpointId)
+      ]);
+
+      setEndpoint(endpointResponse.data);
+      setParameters(parameterResponse.data);
+      setResponses(responseResponse.data);
+      await reloadTree(selectedEndpointId);
+    } catch (restoreError) {
+      if (handleUnauthorized(restoreError)) {
+        return;
+      }
+
+      setError(
+        restoreError instanceof Error ? restoreError.message : `Failed to restore version snapshot ${version.version}`
+      );
+      throw restoreError;
     }
   }
 
