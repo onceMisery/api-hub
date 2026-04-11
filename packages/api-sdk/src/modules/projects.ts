@@ -108,7 +108,7 @@ export type EnvironmentDetail = {
   variables: EnvironmentEntry[];
   defaultHeaders: EnvironmentEntry[];
   defaultQuery: EnvironmentEntry[];
-  authMode: "none" | "bearer" | "api_key_header";
+  authMode: "none" | "bearer" | "api_key_header" | "api_key_query" | "basic";
   authKey: string;
   authValue: string;
   debugHostMode: "inherit" | "append" | "override";
@@ -167,7 +167,7 @@ export type CreateEnvironmentPayload = {
   variables: EnvironmentEntry[];
   defaultHeaders: EnvironmentEntry[];
   defaultQuery: EnvironmentEntry[];
-  authMode: "none" | "bearer" | "api_key_header";
+  authMode: "none" | "bearer" | "api_key_header" | "api_key_query" | "basic";
   authKey: string;
   authValue: string;
   debugHostMode: "inherit" | "append" | "override";
@@ -181,7 +181,7 @@ export type UpdateEnvironmentPayload = {
   variables: EnvironmentEntry[];
   defaultHeaders: EnvironmentEntry[];
   defaultQuery: EnvironmentEntry[];
-  authMode: "none" | "bearer" | "api_key_header";
+  authMode: "none" | "bearer" | "api_key_header" | "api_key_query" | "basic";
   authKey: string;
   authValue: string;
   debugHostMode: "inherit" | "append" | "override";

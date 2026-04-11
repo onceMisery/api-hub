@@ -720,6 +720,70 @@ describe("ProjectShell", () => {
     expect(within(toast).getByText("Staging is now available in the workbench.")).toBeInTheDocument();
   });
 
+  it("imports environment bundles as non-default copies and shows a summary notification", async () => {
+    render(<ProjectShell projectId={1} />);
+    expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open environment import" }));
+    fireEvent.change(screen.getByLabelText("Environment bundle import"), {
+      target: {
+        value: JSON.stringify({
+          version: 1,
+          exportedAt: "2026-04-11T12:00:00.000Z",
+          environments: [
+            {
+              name: "Staging",
+              baseUrl: "https://staging.dev",
+              variables: [],
+              defaultHeaders: [],
+              defaultQuery: [],
+              authMode: "api_key_query",
+              authKey: "api_key",
+              authValue: "demo",
+              debugHostMode: "inherit",
+              debugAllowedHosts: []
+            }
+          ]
+        })
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import environment bundle" }));
+
+    await waitFor(() =>
+      expect(createEnvironment).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: "Staging",
+          isDefault: false,
+          authMode: "api_key_query",
+          authKey: "api_key"
+        })
+      )
+    );
+
+    const toast = await screen.findByRole("status");
+    expect(within(toast).getByText("Environment bundle imported")).toBeInTheDocument();
+  });
+
+  it("clones an environment into a non-default copy", async () => {
+    render(<ProjectShell projectId={1} />);
+    expect((await screen.findAllByText("Local")).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clone environment 41" }));
+
+    await waitFor(() =>
+      expect(createEnvironment).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: "Local Copy",
+          baseUrl: "https://local.dev",
+          isDefault: false,
+          authMode: "none"
+        })
+      )
+    );
+  });
+
   it("loads project detail and saves project debug policy", async () => {
     render(<ProjectShell projectId={1} />);
 

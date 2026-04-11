@@ -395,6 +395,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             projectDebugAllowedHosts={project?.debugAllowedHosts ?? []}
             onCreateEnvironment={handleCreateEnvironment}
             onDeleteEnvironment={handleDeleteEnvironment}
+            onImportEnvironmentBundle={handleImportEnvironmentBundle}
             onSelectEnvironment={setSelectedEnvironmentId}
             onUpdateProjectDebugPolicy={handleUpdateProjectPolicy}
             onUpdateEnvironment={handleUpdateEnvironment}
@@ -555,6 +556,36 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       const message = getErrorMessage(creationError, "Failed to create environment");
       setError(message);
       pushError("Environment create failed", message);
+    }
+  }
+
+  async function handleImportEnvironmentBundle(payloads: CreateEnvironmentPayload[]) {
+    setError(null);
+
+    try {
+      let lastEnvironmentId: number | null = null;
+
+      for (const payload of payloads) {
+        const response = await createEnvironment(projectId, payload);
+        lastEnvironmentId = response.data.id;
+      }
+
+      await reloadEnvironments(lastEnvironmentId);
+      pushSuccess(
+        "Environment bundle imported",
+        payloads.length === 1
+          ? "1 environment was added to the workbench."
+          : `${payloads.length} environments were added to the workbench.`
+      );
+    } catch (importError) {
+      if (handleUnauthorized(importError)) {
+        return;
+      }
+
+      const message = getErrorMessage(importError, "Failed to import environment bundle");
+      setError(message);
+      pushError("Environment import failed", message);
+      throw importError;
     }
   }
 

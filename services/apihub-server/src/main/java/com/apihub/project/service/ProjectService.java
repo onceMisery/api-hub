@@ -241,6 +241,7 @@ public class ProjectService {
         requireProjectWriteAccess(userId, projectId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode());
+        validateEnvironmentAuthMode(request.authMode());
         return projectRepository.createEnvironment(userId, projectId, request);
     }
 
@@ -252,7 +253,15 @@ public class ProjectService {
         EnvironmentDetail current = requireEnvironmentWriteAccess(userId, environmentId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode() != null ? request.debugHostMode() : current.debugHostMode());
+        validateEnvironmentAuthMode(request.authMode() != null ? request.authMode() : current.authMode());
         return projectRepository.updateEnvironment(environmentId, request);
+    }
+
+    private void validateEnvironmentAuthMode(String authMode) {
+        String normalized = authMode == null ? "none" : authMode.trim().toLowerCase();
+        if (!List.of("none", "bearer", "api_key_header", "api_key_query", "basic").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported environment auth mode");
+        }
     }
 
     public void deleteEnvironment(Long environmentId) {

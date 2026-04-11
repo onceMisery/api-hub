@@ -262,6 +262,25 @@ class ProjectServiceTest {
     }
 
     @Test
+    void shouldRejectInvalidEnvironmentAuthMode() {
+        assertThatThrownBy(() -> projectService.updateEnvironment(1L, 1L, new UpdateEnvironmentRequest(
+                "Local",
+                "https://local.dev",
+                true,
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                "digest",
+                "",
+                "",
+                "inherit",
+                java.util.List.of())))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void shouldCompleteProjectModuleGroupEndpointVersionFlowAgainstDatabase() {
         assertThat(projectService.listProjects(1L)).extracting("projectKey").contains("default");
 

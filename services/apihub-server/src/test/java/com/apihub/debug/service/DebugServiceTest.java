@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.net.URI;
 import java.net.InetAddress;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -175,6 +176,79 @@ class DebugServiceTest {
         assertThat(requestCaptor.getValue().headers()).containsExactly(
                 new DebugHeader("X-App", "ApiHub"),
                 new DebugHeader("Authorization", "Bearer env-token"));
+    }
+
+    @Test
+    void shouldInjectBasicAuthWhenEnvironmentUsesBasicMode() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(
+                        41L,
+                        1L,
+                        "Partner",
+                        "https://local.dev/api",
+                        true,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        "basic",
+                        "demo-user",
+                        "s3cr3t",
+                        "inherit",
+                        List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+        given(debugHttpExecutor.execute(any())).willReturn(new DebugHttpResult(
+                200,
+                List.of(new DebugHeader("Content-Type", "application/json")),
+                "{\"ok\":true}",
+                20));
+
+        debugService.execute(new ExecuteDebugRequest(41L, 31L, "", List.of(), ""));
+
+        ArgumentCaptor<DebugHttpRequest> requestCaptor = ArgumentCaptor.forClass(DebugHttpRequest.class);
+        verify(debugHttpExecutor).execute(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().headers()).containsExactly(
+                new DebugHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString("demo-user:s3cr3t".getBytes())));
+    }
+
+    @Test
+    void shouldInjectQueryApiKeyBeforeUserQueryOverrides() {
+        given(projectRepository.findProject(1L)).willReturn(Optional.of(
+                new ProjectDetail(1L, "Default", "default", "Seed", List.of())));
+        given(projectRepository.findEnvironment(41L)).willReturn(Optional.of(
+                new EnvironmentDetail(
+                        41L,
+                        1L,
+                        "Partner",
+                        "https://local.dev/api",
+                        true,
+                        List.of(),
+                        List.of(),
+                        List.of(new EnvironmentEntry("locale", "zh-CN")),
+                        "api_key_query",
+                        "api_key",
+                        "env-token",
+                        "inherit",
+                        List.of())));
+        given(endpointRepository.findEndpointReference(31L)).willReturn(Optional.of(
+                new EndpointRepository.EndpointReference(31L, 21L, 1L)));
+        given(endpointRepository.findEndpoint(31L)).willReturn(Optional.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/31", "Load user", false)));
+        given(debugHttpExecutor.execute(any())).willReturn(new DebugHttpResult(
+                200,
+                List.of(new DebugHeader("Content-Type", "application/json")),
+                "{\"ok\":true}",
+                20));
+
+        debugService.execute(new ExecuteDebugRequest(41L, 31L, "verbose=true", List.of(), ""));
+
+        ArgumentCaptor<DebugHttpRequest> requestCaptor = ArgumentCaptor.forClass(DebugHttpRequest.class);
+        verify(debugHttpExecutor).execute(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().uri()).isEqualTo(URI.create("https://local.dev/api/users/31?locale=zh-CN&api_key=env-token&verbose=true"));
     }
 
     @Test

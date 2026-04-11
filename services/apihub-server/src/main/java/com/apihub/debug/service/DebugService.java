@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +106,7 @@ public class DebugService {
         URI targetUri = buildTargetUri(
                 substituteVariables(environment.baseUrl(), variables),
                 substituteVariables(endpoint.path(), variables),
-                mergeQueryString(environment.defaultQuery(), request.queryString(), variables));
+                mergeQueryString(environment.defaultQuery(), request.queryString(), environment, variables));
         enforceTargetPolicy(project, environment, targetUri);
         List<DebugHeader> headers = mergeHeaders(environment.defaultHeaders(), request.headers(), environment, variables);
         String requestBody = substituteVariables(request.body(), variables);
@@ -361,7 +362,10 @@ public class DebugService {
         return List.copyOf(mergedHeaders.values());
     }
 
-    private String mergeQueryString(List<EnvironmentEntry> defaultQuery, String requestQueryString, Map<String, String> variables) {
+    private String mergeQueryString(List<EnvironmentEntry> defaultQuery,
+                                    String requestQueryString,
+                                    EnvironmentDetail environment,
+                                    Map<String, String> variables) {
         LinkedHashMap<String, String> mergedQuery = new LinkedHashMap<>();
         List<EnvironmentEntry> safeDefaultQuery = defaultQuery == null ? List.of() : defaultQuery;
         for (EnvironmentEntry entry : safeDefaultQuery) {
@@ -370,6 +374,8 @@ public class DebugService {
             }
             mergedQuery.put(entry.name().trim(), substituteVariables(entry.value(), variables));
         }
+
+        injectAuthQuery(mergedQuery, environment, variables);
 
         for (EnvironmentEntry entry : parseQueryString(requestQueryString)) {
             mergedQuery.put(entry.name(), substituteVariables(entry.value(), variables));
@@ -419,6 +425,18 @@ public class DebugService {
             return;
         }
 
+        if ("basic".equals(authMode)) {
+            String authUsername = substituteVariables(environment.authKey(), variables);
+            if (authUsername.isBlank()) {
+                return;
+            }
+
+            String encoded = Base64.getEncoder()
+                    .encodeToString((authUsername + ":" + authValue).getBytes(StandardCharsets.UTF_8));
+            mergedHeaders.put("authorization", new DebugHeader("Authorization", "Basic " + encoded));
+            return;
+        }
+
         if ("bearer".equals(authMode)) {
             mergedHeaders.put(authKey.toLowerCase(), new DebugHeader(authKey, "Bearer " + authValue));
             return;
@@ -427,6 +445,21 @@ public class DebugService {
         if ("api_key_header".equals(authMode)) {
             mergedHeaders.put(authKey.toLowerCase(), new DebugHeader(authKey, authValue));
         }
+    }
+
+    private void injectAuthQuery(Map<String, String> mergedQuery, EnvironmentDetail environment, Map<String, String> variables) {
+        String authMode = environment.authMode() == null ? "none" : environment.authMode().trim().toLowerCase();
+        if (!"api_key_query".equals(authMode)) {
+            return;
+        }
+
+        String authKey = substituteVariables(environment.authKey(), variables);
+        String authValue = substituteVariables(environment.authValue(), variables);
+        if (authKey.isBlank() || authValue.isBlank()) {
+            return;
+        }
+
+        mergedQuery.put(authKey.trim(), authValue);
     }
 
     private String substituteVariables(String template, Map<String, String> variables) {
