@@ -25,3 +25,17 @@ export function getAccessToken() {
 
   return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
 }
+
+export function loadTokens() {
+  if (typeof window === "undefined") {
+    return {
+      accessToken: null,
+      refreshToken: null
+    };
+  }
+
+  return {
+    accessToken: window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY),
+    refreshToken: window.localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)
+  };
+}
