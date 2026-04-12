@@ -15,11 +15,24 @@ public final class ProjectDtos {
     public record CreateProjectRequest(String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
     }
 
+    public record SpaceSummary(
+            Long id,
+            String name,
+            String spaceKey,
+            String currentUserRole,
+            boolean canCreateProject,
+            long projectCount
+    ) {
+    }
+
     public record UpdateProjectRequest(String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
     }
 
     public record ProjectDetail(
             Long id,
+            Long spaceId,
+            String spaceName,
+            String spaceKey,
             String name,
             String projectKey,
             String description,
@@ -29,7 +42,20 @@ public final class ProjectDtos {
             boolean canManageMembers
     ) {
         public ProjectDetail(Long id, String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
-            this(id, name, projectKey, description, debugAllowedHosts, null, false, false);
+            this(id, null, null, null, name, projectKey, description, debugAllowedHosts, null, false, false);
+        }
+
+        public ProjectDetail(
+                Long id,
+                Long spaceId,
+                String spaceName,
+                String spaceKey,
+                String name,
+                String projectKey,
+                String description,
+                List<DebugTargetRuleEntry> debugAllowedHosts
+        ) {
+            this(id, spaceId, spaceName, spaceKey, name, projectKey, description, debugAllowedHosts, null, false, false);
         }
     }
 

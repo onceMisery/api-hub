@@ -32,6 +32,7 @@ import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleTreeItem;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
@@ -52,6 +53,7 @@ import java.util.List;
 @Transactional
 public class ProjectService {
 
+    private static final long LEGACY_FALLBACK_SPACE_ID = 1L;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final ProjectRepository projectRepository;
@@ -79,16 +81,40 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ProjectDetail> listProjects(Long userId) {
-        return projectRepository.listProjects(userId);
+        return listProjects(userId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectDetail> listProjects(Long userId, Long spaceId) {
+        if (spaceId != null) {
+            requireSpaceVisible(userId, spaceId);
+        }
+        return projectRepository.listProjects(userId, spaceId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SpaceSummary> listSpaces(Long userId) {
+        return projectRepository.listSpaces(userId);
     }
 
     public ProjectDetail createProject(CreateProjectRequest request) {
-        return createProject(1L, request);
+        return createProject(1L, null, request);
     }
 
     public ProjectDetail createProject(Long userId, CreateProjectRequest request) {
+        Long targetSpaceId = projectRepository.listSpaces(userId).stream()
+                .filter(SpaceSummary::canCreateProject)
+                .map(SpaceSummary::id)
+                .findFirst()
+                .orElse(LEGACY_FALLBACK_SPACE_ID);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
-        return projectRepository.createProject(userId, request);
+        return projectRepository.createProject(userId, targetSpaceId, request);
+    }
+
+    public ProjectDetail createProject(Long userId, Long spaceId, CreateProjectRequest request) {
+        Long targetSpaceId = resolveTargetSpaceId(userId, spaceId);
+        debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
+        return projectRepository.createProject(userId, targetSpaceId, request);
     }
 
     @Transactional(readOnly = true)
@@ -610,6 +636,29 @@ public class ProjectService {
         EnvironmentDetail environment = requireEnvironmentReadAccess(userId, environmentId);
         requireProjectWriteAccess(userId, environment.projectId());
         return environment;
+    }
+
+    private Long resolveTargetSpaceId(Long userId, Long requestedSpaceId) {
+        if (requestedSpaceId != null) {
+            SpaceSummary space = requireSpaceVisible(userId, requestedSpaceId);
+            if (!space.canCreateProject()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Space project creation denied");
+            }
+            return requestedSpaceId;
+        }
+
+        return projectRepository.listSpaces(userId).stream()
+                .filter(SpaceSummary::canCreateProject)
+                .map(SpaceSummary::id)
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No writable space available"));
+    }
+
+    private SpaceSummary requireSpaceVisible(Long userId, Long spaceId) {
+        return projectRepository.listSpaces(userId).stream()
+                .filter(space -> space.id().equals(spaceId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Space not found"));
     }
 
     private String writeJson(Object value) {

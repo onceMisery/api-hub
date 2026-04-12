@@ -1,16 +1,24 @@
-"use client";
+import { fetchPublicShare } from "@api-hub/api-sdk";
 
-import { useParams } from "next/navigation";
+import { PublicShareScreen } from "@/features/share/public-share-screen";
 
-import { PublicShareBrowser } from "../../../features/projects/components/public-share-browser";
+export default async function PublicSharePage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ shareCode: string }>;
+  searchParams: Promise<{ endpointId?: string | string[] }>;
+}) {
+  const { shareCode } = await params;
+  const resolvedSearchParams = await searchParams;
+  const shareResponse = await fetchPublicShare(shareCode);
+  const share = shareResponse.data;
 
-export default function SharePage() {
-  const params = useParams<{ shareCode: string }>();
-  const shareCode = params.shareCode?.trim() ?? "";
+  const rawEndpointId = Array.isArray(resolvedSearchParams.endpointId)
+    ? resolvedSearchParams.endpointId[0]
+    : resolvedSearchParams.endpointId;
+  const parsedEndpointId = rawEndpointId ? Number(rawEndpointId) : undefined;
+  const initialEndpointId = Number.isNaN(parsedEndpointId) ? undefined : parsedEndpointId;
 
-  if (!shareCode) {
-    return <main className="p-6 text-sm text-rose-600">Invalid share code.</main>;
-  }
-
-  return <PublicShareBrowser shareCode={shareCode} />;
+  return <PublicShareScreen initialEndpointId={initialEndpointId} share={share} shareCode={shareCode} />;
 }

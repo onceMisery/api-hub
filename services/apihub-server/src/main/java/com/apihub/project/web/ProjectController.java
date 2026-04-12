@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,14 +29,22 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ApiResponse<List<ProjectDetail>> listProjects(Authentication authentication) {
-        return ApiResponse.success(projectService.listProjects((Long) authentication.getPrincipal()));
+    public ApiResponse<List<ProjectDetail>> listProjects(@RequestParam(required = false) Long spaceId,
+                                                         Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        return ApiResponse.success(spaceId == null
+                ? projectService.listProjects(userId)
+                : projectService.listProjects(userId, spaceId));
     }
 
     @PostMapping
     public ApiResponse<ProjectDetail> createProject(@RequestBody CreateProjectRequest request,
+                                                    @RequestParam(required = false) Long spaceId,
                                                     Authentication authentication) {
-        return ApiResponse.success(projectService.createProject((Long) authentication.getPrincipal(), request));
+        Long userId = (Long) authentication.getPrincipal();
+        return ApiResponse.success(spaceId == null
+                ? projectService.createProject(userId, request)
+                : projectService.createProject(userId, spaceId, request));
     }
 
     @GetMapping("/{projectId}")

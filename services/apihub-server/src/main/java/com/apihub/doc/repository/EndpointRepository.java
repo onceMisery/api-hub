@@ -197,13 +197,38 @@ public class EndpointRepository {
 
     public Optional<EndpointReference> findEndpointReference(Long endpointId) {
         return jdbcTemplate.query("""
-                select id, group_id, project_id
+                select id, group_id, module_id, project_id
                 from api_endpoint
                 where id = ?
                 """, (rs, rowNum) -> new EndpointReference(
                 rs.getLong("id"),
                 rs.getLong("group_id"),
+                rs.getLong("module_id"),
                 rs.getLong("project_id")), endpointId).stream().findFirst();
+    }
+
+    public Optional<EndpointDetail> findEndpointByProjectAndRouteKey(Long projectId, String routeKey) {
+        return jdbcTemplate.query("""
+                select endpoint.id,
+                       endpoint.group_id,
+                       endpoint.name,
+                       endpoint.http_method,
+                       endpoint.path,
+                       endpoint.description,
+                       endpoint.mock_enabled,
+                       endpoint.status,
+                       endpoint.released_version_id,
+                       case
+                           when released_version.id is null then null
+                           else coalesce(released_version.version_label, concat('r', released_version.revision_no))
+                       end as released_version_label,
+                       endpoint.released_at
+                from api_endpoint endpoint
+                left join api_version released_version on released_version.id = endpoint.released_version_id
+                where endpoint.project_id = ?
+                  and endpoint.route_key = ?
+                limit 1
+                """, ENDPOINT_ROW_MAPPER, projectId, routeKey).stream().findFirst();
     }
 
     public EndpointDetail updateEndpoint(Long endpointId, UpdateEndpointRequest request) {
@@ -550,6 +575,21 @@ public class EndpointRepository {
         return findEndpoint(endpointId).orElseThrow();
     }
 
+    public EndpointDetail updateEndpointLocation(Long userId, Long endpointId, Long moduleId, Long groupId) {
+        jdbcTemplate.update("""
+                update api_endpoint
+                set module_id = ?,
+                    group_id = ?,
+                    updated_by = ?
+                where id = ?
+                """,
+                moduleId,
+                groupId,
+                userId,
+                endpointId);
+        return findEndpoint(endpointId).orElseThrow();
+    }
+
     public EndpointDetail clearReleasedVersion(Long endpointId) {
         return clearReleasedVersion(DEFAULT_USER_ID, endpointId);
     }
@@ -630,7 +670,10 @@ public class EndpointRepository {
         return method.toUpperCase() + ":" + path;
     }
 
-    public record EndpointReference(Long id, Long groupId, Long projectId) {
+    public record EndpointReference(Long id, Long groupId, Long moduleId, Long projectId) {
+        public EndpointReference(Long id, Long groupId, Long projectId) {
+            this(id, groupId, null, projectId);
+        }
     }
 
     public record ProjectMockCenterCandidate(

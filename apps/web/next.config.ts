@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const backendOrigin = process.env.APIHUB_BACKEND_ORIGIN ?? "http://localhost:8080";
 
 const nextConfig: NextConfig = {
-  typedRoutes: true,
   async rewrites() {
     return [
       {

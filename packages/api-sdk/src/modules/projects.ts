@@ -2,6 +2,9 @@ import { apiFetch } from "../client";
 
 export type ProjectSummary = {
   id: number;
+  spaceId: number | null;
+  spaceName: string | null;
+  spaceKey: string | null;
   name: string;
   projectKey: string;
   description: string | null;
@@ -18,6 +21,9 @@ export type DebugTargetRule = {
 
 export type ProjectDetail = {
   id: number;
+  spaceId: number | null;
+  spaceName: string | null;
+  spaceKey: string | null;
   name: string;
   projectKey: string;
   description: string | null;
@@ -34,6 +40,15 @@ export type ProjectMemberDetail = {
   email: string;
   roleCode: "project_admin" | "editor" | "tester" | "viewer";
   owner: boolean;
+};
+
+export type SpaceSummary = {
+  id: number;
+  name: string;
+  spaceKey: string;
+  currentUserRole: string | null;
+  canCreateProject: boolean;
+  projectCount: number;
 };
 
 export type UpsertProjectMemberPayload = {
@@ -132,6 +147,55 @@ export type CreateProjectPayload = {
   projectKey: string;
   description: string;
   debugAllowedHosts: DebugTargetRule[];
+};
+
+export type ImportSpecPayload = {
+  sourceName: string;
+  sourceUrl?: string;
+  content: string;
+  createVersionSnapshot: boolean;
+  bootstrapEnvironments: boolean;
+  enableMockByDefault: boolean;
+};
+
+export type ImportProjectPayload = {
+  projectName: string;
+  projectKey: string;
+  description: string;
+  sourceName: string;
+  sourceUrl?: string;
+  content: string;
+  createVersionSnapshot: boolean;
+  bootstrapEnvironments: boolean;
+  enableMockByDefault: boolean;
+};
+
+export type ImportResult = {
+  projectId: number;
+  projectName: string;
+  sourceType: "openapi" | "smartdoc";
+  createdModules: number;
+  createdGroups: number;
+  createdEndpoints: number;
+  updatedEndpoints: number;
+  createdVersions: number;
+  createdEnvironments: number;
+  warnings: string[];
+};
+
+export type ImportPreview = {
+  sourceType: "openapi" | "smartdoc";
+  resolvedName: string;
+  totalEndpoints: number;
+  createdModules: number;
+  createdGroups: number;
+  createdEndpoints: number;
+  updatedEndpoints: number;
+  detectedEnvironments: number;
+  modules: string[];
+  groups: string[];
+  routes: string[];
+  warnings: string[];
 };
 
 export type CreateModulePayload = {
@@ -371,12 +435,18 @@ export type DebugHistoryFilters = {
   limit?: number;
 };
 
-export function fetchProjects() {
-  return apiFetch<ProjectSummary[]>("/api/v1/projects");
+export function fetchSpaces() {
+  return apiFetch<SpaceSummary[]>("/api/v1/spaces");
 }
 
-export function createProject(payload: CreateProjectPayload) {
-  return apiFetch<ProjectDetail>("/api/v1/projects", {
+export function fetchProjects(spaceId?: number | null) {
+  const suffix = typeof spaceId === "number" ? `?spaceId=${spaceId}` : "";
+  return apiFetch<ProjectSummary[]>(`/api/v1/projects${suffix}`);
+}
+
+export function createProject(payload: CreateProjectPayload, spaceId?: number | null) {
+  const suffix = typeof spaceId === "number" ? `?spaceId=${spaceId}` : "";
+  return apiFetch<ProjectDetail>(`/api/v1/projects${suffix}`, {
     method: "POST",
     body: JSON.stringify(payload)
   });
@@ -384,6 +454,62 @@ export function createProject(payload: CreateProjectPayload) {
 
 export function fetchProject(projectId: number) {
   return apiFetch<ProjectDetail>(`/api/v1/projects/${projectId}`);
+}
+
+export function importOpenApiToProject(projectId: number, payload: ImportSpecPayload) {
+  return apiFetch<ImportResult>(`/api/v1/projects/${projectId}/imports/openapi`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function previewOpenApiToProject(projectId: number, payload: ImportSpecPayload) {
+  return apiFetch<ImportPreview>(`/api/v1/projects/${projectId}/imports/openapi/preview`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function importSmartDocToProject(projectId: number, payload: ImportSpecPayload) {
+  return apiFetch<ImportResult>(`/api/v1/projects/${projectId}/imports/smartdoc`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function previewSmartDocToProject(projectId: number, payload: ImportSpecPayload) {
+  return apiFetch<ImportPreview>(`/api/v1/projects/${projectId}/imports/smartdoc/preview`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function importOpenApiAsProject(spaceId: number, payload: ImportProjectPayload) {
+  return apiFetch<ImportResult>(`/api/v1/spaces/${spaceId}/imports/openapi-project`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function previewOpenApiAsProject(spaceId: number, payload: ImportProjectPayload) {
+  return apiFetch<ImportPreview>(`/api/v1/spaces/${spaceId}/imports/openapi-project/preview`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function importSmartDocAsProject(spaceId: number, payload: ImportProjectPayload) {
+  return apiFetch<ImportResult>(`/api/v1/spaces/${spaceId}/imports/smartdoc-project`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function previewSmartDocAsProject(spaceId: number, payload: ImportProjectPayload) {
+  return apiFetch<ImportPreview>(`/api/v1/spaces/${spaceId}/imports/smartdoc-project/preview`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function fetchProjectMembers(projectId: number) {
