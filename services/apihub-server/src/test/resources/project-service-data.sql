@@ -68,3 +68,24 @@ ALTER TABLE api_group ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_endpoint ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_version ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE project_share_link ALTER COLUMN id RESTART WITH 4;
+
+INSERT INTO test_suite (id, project_id, name, description, created_by, created_at, updated_at)
+VALUES (1, 1, 'Smoke Suite', 'Seed smoke suite', 1, TIMESTAMP '2026-04-12 10:00:00', TIMESTAMP '2026-04-12 10:00:00');
+
+INSERT INTO test_step (id, suite_id, endpoint_id, environment_id, step_order, name, enabled, query_string, request_headers_json, request_body, assertions_json, extractors_json, created_by, updated_by, created_at, updated_at)
+VALUES (1, 1, 1, 1, 0, 'Get user smoke', TRUE, 'id=1001', '[]', '{}', '[{"type":"status_equals","expectedValue":"200"}]', '[]', 1, 1, TIMESTAMP '2026-04-12 10:00:00', TIMESTAMP '2026-04-12 10:00:00');
+
+INSERT INTO test_execution (id, suite_id, status, execution_source, trigger_id, schedule_id, total_steps, passed_steps, failed_steps, duration_ms, report_json, executed_by, executed_at)
+VALUES (1, 1, 'passed', 'manual', NULL, NULL, 1, 1, 0, 42, '{"steps":[{"stepOrder":0,"stepName":"Get user smoke","endpointId":1,"endpointName":"Get User","method":"GET","path":"/users/{id}","environmentId":1,"environmentName":"Local","finalUrl":"https://local.dev/users/1001","status":"passed","responseStatusCode":200,"durationMs":42,"responseBody":"{\"ok\":true}","responseHeaders":[],"assertions":[{"type":"status_equals","expectedValue":"200","passed":true,"actualValue":"200","message":"HTTP status matched"}],"errorMessage":null}]}' , 1, TIMESTAMP '2026-04-12 10:05:00');
+
+INSERT INTO test_suite_trigger (id, suite_id, name, token_hash, token_prefix, active, created_by, created_at, last_triggered_at, last_execution_id)
+VALUES (1, 1, 'CI Smoke', 'seed-trigger-hash', 'ats_seed', TRUE, 1, TIMESTAMP '2026-04-12 10:01:00', TIMESTAMP '2026-04-12 10:05:00', 1);
+
+INSERT INTO test_suite_schedule (id, suite_id, enabled, interval_minutes, next_run_at, last_run_at, last_execution_id, created_by, updated_by, created_at, updated_at)
+VALUES (1, 1, TRUE, 60, TIMESTAMP '2026-04-13 11:00:00', TIMESTAMP '2026-04-13 10:00:00', 1, 1, 1, TIMESTAMP '2026-04-12 10:02:00', TIMESTAMP '2026-04-12 10:02:00');
+
+ALTER TABLE test_suite ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE test_step ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE test_execution ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE test_suite_trigger ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE test_suite_schedule ALTER COLUMN id RESTART WITH 2;

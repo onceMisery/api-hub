@@ -211,3 +211,88 @@ CREATE INDEX idx_debug_history_project_created ON debug_history (project_id, cre
 CREATE INDEX idx_debug_history_environment_created ON debug_history (environment_id, created_at DESC);
 CREATE INDEX idx_debug_history_endpoint_created ON debug_history (endpoint_id, created_at DESC);
 CREATE INDEX idx_debug_history_created_by_created ON debug_history (created_by, created_at DESC);
+
+CREATE TABLE test_suite (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_test_suite_project_updated ON test_suite (project_id, updated_at DESC, id DESC);
+
+CREATE TABLE test_step (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  suite_id BIGINT NOT NULL,
+  endpoint_id BIGINT NOT NULL,
+  environment_id BIGINT NOT NULL,
+  step_order INT NOT NULL DEFAULT 0,
+  name VARCHAR(128) NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  query_string CLOB,
+  request_headers_json CLOB NOT NULL,
+  request_body CLOB,
+  assertions_json CLOB NOT NULL,
+  extractors_json CLOB NOT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_test_step_suite_order ON test_step (suite_id, step_order, id);
+
+CREATE TABLE test_execution (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  suite_id BIGINT NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  execution_source VARCHAR(16) NOT NULL DEFAULT 'manual',
+  trigger_id BIGINT NULL,
+  schedule_id BIGINT NULL,
+  total_steps INT NOT NULL DEFAULT 0,
+  passed_steps INT NOT NULL DEFAULT 0,
+  failed_steps INT NOT NULL DEFAULT 0,
+  duration_ms BIGINT NOT NULL DEFAULT 0,
+  report_json CLOB NOT NULL,
+  executed_by BIGINT NOT NULL,
+  executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_test_execution_suite_executed ON test_execution (suite_id, executed_at DESC, id DESC);
+CREATE INDEX idx_test_execution_source_executed ON test_execution (execution_source, executed_at DESC, id DESC);
+
+CREATE TABLE test_suite_trigger (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  suite_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  token_hash VARCHAR(64) NOT NULL,
+  token_prefix VARCHAR(16) NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_triggered_at TIMESTAMP NULL,
+  last_execution_id BIGINT NULL
+);
+
+CREATE UNIQUE INDEX uk_test_suite_trigger_token_hash ON test_suite_trigger (token_hash);
+CREATE INDEX idx_test_suite_trigger_suite_created ON test_suite_trigger (suite_id, created_at DESC, id DESC);
+
+CREATE TABLE test_suite_schedule (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  suite_id BIGINT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  interval_minutes INT NOT NULL DEFAULT 60,
+  next_run_at TIMESTAMP NULL,
+  last_run_at TIMESTAMP NULL,
+  last_execution_id BIGINT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX uk_test_suite_schedule_suite_id ON test_suite_schedule (suite_id);
+CREATE INDEX idx_test_suite_schedule_next_run ON test_suite_schedule (enabled, next_run_at, id);

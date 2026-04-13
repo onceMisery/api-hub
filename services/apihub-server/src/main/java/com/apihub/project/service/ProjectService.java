@@ -10,8 +10,10 @@ import com.apihub.debug.service.DebugTargetRuleValidator;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
+import com.apihub.doc.model.VersionComparisonResult;
 import com.apihub.doc.model.VersionDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.doc.service.VersionComparisonService;
 import com.apihub.mock.model.MockDtos.MockReleaseDetail;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
@@ -61,17 +63,20 @@ public class ProjectService {
     private final MockRuntimeResolver mockRuntimeResolver;
     private final DebugTargetRuleValidator debugTargetRuleValidator;
     private final AuthUserRepository authUserRepository;
+    private final VersionComparisonService versionComparisonService;
 
     public ProjectService(ProjectRepository projectRepository,
                           EndpointRepository endpointRepository,
                           MockRuntimeResolver mockRuntimeResolver,
                           DebugTargetRuleValidator debugTargetRuleValidator,
-                          AuthUserRepository authUserRepository) {
+                          AuthUserRepository authUserRepository,
+                          VersionComparisonService versionComparisonService) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.mockRuntimeResolver = mockRuntimeResolver;
         this.debugTargetRuleValidator = debugTargetRuleValidator;
         this.authUserRepository = authUserRepository;
+        this.versionComparisonService = versionComparisonService;
     }
 
     @Transactional(readOnly = true)
@@ -561,10 +566,66 @@ public class ProjectService {
         return endpointRepository.clearReleasedVersion(userId, endpointId);
     }
 
+    @Transactional(readOnly = true)
+    public VersionComparisonResult compareVersions(Long userId, Long endpointId, Long baseVersionId, Long targetVersionId) {
+        EndpointDetail endpoint = requireEndpointReadAccess(userId, endpointId);
+        VersionDetail baseVersion = requireVersionForEndpoint(endpointId, baseVersionId);
+
+        VersionComparisonService.SnapshotSide baseSide = new VersionComparisonService.SnapshotSide(
+                baseVersion.id(),
+                baseVersion.version(),
+                baseVersion.changeSummary(),
+                false,
+                baseVersion.released(),
+                baseVersion.releasedAt());
+
+        VersionComparisonService.SnapshotSide targetSide;
+        String targetSnapshotJson;
+        if (targetVersionId != null) {
+            VersionDetail targetVersion = requireVersionForEndpoint(endpointId, targetVersionId);
+            targetSide = new VersionComparisonService.SnapshotSide(
+                    targetVersion.id(),
+                    targetVersion.version(),
+                    targetVersion.changeSummary(),
+                    false,
+                    targetVersion.released(),
+                    targetVersion.releasedAt());
+            targetSnapshotJson = targetVersion.snapshotJson();
+        } else {
+            targetSide = new VersionComparisonService.SnapshotSide(
+                    null,
+                    "Current Draft",
+                    endpoint.releasedVersionLabel() == null ? "Current editable draft" : "Compare against current editable draft",
+                    true,
+                    false,
+                    null);
+            targetSnapshotJson = versionComparisonService.buildDraftSnapshotJson(
+                    endpoint,
+                    endpointRepository.listParameters(endpointId),
+                    endpointRepository.listResponses(endpointId));
+        }
+
+        return versionComparisonService.compareSnapshots(
+                endpointId,
+                baseSide,
+                baseVersion.snapshotJson(),
+                targetSide,
+                targetSnapshotJson);
+    }
+
     private ProjectDetail requireProjectReadAccess(Long userId, Long projectId) {
         ProjectDetail project = projectRepository.findProject(userId, projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
         return project;
+    }
+
+    private VersionDetail requireVersionForEndpoint(Long endpointId, Long versionId) {
+        VersionDetail version = endpointRepository.findVersion(versionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found"));
+        if (!endpointId.equals(version.endpointId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found");
+        }
+        return version;
     }
 
     private ProjectDetail requireProjectWriteAccess(Long userId, Long projectId) {

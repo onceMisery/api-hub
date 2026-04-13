@@ -278,6 +278,23 @@ public class ProjectRepository {
         return matched != null && matched > 0;
     }
 
+    public boolean canTestProject(Long userId, Long projectId) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from project
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.id = ?
+                  and (
+                        project.owner_id = ?
+                     or project_member.role_code in ('project_admin', 'editor', 'tester')
+                  )
+                """, Integer.class, userId, projectId, userId);
+        return matched != null && matched > 0;
+    }
+
     public boolean canManageProjectMembers(Long userId, Long projectId) {
         Integer matched = jdbcTemplate.queryForObject("""
                 select count(*)

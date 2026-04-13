@@ -6,6 +6,7 @@ import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
+import com.apihub.doc.service.VersionComparisonService;
 import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
@@ -46,7 +47,7 @@ import static org.assertj.core.groups.Tuple.tuple;
         "spring.datasource.username=sa",
         "spring.datasource.password="
 })
-@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class, DebugTargetRuleValidator.class, AuthUserRepository.class})
+@Import({ProjectService.class, ProjectRepository.class, EndpointRepository.class, MockRuntimeResolver.class, DebugTargetRuleValidator.class, AuthUserRepository.class, VersionComparisonService.class})
 @Sql(scripts = "/project-service-schema.sql")
 @Sql(scripts = "/project-service-data.sql")
 class ProjectServiceTest {

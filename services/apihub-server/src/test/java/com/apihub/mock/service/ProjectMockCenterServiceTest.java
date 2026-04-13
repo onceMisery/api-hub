@@ -5,6 +5,7 @@ import com.apihub.debug.service.DebugTargetRuleValidator;
 import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.doc.service.VersionComparisonService;
 import com.apihub.mock.model.ProjectMockDtos.MockAccessMode;
 import com.apihub.mock.model.ProjectMockDtos.UpdateProjectMockAccessRequest;
 import com.apihub.mock.repository.ProjectMockAccessRepository;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         ProjectRepository.class,
         EndpointRepository.class,
         ProjectService.class,
+        VersionComparisonService.class,
         MockRuntimeResolver.class,
         DebugTargetRuleValidator.class,
         AuthUserRepository.class
