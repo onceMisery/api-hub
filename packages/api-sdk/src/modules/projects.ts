@@ -14,6 +14,17 @@ export type ProjectSummary = {
   canManageMembers: boolean;
 };
 
+export type ProjectDocPushSettings = {
+  projectId: number;
+  projectName: string;
+  enabled: boolean;
+  token: string;
+};
+
+export type UpdateProjectDocPushPayload = {
+  enabled: boolean;
+};
+
 export type DebugTargetRule = {
   pattern: string;
   allowPrivate: boolean;
@@ -49,6 +60,11 @@ export type SpaceSummary = {
   currentUserRole: string | null;
   canCreateProject: boolean;
   projectCount: number;
+};
+
+export type CreateSpacePayload = {
+  name: string;
+  spaceKey: string;
 };
 
 export type UpsertProjectMemberPayload = {
@@ -87,6 +103,8 @@ export type EndpointDetail = {
   path: string;
   description: string | null;
   mockEnabled: boolean;
+  createdByDisplayName?: string | null;
+  updatedByDisplayName?: string | null;
   status?: "draft" | "review" | "released" | "deprecated" | "archived";
   releasedVersionId?: number | null;
   releasedVersionLabel?: string | null;
@@ -728,6 +746,13 @@ export function fetchSpaces() {
   return apiFetch<SpaceSummary[]>("/api/v1/spaces");
 }
 
+export function createSpace(payload: CreateSpacePayload) {
+  return apiFetch<SpaceSummary>("/api/v1/spaces", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchProjects(spaceId?: number | null) {
   const suffix = typeof spaceId === "number" ? `?spaceId=${spaceId}` : "";
   return apiFetch<ProjectSummary[]>(`/api/v1/projects${suffix}`);
@@ -746,6 +771,23 @@ export function createProject(
 
 export function fetchProject(projectId: number) {
   return apiFetch<ProjectDetail>(`/api/v1/projects/${projectId}`);
+}
+
+export function fetchProjectDocPushSettings(projectId: number) {
+  return apiFetch<ProjectDocPushSettings>(`/api/v1/projects/${projectId}/doc-push`);
+}
+
+export function updateProjectDocPushSettings(projectId: number, payload: UpdateProjectDocPushPayload) {
+  return apiFetch<ProjectDocPushSettings>(`/api/v1/projects/${projectId}/doc-push`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function regenerateProjectDocPushToken(projectId: number) {
+  return apiFetch<ProjectDocPushSettings>(`/api/v1/projects/${projectId}/doc-push/regenerate`, {
+    method: "POST",
+  });
 }
 
 export function exportProjectOpenApi(projectId: number) {

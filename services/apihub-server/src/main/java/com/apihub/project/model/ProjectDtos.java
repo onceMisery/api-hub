@@ -15,6 +15,9 @@ public final class ProjectDtos {
     public record CreateProjectRequest(String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
     }
 
+    public record CreateSpaceRequest(String name, String spaceKey) {
+    }
+
     public record SpaceSummary(
             Long id,
             String name,
@@ -26,6 +29,17 @@ public final class ProjectDtos {
     }
 
     public record UpdateProjectRequest(String name, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
+    }
+
+    public record ProjectDocPushSettings(
+            Long projectId,
+            String projectName,
+            boolean enabled,
+            String token
+    ) {
+    }
+
+    public record UpdateProjectDocPushRequest(Boolean enabled) {
     }
 
     public record ProjectDetail(

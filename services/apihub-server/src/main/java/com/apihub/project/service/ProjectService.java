@@ -24,6 +24,7 @@ import com.apihub.mock.service.MockRuntimeResolver;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
+import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
@@ -33,10 +34,12 @@ import com.apihub.project.model.ProjectDtos.GroupTreeItem;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleTreeItem;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
+import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
+import com.apihub.project.model.ProjectDtos.UpdateProjectDocPushRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
@@ -102,6 +105,11 @@ public class ProjectService {
         return projectRepository.listSpaces(userId);
     }
 
+    public SpaceSummary createSpace(Long userId, CreateSpaceRequest request) {
+        validateSpaceRequest(request);
+        return projectRepository.createSpace(userId, request);
+    }
+
     public ProjectDetail createProject(CreateProjectRequest request) {
         return createProject(1L, null, request);
     }
@@ -148,6 +156,24 @@ public class ProjectService {
                 request.name() != null ? request.name() : current.name(),
                 request.description() != null ? request.description() : current.description(),
                 debugAllowedHosts);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectDocPushSettings getProjectDocPushSettings(Long userId, Long projectId) {
+        requireProjectWriteAccess(userId, projectId);
+        return projectRepository.findProjectDocPushSettings(projectId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+    }
+
+    public ProjectDocPushSettings updateProjectDocPushSettings(Long userId, Long projectId, UpdateProjectDocPushRequest request) {
+        requireProjectWriteAccess(userId, projectId);
+        boolean enabled = request != null && request.enabled() != null ? request.enabled() : true;
+        return projectRepository.updateProjectDocPushEnabled(projectId, enabled);
+    }
+
+    public ProjectDocPushSettings regenerateProjectDocPushToken(Long userId, Long projectId) {
+        requireProjectWriteAccess(userId, projectId);
+        return projectRepository.regenerateProjectDocPushToken(projectId);
     }
 
     @Transactional(readOnly = true)
@@ -720,6 +746,12 @@ public class ProjectService {
                 .filter(space -> space.id().equals(spaceId))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Space not found"));
+    }
+
+    private void validateSpaceRequest(CreateSpaceRequest request) {
+        if (request == null || request.name() == null || request.name().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Space name is required");
+        }
     }
 
     private String writeJson(Object value) {

@@ -10,6 +10,8 @@ public record EndpointDetail(
         String path,
         String description,
         boolean mockEnabled,
+        String createdByDisplayName,
+        String updatedByDisplayName,
         String status,
         Long releasedVersionId,
         String releasedVersionLabel,
@@ -22,6 +24,6 @@ public record EndpointDetail(
                           String path,
                           String description,
                           boolean mockEnabled) {
-        this(id, groupId, name, method, path, description, mockEnabled, "draft", null, null, null);
+        this(id, groupId, name, method, path, description, mockEnabled, null, null, "draft", null, null, null);
     }
 }

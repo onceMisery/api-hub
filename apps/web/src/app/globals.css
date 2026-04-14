@@ -81,18 +81,6 @@
     --ring: 345 79% 58%;
   }
 
-  :root[data-background="none"] {
-    --workspace-bg-image: none;
-  }
-
-  :root[data-background="hero"] {
-    --workspace-bg-image: url("/images/hero-illustration.png");
-  }
-
-  :root[data-background="docs"] {
-    --workspace-bg-image: url("/images/feature-docs.png");
-  }
-
   * {
     @apply border-border;
   }
@@ -118,9 +106,9 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
-    opacity: 0.08;
-    transform: scale(1.06);
-    transform-origin: center;
+    background-attachment: fixed;
+    opacity: 0.18;
+    transform: scale(1.02);
   }
 
   body::after {
@@ -131,7 +119,7 @@
     background:
       radial-gradient(circle at top left, hsl(var(--primary) / 0.14), transparent 28%),
       radial-gradient(circle at top right, hsl(var(--info) / 0.1), transparent 30%),
-      linear-gradient(180deg, hsl(var(--background) / 0.92), hsl(var(--background)) 62%);
+      linear-gradient(180deg, hsl(var(--background) / 0.76), hsl(var(--background)) 68%);
     pointer-events: none;
   }
 

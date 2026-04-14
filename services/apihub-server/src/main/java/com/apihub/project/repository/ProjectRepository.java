@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
+import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
@@ -13,6 +14,7 @@ import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
+import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
@@ -76,6 +78,12 @@ public class ProjectRepository {
             rs.getString("email"),
             rs.getString("role_code"),
             rs.getBoolean("owner"));
+
+    private static final RowMapper<ProjectDocPushSettings> PROJECT_DOC_PUSH_ROW_MAPPER = (rs, rowNum) -> new ProjectDocPushSettings(
+            rs.getLong("project_id"),
+            rs.getString("project_name"),
+            rs.getBoolean("doc_push_enabled"),
+            rs.getString("doc_push_token"));
 
     private static final RowMapper<ModuleDetail> MODULE_ROW_MAPPER = (rs, rowNum) -> new ModuleDetail(
             rs.getLong("id"),
@@ -196,6 +204,32 @@ public class ProjectRepository {
                 """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId);
     }
 
+    public SpaceSummary createSpace(Long userId, CreateSpaceRequest request) {
+        String preferredKey = request.spaceKey() == null || request.spaceKey().isBlank()
+                ? request.name()
+                : request.spaceKey();
+        String spaceKey = nextAvailableSpaceKey(preferredKey);
+
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into space (name, space_key, owner_id, status)
+                    values (?, ?, ?, 'active')
+                    """, Statement.RETURN_GENERATED_KEYS);
+            statement.setString(1, request.name());
+            statement.setString(2, spaceKey);
+            statement.setLong(3, userId);
+            return statement;
+        }, keyHolder);
+
+        long spaceId = requireGeneratedId(keyHolder);
+        jdbcTemplate.update("""
+                insert into space_member (space_id, user_id, role_code, member_status)
+                values (?, ?, 'space_admin', 'active')
+                """, spaceId, userId);
+        return findSpaceSummary(userId, spaceId).orElseThrow();
+    }
+
     public Optional<ProjectDetail> findProject(Long userId, Long projectId) {
         return jdbcTemplate.query("""
                 select project.id,
@@ -231,6 +265,47 @@ public class ProjectRepository {
                 """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, userId, projectId, userId).stream().findFirst();
     }
 
+    public Optional<SpaceSummary> findSpaceSummary(Long userId, Long spaceId) {
+        return jdbcTemplate.query("""
+                select distinct space.id,
+                                space.name,
+                                space.space_key,
+                                case
+                                    when space.owner_id = ? then 'space_admin'
+                                    else space_member.role_code
+                                end as current_user_role,
+                                case
+                                    when space.owner_id = ? then true
+                                    when space_member.role_code in ('space_admin', 'project_admin', 'editor') then true
+                                    else false
+                                end as can_create_project,
+                                coalesce(projects.project_count, 0) as project_count
+                from space
+                left join space_member
+                  on space_member.space_id = space.id
+                 and space_member.user_id = ?
+                 and space_member.member_status = 'active'
+                left join (
+                    select project.space_id, count(*) as project_count
+                    from project
+                    left join project_member
+                      on project_member.project_id = project.id
+                     and project_member.user_id = ?
+                     and project_member.member_status = 'active'
+                    where project.owner_id = ?
+                       or project_member.id is not null
+                    group by project.space_id
+                ) projects
+                  on projects.space_id = space.id
+                where space.id = ?
+                  and (
+                        space.owner_id = ?
+                     or space_member.id is not null
+                     or projects.project_count > 0
+                  )
+                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, spaceId, userId).stream().findFirst();
+    }
+
     public Optional<ProjectDetail> findProject(Long projectId) {
         return jdbcTemplate.query("""
                 select project.id,
@@ -245,6 +320,52 @@ public class ProjectRepository {
                 join space on space.id = project.space_id
                 where project.id = ?
                 """, PROJECT_ROW_MAPPER, projectId).stream().findFirst();
+    }
+
+    public Optional<ProjectDocPushSettings> findProjectDocPushSettings(Long projectId) {
+        return jdbcTemplate.query("""
+                select id as project_id,
+                       name as project_name,
+                       doc_push_enabled,
+                       doc_push_token
+                from project
+                where id = ?
+                """, PROJECT_DOC_PUSH_ROW_MAPPER, projectId).stream().findFirst();
+    }
+
+    public Optional<ProjectPushTarget> findProjectPushTarget(String token) {
+        return jdbcTemplate.query("""
+                select id as project_id,
+                       owner_id,
+                       name as project_name,
+                       doc_push_enabled,
+                       doc_push_token
+                from project
+                where doc_push_token = ?
+                """, (rs, rowNum) -> new ProjectPushTarget(
+                rs.getLong("project_id"),
+                rs.getLong("owner_id"),
+                rs.getString("project_name"),
+                rs.getBoolean("doc_push_enabled"),
+                rs.getString("doc_push_token")), token).stream().findFirst();
+    }
+
+    public ProjectDocPushSettings updateProjectDocPushEnabled(Long projectId, boolean enabled) {
+        jdbcTemplate.update("""
+                update project
+                set doc_push_enabled = ?
+                where id = ?
+                """, enabled, projectId);
+        return findProjectDocPushSettings(projectId).orElseThrow();
+    }
+
+    public ProjectDocPushSettings regenerateProjectDocPushToken(Long projectId) {
+        jdbcTemplate.update("""
+                update project
+                set doc_push_token = ?
+                where id = ?
+                """, UUID.randomUUID().toString().replace("-", ""), projectId);
+        return findProjectDocPushSettings(projectId).orElseThrow();
     }
 
     public boolean canAccessProject(Long userId, Long projectId) {
@@ -723,8 +844,28 @@ public class ProjectRepository {
         return slugify(name) + "-" + (nextSortOrder("module", "project_id", projectId) + 1);
     }
 
+    private String nextAvailableSpaceKey(String value) {
+        String base = slugify(value);
+        String candidate = base;
+        int suffix = 2;
+        while (spaceKeyExists(candidate)) {
+            candidate = base + "-" + suffix;
+            suffix++;
+        }
+        return candidate;
+    }
+
     private String nextGroupKey(Long moduleId, String name) {
         return slugify(name) + "-" + (nextSortOrder("api_group", "module_id", moduleId) + 1);
+    }
+
+    private boolean spaceKeyExists(String spaceKey) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from space
+                where space_key = ?
+                """, Integer.class, spaceKey);
+        return matched != null && matched > 0;
     }
 
     private int nextSortOrder(String tableName, String foreignKeyColumn, Long foreignKeyValue) {
@@ -824,5 +965,8 @@ public class ProjectRepository {
     }
 
     public record GroupReference(Long id, Long moduleId, Long projectId) {
+    }
+
+    public record ProjectPushTarget(Long projectId, Long ownerId, String projectName, boolean enabled, String token) {
     }
 }

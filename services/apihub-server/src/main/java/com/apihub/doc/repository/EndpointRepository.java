@@ -49,6 +49,8 @@ public class EndpointRepository {
             rs.getString("path"),
             rs.getString("description"),
             rs.getBoolean("mock_enabled"),
+            rs.getString("created_by_display_name"),
+            rs.getString("updated_by_display_name"),
             rs.getString("status"),
             rs.getObject("released_version_id", Long.class),
             rs.getString("released_version_label"),
@@ -118,6 +120,8 @@ public class EndpointRepository {
                        endpoint.path,
                        endpoint.description,
                        endpoint.mock_enabled,
+                       created_user.display_name as created_by_display_name,
+                       updated_user.display_name as updated_by_display_name,
                        endpoint.status,
                        endpoint.released_version_id,
                        case
@@ -126,6 +130,8 @@ public class EndpointRepository {
                        end as released_version_label,
                        endpoint.released_at
                 from api_endpoint endpoint
+                left join sys_user created_user on created_user.id = endpoint.created_by
+                left join sys_user updated_user on updated_user.id = endpoint.updated_by
                 left join api_version released_version on released_version.id = endpoint.released_version_id
                 where endpoint.group_id = ?
                 order by endpoint.sort_order, endpoint.id
@@ -182,6 +188,8 @@ public class EndpointRepository {
                        endpoint.path,
                        endpoint.description,
                        endpoint.mock_enabled,
+                       created_user.display_name as created_by_display_name,
+                       updated_user.display_name as updated_by_display_name,
                        endpoint.status,
                        endpoint.released_version_id,
                        case
@@ -190,6 +198,8 @@ public class EndpointRepository {
                        end as released_version_label,
                        endpoint.released_at
                 from api_endpoint endpoint
+                left join sys_user created_user on created_user.id = endpoint.created_by
+                left join sys_user updated_user on updated_user.id = endpoint.updated_by
                 left join api_version released_version on released_version.id = endpoint.released_version_id
                 where endpoint.id = ?
                 """, ENDPOINT_ROW_MAPPER, endpointId).stream().findFirst();
@@ -216,6 +226,8 @@ public class EndpointRepository {
                        endpoint.path,
                        endpoint.description,
                        endpoint.mock_enabled,
+                       created_user.display_name as created_by_display_name,
+                       updated_user.display_name as updated_by_display_name,
                        endpoint.status,
                        endpoint.released_version_id,
                        case
@@ -224,6 +236,8 @@ public class EndpointRepository {
                        end as released_version_label,
                        endpoint.released_at
                 from api_endpoint endpoint
+                left join sys_user created_user on created_user.id = endpoint.created_by
+                left join sys_user updated_user on updated_user.id = endpoint.updated_by
                 left join api_version released_version on released_version.id = endpoint.released_version_id
                 where endpoint.project_id = ?
                   and endpoint.route_key = ?
@@ -305,6 +319,8 @@ public class EndpointRepository {
                        endpoint.path,
                        endpoint.description,
                        endpoint.mock_enabled,
+                       created_user.display_name as created_by_display_name,
+                       updated_user.display_name as updated_by_display_name,
                        endpoint.status,
                        endpoint.released_version_id,
                        case
@@ -313,6 +329,8 @@ public class EndpointRepository {
                        end as released_version_label,
                        endpoint.released_at
                 from api_endpoint endpoint
+                left join sys_user created_user on created_user.id = endpoint.created_by
+                left join sys_user updated_user on updated_user.id = endpoint.updated_by
                 left join api_version released_version on released_version.id = endpoint.released_version_id
                 where endpoint.project_id = ? and endpoint.http_method = ? and endpoint.mock_enabled = true
                 order by endpoint.path, endpoint.id
