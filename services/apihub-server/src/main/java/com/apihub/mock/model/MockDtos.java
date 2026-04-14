@@ -25,7 +25,9 @@ public final class MockDtos {
             List<MockBodyConditionEntry> bodyConditions,
             int statusCode,
             String mediaType,
-            String body
+            String body,
+            int delayMs,
+            String templateMode
     ) {
     }
 
@@ -38,7 +40,9 @@ public final class MockDtos {
             List<MockBodyConditionEntry> bodyConditions,
             int statusCode,
             String mediaType,
-            String body
+            String body,
+            int delayMs,
+            String templateMode
     ) {
     }
 
@@ -89,7 +93,8 @@ public final class MockDtos {
             List<MockRuleTraceItem> ruleTraces,
             int statusCode,
             String mediaType,
-            String body
+            String body,
+            int delayMs
     ) {
     }
 }

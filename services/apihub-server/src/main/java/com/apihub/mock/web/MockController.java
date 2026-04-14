@@ -39,6 +39,7 @@ public class MockController {
                 extractQueryParameters(request),
                 extractHeaders(request),
                 extractRequestBody(request));
+        applyDelay(response.delayMs());
 
         HttpHeaders headers = new HttpHeaders();
         response.headers().forEach(header -> headers.add(header.name(), header.value()));
@@ -77,6 +78,18 @@ public class MockController {
             return request.getReader().lines().reduce("", (current, line) -> current + line);
         } catch (IOException exception) {
             throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Failed to read mock request body", exception);
+        }
+    }
+
+    private void applyDelay(int delayMs) {
+        if (delayMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(delayMs);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Mock response interrupted", exception);
         }
     }
 }

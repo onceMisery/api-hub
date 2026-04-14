@@ -65,7 +65,8 @@ public class MockService {
         return new MockResponse(
                 document.statusCode(),
                 List.of(new DebugHeader("Content-Type", document.mediaType())),
-                document.body());
+                document.body(),
+                document.delayMs());
     }
 
     private boolean matches(String templatePath, String requestPath) {
@@ -138,6 +139,6 @@ public class MockService {
                 .toList();
     }
 
-    public record MockResponse(int statusCode, List<DebugHeader> headers, String body) {
+    public record MockResponse(int statusCode, List<DebugHeader> headers, String body, int delayMs) {
     }
 }

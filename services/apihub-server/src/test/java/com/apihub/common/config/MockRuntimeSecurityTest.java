@@ -59,7 +59,7 @@ class MockRuntimeSecurityTest {
         given(projectRepository.canAccessProject(42L, 1L)).willReturn(true);
         given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of("authorization", "Bearer access-42"), ""))
                 .willReturn(new com.apihub.mock.service.MockService.MockResponse(
-                        200, List.of(new DebugHeader("Content-Type", "application/json")), "{\"ok\":true}"));
+                        200, List.of(new DebugHeader("Content-Type", "application/json")), "{\"ok\":true}", 0));
 
         mockMvc.perform(get("/mock/1/users/31"))
                 .andExpect(status().isUnauthorized());
@@ -75,7 +75,7 @@ class MockRuntimeSecurityTest {
                 new MockAccessSettings(1L, MockAccessMode.TOKEN, "token-mode-secret")));
         given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of("x-apihub-mock-token", "token-mode-secret"), ""))
                 .willReturn(new com.apihub.mock.service.MockService.MockResponse(
-                        200, List.of(new DebugHeader("Content-Type", "application/json")), "{\"ok\":true}"));
+                        200, List.of(new DebugHeader("Content-Type", "application/json")), "{\"ok\":true}", 0));
 
         mockMvc.perform(get("/mock/1/users/31")
                         .header("X-ApiHub-Mock-Token", "token-mode-secret"))
@@ -92,7 +92,7 @@ class MockRuntimeSecurityTest {
                 new MockAccessSettings(1L, MockAccessMode.PUBLIC, "public-token")));
         given(mockService.resolve(1L, "GET", "/users/31", Map.of(), Map.of(), ""))
                 .willReturn(new com.apihub.mock.service.MockService.MockResponse(
-                        200, List.of(new DebugHeader("Content-Type", "application/json")), "{\"ok\":true}"));
+                        200, List.of(new DebugHeader("Content-Type", "application/json")), "{\"ok\":true}", 0));
 
         mockMvc.perform(get("/mock/1/users/31"))
                 .andExpect(status().isOk());

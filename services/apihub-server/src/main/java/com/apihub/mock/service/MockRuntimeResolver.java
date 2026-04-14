@@ -24,6 +24,15 @@ import java.util.Map;
 public class MockRuntimeResolver {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final MockTemplateRenderer mockTemplateRenderer;
+
+    public MockRuntimeResolver() {
+        this(new MockTemplateRenderer());
+    }
+
+    public MockRuntimeResolver(MockTemplateRenderer mockTemplateRenderer) {
+        this.mockTemplateRenderer = mockTemplateRenderer;
+    }
 
     public MockSimulationResult resolveDraft(MockSimulationRequest request) {
         Map<String, String> querySamples = toMap(request.querySamples(), false);
@@ -89,7 +98,8 @@ public class MockRuntimeResolver {
                     List.copyOf(ruleTraces),
                     winner.rule().statusCode(),
                     normalizeMediaType(winner.rule().mediaType()),
-                    normalizeRuleBody(winner.rule().body())
+                    renderRuleBody(winner.rule()),
+                    normalizeDelayMs(winner.rule().delayMs())
             );
         }
 
@@ -103,7 +113,8 @@ public class MockRuntimeResolver {
                 List.copyOf(ruleTraces),
                 responseGroup.statusCode(),
                 responseGroup.mediaType(),
-                buildJsonBody(responseGroup.responses())
+                buildJsonBody(responseGroup.responses()),
+                0
         );
     }
 
@@ -359,6 +370,14 @@ public class MockRuntimeResolver {
 
     private String normalizeRuleBody(String body) {
         return isBlank(body) ? "{}" : body;
+    }
+
+    private String renderRuleBody(MockRuleUpsertItem rule) {
+        return mockTemplateRenderer.render(rule.templateMode(), normalizeRuleBody(rule.body()));
+    }
+
+    private int normalizeDelayMs(int delayMs) {
+        return Math.max(delayMs, 0);
     }
 
     private String normalizeType(String dataType) {

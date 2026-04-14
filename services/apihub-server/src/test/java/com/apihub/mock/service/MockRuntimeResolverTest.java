@@ -2,10 +2,10 @@ package com.apihub.mock.service;
 
 import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
+import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
 import com.apihub.mock.model.MockDtos.MockSimulationResult;
-import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -28,7 +28,9 @@ class MockRuntimeResolverTest {
                         List.of(),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}"
+                        "{\"error\":\"token expired\"}",
+                        0,
+                        "plain"
                 )),
                 List.of(new MockSimulationResponseItem(
                         200,
@@ -49,6 +51,7 @@ class MockRuntimeResolverTest {
         assertThat(result.matchedRulePriority()).isEqualTo(100);
         assertThat(result.statusCode()).isEqualTo(401);
         assertThat(result.body()).isEqualTo("{\"error\":\"token expired\"}");
+        assertThat(result.delayMs()).isZero();
         assertThat(result.explanations()).contains("Matched query mode=strict", "Matched header x-scenario=unauthorized");
     }
 
@@ -64,7 +67,9 @@ class MockRuntimeResolverTest {
                         List.of(),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}"
+                        "{\"error\":\"token expired\"}",
+                        0,
+                        "plain"
                 )),
                 List.of(new MockSimulationResponseItem(
                         200,
@@ -85,6 +90,7 @@ class MockRuntimeResolverTest {
         assertThat(result.matchedRulePriority()).isNull();
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.body()).isEqualTo("{\"userId\":\"u_1001\"}");
+        assertThat(result.delayMs()).isZero();
         assertThat(result.explanations()).contains(
                 "Rule skipped: missing header x-scenario=unauthorized",
                 "No rule matched; fallback to draft default response"
@@ -103,7 +109,9 @@ class MockRuntimeResolverTest {
                         List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         202,
                         "application/json",
-                        "{\"matched\":true}"
+                        "{\"matched\":true}",
+                        0,
+                        "plain"
                 )),
                 List.of(),
                 List.of(),
@@ -130,7 +138,9 @@ class MockRuntimeResolverTest {
                                 List.of(),
                                 503,
                                 "application/json",
-                                "{\"disabled\":true}"
+                                "{\"disabled\":true}",
+                                0,
+                                "plain"
                         ),
                         new MockRuleUpsertItem(
                                 "Skipped rule",
@@ -141,7 +151,9 @@ class MockRuntimeResolverTest {
                                 List.of(),
                                 401,
                                 "application/json",
-                                "{\"skipped\":true}"
+                                "{\"skipped\":true}",
+                                0,
+                                "plain"
                         ),
                         new MockRuleUpsertItem(
                                 "Matched rule",
@@ -152,7 +164,9 @@ class MockRuntimeResolverTest {
                                 List.of(new MockBodyConditionEntry("$.user.id", "31")),
                                 202,
                                 "application/json",
-                                "{\"matched\":true}"
+                                "{\"matched\":true}",
+                                0,
+                                "plain"
                         ),
                         new MockRuleUpsertItem(
                                 "Not evaluated rule",
@@ -163,7 +177,9 @@ class MockRuntimeResolverTest {
                                 List.of(),
                                 200,
                                 "application/json",
-                                "{\"late\":true}"
+                                "{\"late\":true}",
+                                0,
+                                "plain"
                         )
                 ),
                 List.of(),
@@ -201,7 +217,9 @@ class MockRuntimeResolverTest {
                                 List.of(),
                                 401,
                                 "application/json",
-                                "{\"strict\":true}"
+                                "{\"strict\":true}",
+                                0,
+                                "plain"
                         ),
                         new MockRuleUpsertItem(
                                 "Admin body rule",
@@ -212,7 +230,9 @@ class MockRuntimeResolverTest {
                                 List.of(new MockBodyConditionEntry("$.user.role", "admin")),
                                 202,
                                 "application/json",
-                                "{\"admin\":true}"
+                                "{\"admin\":true}",
+                                0,
+                                "plain"
                         )
                 ),
                 List.of(new MockSimulationResponseItem(
@@ -233,5 +253,43 @@ class MockRuntimeResolverTest {
         assertThat(result.ruleTraces()).hasSize(2);
         assertThat(result.ruleTraces()).extracting(trace -> trace.status()).containsExactly("skipped", "skipped");
         assertThat(result.explanations()).contains("No rule matched; fallback to draft default response");
+    }
+
+    @Test
+    void shouldRenderMockJsStyleBodyAndExposeDelay() {
+        MockSimulationResult result = resolver.resolveDraft(new MockSimulationRequest(
+                List.of(new MockRuleUpsertItem(
+                        "Dynamic user payload",
+                        180,
+                        true,
+                        List.of(new MockConditionEntry("scene", "dynamic")),
+                        List.of(),
+                        List.of(),
+                        200,
+                        "application/json",
+                        """
+                        {
+                          "requestId": "@guid",
+                          "email": "@email",
+                          "age": "@integer(18,60)"
+                        }
+                        """,
+                        650,
+                        "mockjs"
+                )),
+                List.of(),
+                List.of(new MockConditionEntry("scene", "dynamic")),
+                List.of(),
+                ""
+        ));
+
+        assertThat(result.source()).isEqualTo("rule");
+        assertThat(result.delayMs()).isEqualTo(650);
+        assertThat(result.body()).contains("\"requestId\":");
+        assertThat(result.body()).contains("\"email\":");
+        assertThat(result.body()).contains("\"age\":");
+        assertThat(result.body()).doesNotContain("@guid");
+        assertThat(result.body()).doesNotContain("@email");
+        assertThat(result.body()).doesNotContain("@integer");
     }
 }

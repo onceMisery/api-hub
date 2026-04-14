@@ -534,7 +534,9 @@ public class ProjectService {
                         rule.bodyConditions(),
                         rule.statusCode(),
                         rule.mediaType(),
-                        rule.body()))
+                        rule.body(),
+                        rule.delayMs(),
+                        rule.templateMode()))
                 .toList());
 
         return endpointRepository.createMockRelease(userId, endpointId, responseSnapshotJson, rulesSnapshotJson);
@@ -546,7 +548,25 @@ public class ProjectService {
 
     public MockSimulationResult simulateMock(Long userId, Long endpointId, MockSimulationRequest request) {
         requireEndpointReadAccess(userId, endpointId);
-        return mockRuntimeResolver.resolveDraft(request);
+        return mockRuntimeResolver.resolveDraft(new MockSimulationRequest(
+                request.draftRules() == null ? List.of() : request.draftRules().stream()
+                        .map(rule -> new MockRuleUpsertItem(
+                                rule.ruleName(),
+                                rule.priority(),
+                                rule.enabled(),
+                                rule.queryConditions(),
+                                rule.headerConditions(),
+                                rule.bodyConditions(),
+                                rule.statusCode(),
+                                rule.mediaType(),
+                                rule.body(),
+                                Math.max(rule.delayMs(), 0),
+                                rule.templateMode()))
+                        .toList(),
+                request.draftResponses(),
+                request.querySamples(),
+                request.headerSamples(),
+                request.bodySample()));
     }
 
     @Transactional(readOnly = true)

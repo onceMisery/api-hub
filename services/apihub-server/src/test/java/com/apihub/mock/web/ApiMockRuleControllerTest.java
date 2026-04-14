@@ -58,7 +58,9 @@ class ApiMockRuleControllerTest {
                         List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}"
+                        "{\"error\":\"token expired\"}",
+                        350,
+                        "mockjs"
                 )));
 
         mockMvc.perform(get("/api/v1/endpoints/31/mock-rules")
@@ -67,7 +69,9 @@ class ApiMockRuleControllerTest {
                 .andExpect(jsonPath("$.data[0].ruleName").value("unauthorized"))
                 .andExpect(jsonPath("$.data[0].bodyConditions[0].jsonPath").value("$.user.id"))
                 .andExpect(jsonPath("$.data[0].bodyConditions[0].expectedValue").value("31"))
-                .andExpect(jsonPath("$.data[0].statusCode").value(401));
+                .andExpect(jsonPath("$.data[0].statusCode").value(401))
+                .andExpect(jsonPath("$.data[0].delayMs").value(350))
+                .andExpect(jsonPath("$.data[0].templateMode").value("mockjs"));
     }
 
     @Test
@@ -86,7 +90,9 @@ class ApiMockRuleControllerTest {
                                     "bodyConditions": [{ "jsonPath": "$.user.id", "expectedValue": "31" }],
                                     "statusCode": 401,
                                     "mediaType": "application/json",
-                                    "body": "{\\\"error\\\":\\\"token expired\\\"}"
+                                    "body": "{\\\"error\\\":\\\"token expired\\\"}",
+                                    "delayMs": 350,
+                                    "templateMode": "mockjs"
                                   }
                                 ]
                                 """))
@@ -102,7 +108,9 @@ class ApiMockRuleControllerTest {
                         List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}"
+                        "{\"error\":\"token expired\"}",
+                        350,
+                        "mockjs"
                 ))));
     }
 }

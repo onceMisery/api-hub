@@ -96,7 +96,9 @@ public class EndpointRepository {
             parseBodyConditionEntries(rs.getString("body_conditions_json")),
             rs.getInt("status_code"),
             rs.getString("media_type"),
-            rs.getString("body_json"));
+            rs.getString("body_json"),
+            rs.getInt("delay_ms"),
+            rs.getString("template_mode"));
     private static final RowMapper<MockReleaseDetail> MOCK_RELEASE_ROW_MAPPER = (rs, rowNum) -> new MockReleaseDetail(
             rs.getLong("id"),
             rs.getLong("endpoint_id"),
@@ -415,7 +417,9 @@ public class EndpointRepository {
                        body_conditions_json,
                        status_code,
                        media_type,
-                       body_json
+                       body_json,
+                       delay_ms,
+                       template_mode
                 from mock_rule
                 where endpoint_id = ?
                 order by priority desc, id
@@ -442,9 +446,11 @@ public class EndpointRepository {
                         status_code,
                         media_type,
                         body_json,
+                        delay_ms,
+                        template_mode,
                         created_by,
                         updated_by
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     endpointId,
                     item.ruleName(),
@@ -456,6 +462,8 @@ public class EndpointRepository {
                     item.statusCode(),
                     item.mediaType(),
                     item.body(),
+                    Math.max(item.delayMs(), 0),
+                    normalizeTemplateMode(item.templateMode()),
                     userId,
                     userId);
         }
@@ -743,5 +751,9 @@ public class EndpointRepository {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize mock body conditions", exception);
         }
+    }
+
+    private String normalizeTemplateMode(String templateMode) {
+        return templateMode == null || templateMode.isBlank() ? "plain" : templateMode.trim().toLowerCase(java.util.Locale.ROOT);
     }
 }

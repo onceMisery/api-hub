@@ -435,7 +435,9 @@ class ProjectServiceTest {
                         java.util.List.of(new MockBodyConditionEntry("$.user.id", "31")),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}")));
+                        "{\"error\":\"token expired\"}",
+                        180,
+                        "mockjs")));
 
         var firstRelease = projectService.publishMockRelease(1L, endpoint.id());
         var secondRelease = projectService.publishMockRelease(1L, endpoint.id());
@@ -448,6 +450,8 @@ class ProjectServiceTest {
         assertThat(releases.get(0).rulesSnapshotJson()).contains("\"Unauthorized\"");
         assertThat(releases.get(0).rulesSnapshotJson()).contains("\"bodyConditions\"");
         assertThat(releases.get(0).rulesSnapshotJson()).contains("$.user.id");
+        assertThat(releases.get(0).rulesSnapshotJson()).contains("\"delayMs\":180");
+        assertThat(releases.get(0).rulesSnapshotJson()).contains("\"templateMode\":\"mockjs\"");
     }
 
     @Test
@@ -472,7 +476,9 @@ class ProjectServiceTest {
                         java.util.List.of(),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}"
+                        "{\"error\":\"token expired\"}",
+                        90,
+                        "plain"
                 )),
                 java.util.List.of(new MockSimulationResponseItem(
                         200,
@@ -492,6 +498,7 @@ class ProjectServiceTest {
         assertThat(result.matchedRuleName()).isEqualTo("Unauthorized");
         assertThat(result.statusCode()).isEqualTo(401);
         assertThat(result.body()).isEqualTo("{\"error\":\"token expired\"}");
+        assertThat(result.delayMs()).isEqualTo(90);
     }
 
     @Test

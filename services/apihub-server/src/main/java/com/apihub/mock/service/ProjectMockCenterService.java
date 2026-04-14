@@ -147,7 +147,9 @@ public class ProjectMockCenterService {
                         rule.bodyConditions(),
                         rule.statusCode(),
                         rule.mediaType(),
-                        rule.body()))
+                        rule.body(),
+                        rule.delayMs(),
+                        rule.templateMode()))
                 .toList());
     }
 

@@ -1,0 +1,1130 @@
+import React from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
+import { EndpointEditor } from "./endpoint-editor";
+
+describe("EndpointEditor", () => {
+  it("renders endpoint details and versions", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: "{\"path\":\"/users/{id}\"}"
+          }
+        ]}
+      />
+    );
+
+    expect(screen.getByDisplayValue("Get User")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("/users/{id}")).toBeInTheDocument();
+    expect(screen.getAllByText("/mock/1/users/{id}")).toHaveLength(2);
+    expect(screen.getByText("Request Parameters")).toBeInTheDocument();
+    expect(screen.getByText("Versions")).toBeInTheDocument();
+    expect(screen.getByText("Initial release")).toBeInTheDocument();
+  });
+
+  it("renders only the requested editor sections", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        visibleSections={["basics", "mockRules", "mockRuntime"]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Endpoint basics")).toBeInTheDocument();
+    expect(screen.getByText("Mock Rules")).toBeInTheDocument();
+    expect(screen.getByText("Published Runtime")).toBeInTheDocument();
+    expect(screen.queryByText("Request Parameters")).not.toBeInTheDocument();
+    expect(screen.queryByText("Versions")).not.toBeInTheDocument();
+  });
+
+  it("submits updated endpoint basics", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: false
+        }}
+        projectId={1}
+        onSave={onSave}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Endpoint name"), { target: { value: "Get User Detail" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Load detailed user profile" } });
+    fireEvent.click(screen.getByLabelText("Enable mock"));
+    fireEvent.click(screen.getByRole("button", { name: "Save endpoint" }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({
+        description: "Load detailed user profile",
+        method: "GET",
+        mockEnabled: true,
+        name: "Get User Detail",
+        path: "/users/{id}"
+      })
+    );
+  });
+
+  it("saves parameter and response rows, creates versions, and deletes the endpoint", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const onSaveMockRules = vi.fn().mockResolvedValue(undefined);
+    const onSaveParameters = vi.fn().mockResolvedValue(undefined);
+    const onSaveResponses = vi.fn().mockResolvedValue(undefined);
+    const onSaveVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: false
+        }}
+        projectId={1}
+        onDelete={onDelete}
+        onSaveMockRules={onSaveMockRules}
+        onSaveParameters={onSaveParameters}
+        onSaveResponses={onSaveResponses}
+        onSaveVersion={onSaveVersion}
+        parameters={[]}
+        responses={[]}
+        versions={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add parameter row" }));
+    fireEvent.change(screen.getByLabelText("Parameter 1 name"), { target: { value: "id" } });
+    fireEvent.change(screen.getByLabelText("Parameter 1 type"), { target: { value: "string" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save parameters" }));
+
+    await waitFor(() =>
+      expect(onSaveParameters).toHaveBeenCalledWith([
+        {
+          dataType: "string",
+          description: "",
+          exampleValue: "",
+          name: "id",
+          required: false,
+          sectionType: "query"
+        }
+      ])
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add response row" }));
+    fireEvent.change(screen.getByLabelText("Response 1 name"), { target: { value: "userId" } });
+    fireEvent.change(screen.getByLabelText("Response 1 type"), { target: { value: "string" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save responses" }));
+
+    await waitFor(() =>
+      expect(onSaveResponses).toHaveBeenCalledWith([
+        {
+          dataType: "string",
+          description: "",
+          exampleValue: "",
+          httpStatusCode: 200,
+          mediaType: "application/json",
+          name: "userId",
+          required: false
+        }
+      ])
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add mock rule" }));
+    fireEvent.change(screen.getByLabelText("Mock rule 1 name"), { target: { value: "Unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 query conditions"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 header conditions"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 body conditions"), { target: { value: "$.user.id=31" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 response status"), { target: { value: "401" } });
+    fireEvent.change(screen.getByLabelText("Mock rule 1 body"), { target: { value: "{\"error\":\"token expired\"}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save mock rules" }));
+
+    await waitFor(() =>
+      expect(onSaveMockRules).toHaveBeenCalledWith([
+        {
+          body: "{\"error\":\"token expired\"}",
+          bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
+          enabled: true,
+          headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+          mediaType: "application/json",
+          priority: 100,
+          queryConditions: [{ name: "mode", value: "strict" }],
+          ruleName: "Unauthorized",
+          statusCode: 401
+        }
+      ])
+    );
+
+    fireEvent.change(screen.getByLabelText("Version label"), { target: { value: "v2" } });
+    fireEvent.change(screen.getByLabelText("Version summary"), { target: { value: "Added editable schema" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save version snapshot" }));
+
+    await waitFor(() =>
+      expect(onSaveVersion).toHaveBeenCalledWith({
+        changeSummary: "Added editable schema",
+        version: "v2"
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete endpoint" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalled());
+  });
+
+  it("shows a basic diff against a selected version snapshot", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: false
+        }}
+        projectId={1}
+        parameters={[
+          {
+            id: 1,
+            sectionType: "query",
+            name: "id",
+            dataType: "string",
+            required: true,
+            description: "User id",
+            exampleValue: "1001",
+            sortOrder: 0
+          }
+        ]}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "1001",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User",
+                method: "GET",
+                path: "/users",
+                description: "Load a user"
+              },
+              parameters: [],
+              responses: []
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Compare against version"), { target: { value: "1" } });
+
+    expect(await screen.findByText("Changed endpoint path")).toBeInTheDocument();
+    expect(screen.getByText("/users -> /users/{id}")).toBeInTheDocument();
+    expect(screen.getByText("Added request parameter")).toBeInTheDocument();
+    expect(screen.getByText("query.id")).toBeInTheDocument();
+    expect(screen.getByText("Added response field")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId")).toBeInTheDocument();
+  });
+
+  it("shows structural diff items for removed and changed fields", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User Detail",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user with profile",
+          mockEnabled: false
+        }}
+        projectId={1}
+        parameters={[]}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "uuid",
+            required: true,
+            description: "Current user identifier",
+            exampleValue: "u_2002",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User",
+                method: "GET",
+                path: "/users/{id}",
+                description: "Load a single user"
+              },
+              parameters: [
+                {
+                  sectionType: "query",
+                  name: "expand",
+                  dataType: "string",
+                  required: false,
+                  description: "Expand relations",
+                  exampleValue: "team"
+                }
+              ],
+              responses: [
+                {
+                  httpStatusCode: 200,
+                  mediaType: "application/json",
+                  name: "userId",
+                  dataType: "string",
+                  required: true,
+                  description: "User identifier",
+                  exampleValue: "u_1001"
+                }
+              ]
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Compare against version"), { target: { value: "1" } });
+
+    expect(await screen.findByText("Changed endpoint name")).toBeInTheDocument();
+    expect(screen.getByText("Get User -> Get User Detail")).toBeInTheDocument();
+    expect(screen.getByText("Removed request parameter")).toBeInTheDocument();
+    expect(screen.getByText("query.expand")).toBeInTheDocument();
+    expect(screen.getByText("Changed response field type")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId: string -> uuid")).toBeInTheDocument();
+    expect(screen.getByText("Changed response field description")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId: User identifier -> Current user identifier")).toBeInTheDocument();
+    expect(screen.getByText("Changed response field example")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json userId: u_1001 -> u_2002")).toBeInTheDocument();
+  });
+
+  it("shows grouped version diff sections in the editor compare panel", async () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User Detail",
+          method: "POST",
+          path: "/users/{id}",
+          description: "Profile",
+          mockEnabled: false
+        }}
+        projectId={1}
+        parameters={[
+          {
+            id: 1,
+            sectionType: "query",
+            name: "expand",
+            dataType: "string",
+            required: false,
+            description: "",
+            exampleValue: "team",
+            sortOrder: 0
+          }
+        ]}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "uuid",
+            required: true,
+            description: "",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          }
+        ]}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial",
+            snapshotJson: JSON.stringify({
+              endpoint: { name: "Get User", method: "GET", path: "/users", description: "Load" },
+              parameters: [],
+              responses: []
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Compare against version"), { target: { value: "1" } });
+
+    expect((await screen.findAllByText("5 total changes")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Endpoint basics").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Request parameters").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Responses").length).toBeGreaterThan(0);
+  });
+
+  it("restores a selected version snapshot through the restore callback", async () => {
+    const onRestoreVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: false
+        }}
+        projectId={1}
+        onRestoreVersion={onRestoreVersion}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Initial release",
+            snapshotJson: JSON.stringify({
+              endpoint: {
+                name: "Get User Legacy",
+                method: "POST",
+                path: "/legacy/users",
+                description: "Legacy"
+              },
+              parameters: [
+                {
+                  sectionType: "query",
+                  name: "expand",
+                  dataType: "string",
+                  required: false,
+                  description: "",
+                  exampleValue: ""
+                }
+              ],
+              responses: [
+                {
+                  httpStatusCode: 202,
+                  mediaType: "application/json",
+                  name: "jobId",
+                  dataType: "string",
+                  required: true,
+                  description: "",
+                  exampleValue: "job_1"
+                }
+              ]
+            })
+          }
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore snapshot v1" }));
+
+    await waitFor(() =>
+      expect(onRestoreVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ version: "v1" }),
+        expect.objectContaining({
+          endpoint: expect.objectContaining({
+            name: "Get User Legacy",
+            method: "POST",
+            path: "/legacy/users"
+          })
+        })
+      )
+    );
+  });
+
+  it("shows a restore error for malformed version snapshots", async () => {
+    const onRestoreVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: false
+        }}
+        projectId={1}
+        onRestoreVersion={onRestoreVersion}
+        versions={[
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Broken snapshot",
+            snapshotJson: "{\"endpoint\":{}}"
+          }
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore snapshot v1" }));
+
+    expect(await screen.findByText("Version snapshot cannot be restored.")).toBeInTheDocument();
+    expect(onRestoreVersion).not.toHaveBeenCalled();
+  });
+
+  it("runs a draft mock simulation and renders the resolved result", async () => {
+    const onSimulateMock = vi.fn().mockResolvedValue({
+      source: "rule",
+      matchedRuleName: "Unauthorized",
+      matchedRulePriority: 100,
+      explanations: ["Matched query mode=strict", "Matched header x-scenario=unauthorized"],
+      ruleTraces: [],
+      statusCode: 401,
+      mediaType: "application/json",
+      body: "{\"error\":\"token expired\"}"
+    });
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          },
+          {
+            id: 2,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "count",
+            dataType: "integer",
+            required: true,
+            description: "Count",
+            exampleValue: "",
+            sortOrder: 1
+          }
+        ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        onSimulateMock={onSimulateMock}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Simulator header samples"), { target: { value: "x-scenario=unauthorized" } });
+    fireEvent.change(screen.getByLabelText("Simulator request body"), { target: { value: "{\"user\":{\"id\":31}}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run mock simulation" }));
+
+    await waitFor(() =>
+      expect(onSimulateMock).toHaveBeenCalledWith({
+        draftRules: [
+          {
+            body: "{\"error\":\"token expired\"}",
+            bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
+            enabled: true,
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            mediaType: "application/json",
+            priority: 100,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            ruleName: "Unauthorized",
+            statusCode: 401
+          }
+        ],
+        draftResponses: [
+          {
+            dataType: "string",
+            description: "User identifier",
+            exampleValue: "u_1001",
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            required: true
+          },
+          {
+            dataType: "integer",
+            description: "Count",
+            exampleValue: "",
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "count",
+            required: true
+          }
+        ],
+        headerSamples: [{ name: "x-scenario", value: "unauthorized" }],
+        querySamples: [{ name: "mode", value: "strict" }],
+        bodySample: "{\"user\":{\"id\":31}}"
+      })
+    );
+
+    expect(await screen.findByText("Unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("Matched header x-scenario=unauthorized")).toBeInTheDocument();
+    const simulationBody = screen.getByText("Simulation Body").parentElement?.querySelector("pre");
+    expect(simulationBody).toHaveTextContent('"error":"token expired"');
+  });
+
+  it("renders a mock matchboard with rule states and trace evidence", async () => {
+    const onSimulateMock = vi.fn().mockResolvedValue({
+      source: "rule",
+      matchedRuleName: "Matched rule",
+      matchedRulePriority: 120,
+      explanations: ["Matched query mode=strict", "Matched body $.user.id=31"],
+      ruleTraces: [
+        {
+          ruleName: "Disabled rule",
+          priority: 300,
+          status: "disabled",
+          checks: [],
+          summary: "Rule is disabled and skipped from draft runtime."
+        },
+        {
+          ruleName: "Skipped rule",
+          priority: 220,
+          status: "skipped",
+          checks: ["Matched query mode=strict"],
+          summary: "Rule skipped: missing header x-scenario=blocked"
+        },
+        {
+          ruleName: "Matched rule",
+          priority: 120,
+          status: "matched",
+          checks: ["Matched query mode=strict", "Matched body $.user.id=31"],
+          summary: "Rule matched and produced the simulated response."
+        },
+        {
+          ruleName: "Not evaluated rule",
+          priority: 80,
+          status: "not_evaluated",
+          checks: [],
+          summary: "Rule not evaluated because a higher-priority rule already matched."
+        }
+      ],
+      statusCode: 202,
+      mediaType: "application/json",
+      body: "{\"matched\":true}"
+    });
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Matched rule",
+            priority: 120,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [],
+            bodyConditions: [{ jsonPath: "$.user.id", expectedValue: "31" }],
+            statusCode: 202,
+            mediaType: "application/json",
+            body: "{\"matched\":true}"
+          }
+        ]}
+        onSimulateMock={onSimulateMock}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Simulator query samples"), { target: { value: "mode=strict" } });
+    fireEvent.change(screen.getByLabelText("Simulator request body"), { target: { value: "{\"user\":{\"id\":31}}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run mock simulation" }));
+
+    const matchboard = await screen.findByRole("region", { name: "Rule Matchboard" });
+    expect(within(matchboard).getAllByText("Matched").length).toBeGreaterThan(0);
+    expect(within(matchboard).getAllByText("Skipped").length).toBeGreaterThan(0);
+    expect(within(matchboard).getAllByText("Disabled").length).toBeGreaterThan(0);
+    expect(within(matchboard).getAllByText("Not evaluated").length).toBeGreaterThan(0);
+    expect(within(matchboard).getByText("Matched rule")).toBeInTheDocument();
+    expect(within(matchboard).getByText("Rule skipped: missing header x-scenario=blocked")).toBeInTheDocument();
+    expect(within(matchboard).getByText("Rule not evaluated because a higher-priority rule already matched.")).toBeInTheDocument();
+  });
+
+  it("shows published runtime status and triggers mock publish", async () => {
+    const onPublishMockRelease = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockReleases={[
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-09T12:20:00Z"
+          }
+        ]}
+        onPublishMockRelease={onPublishMockRelease}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Published Runtime")).toBeInTheDocument();
+    expect(screen.getAllByText("Release #3").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("/mock/1/users/{id}").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish mock" }));
+
+    await waitFor(() => expect(onPublishMockRelease).toHaveBeenCalled());
+  });
+
+  it("shows published runtime snapshot summary and draft drift details", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "User identifier",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          },
+          {
+            id: 2,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "role",
+            dataType: "string",
+            required: true,
+            description: "Role",
+            exampleValue: "admin",
+            sortOrder: 1
+          }
+        ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        mockReleases={[
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"}]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-09T12:20:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Draft has unpublished mock changes.")).toBeInTheDocument();
+    expect(screen.getByText("Published response fields")).toBeInTheDocument();
+    expect(screen.getByText("1 field across 1 status group")).toBeInTheDocument();
+    expect(screen.getAllByText("Published rules").length).toBeGreaterThan(0);
+    expect(screen.getByText("0 enabled of 0 total")).toBeInTheDocument();
+    expect(screen.getByText("Draft response fields")).toBeInTheDocument();
+    expect(screen.getByText("2 fields across 1 status group")).toBeInTheDocument();
+    expect(screen.getByText("Draft rules")).toBeInTheDocument();
+    expect(screen.getByText("1 enabled of 1 total")).toBeInTheDocument();
+    expect(screen.getByText("Draft response fields changed from 1 to 2.")).toBeInTheDocument();
+    expect(screen.getByText("Draft enabled rules changed from 0 to 1.")).toBeInTheDocument();
+  });
+
+  it("shows published runtime response groups and rule breakdown", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockReleases={[
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"},{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"role\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"admin\"}]",
+            rulesSnapshotJson:
+              "[{\"ruleName\":\"Unauthorized\",\"priority\":100,\"enabled\":true,\"queryConditions\":[{\"name\":\"mode\",\"value\":\"strict\"}],\"headerConditions\":[{\"name\":\"x-scenario\",\"value\":\"unauthorized\"}],\"statusCode\":401,\"mediaType\":\"application/json\",\"body\":\"{\\\"error\\\":\\\"token expired\\\"}\"}]",
+            createdAt: "2026-04-09T12:20:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Published response groups")).toBeInTheDocument();
+    expect(screen.getByText("200 application/json")).toBeInTheDocument();
+    expect(screen.getByText("2 fields")).toBeInTheDocument();
+    expect(screen.getAllByText("Published rules").length).toBeGreaterThan(0);
+    expect(screen.getByText("Unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("Priority 100")).toBeInTheDocument();
+    expect(screen.getByText("query mode=strict")).toBeInTheDocument();
+    expect(screen.getByText("header x-scenario=unauthorized")).toBeInTheDocument();
+  });
+
+  it("inspects an older mock release while keeping runtime pinned to the latest release", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockReleases={[
+          {
+            id: 31,
+            endpointId: 7,
+            releaseNo: 4,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"userId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"u_1001\"}]",
+            rulesSnapshotJson:
+              "[{\"ruleName\":\"Latest rule\",\"priority\":120,\"enabled\":true,\"queryConditions\":[],\"headerConditions\":[],\"bodyConditions\":[],\"statusCode\":200,\"mediaType\":\"application/json\",\"body\":\"{\\\"ok\\\":true}\"}]",
+            createdAt: "2026-04-11T09:00:00Z"
+          },
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson:
+              "[{\"ruleName\":\"Legacy rule\",\"priority\":80,\"enabled\":true,\"queryConditions\":[],\"headerConditions\":[],\"bodyConditions\":[],\"statusCode\":503,\"mediaType\":\"application/json\",\"body\":\"{\\\"legacy\\\":true}\"}]",
+            createdAt: "2026-04-10T09:00:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Release #4 is the only snapshot served by runtime.")).toBeInTheDocument();
+    expect(screen.getByText("Inspecting Release #4")).toBeInTheDocument();
+    expect(screen.getByText("Latest rule")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Inspect published release"), { target: { value: "21" } });
+
+    expect(screen.getByText("Inspecting Release #3")).toBeInTheDocument();
+    expect(screen.getByText("Legacy rule")).toBeInTheDocument();
+    expect(screen.getByText("Runtime source remains Release #4")).toBeInTheDocument();
+  });
+
+  it("compares the draft against the inspected release without changing runtime source messaging", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load",
+          mockEnabled: true
+        }}
+        projectId={1}
+        responses={[
+          {
+            id: 1,
+            endpointId: 7,
+            httpStatusCode: 200,
+            mediaType: "application/json",
+            name: "userId",
+            dataType: "string",
+            required: true,
+            description: "",
+            exampleValue: "u_1001",
+            sortOrder: 0
+          }
+        ]}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Draft rule",
+            priority: 100,
+            enabled: true,
+            queryConditions: [],
+            headerConditions: [],
+            bodyConditions: [],
+            statusCode: 200,
+            mediaType: "application/json",
+            body: "{\"draft\":true}"
+          }
+        ]}
+        mockReleases={[
+          {
+            id: 31,
+            endpointId: 7,
+            releaseNo: 4,
+            responseSnapshotJson: "[]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-11T09:00:00Z"
+          },
+          {
+            id: 21,
+            endpointId: 7,
+            releaseNo: 3,
+            responseSnapshotJson:
+              "[{\"httpStatusCode\":200,\"mediaType\":\"application/json\",\"name\":\"legacyId\",\"dataType\":\"string\",\"required\":true,\"description\":\"\",\"exampleValue\":\"old\"}]",
+            rulesSnapshotJson: "[]",
+            createdAt: "2026-04-10T09:00:00Z"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Inspect published release"), { target: { value: "21" } });
+
+    expect(screen.queryByText("Draft response fields changed from 0 to 1.")).not.toBeInTheDocument();
+    expect(screen.getByText("Draft enabled rules changed from 0 to 1.")).toBeInTheDocument();
+    expect(screen.getByText("Runtime source remains Release #4")).toBeInTheDocument();
+  });
+
+  it("shows unpublished runtime state when no release exists", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("No published release yet.")).toBeInTheDocument();
+  });
+
+  it("surfaces the version release lane and wires release plus draft reset actions", async () => {
+    const onReleaseVersion = vi.fn().mockResolvedValue(undefined);
+    const onClearReleasedVersion = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: false,
+          status: "released",
+          releasedVersionId: 2,
+          releasedVersionLabel: "v2",
+          releasedAt: "2026-04-11T09:00:00Z"
+        }}
+        projectId={1}
+        onClearReleasedVersion={onClearReleasedVersion}
+        onReleaseVersion={onReleaseVersion}
+        versions={[
+          {
+            id: 2,
+            endpointId: 7,
+            version: "v2",
+            changeSummary: "Live",
+            snapshotJson: "{}",
+            released: true,
+            releasedAt: "2026-04-11T09:00:00Z"
+          },
+          {
+            id: 1,
+            endpointId: 7,
+            version: "v1",
+            changeSummary: "Candidate",
+            snapshotJson: "{}",
+            released: false,
+            releasedAt: null
+          }
+        ]}
+      />
+    );
+
+    expect(screen.getAllByText("Live: v2").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Return to draft lane" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Return to draft lane" }));
+
+    await waitFor(() => expect(onClearReleasedVersion).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Compare snapshot v1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Release selected snapshot" }));
+
+    await waitFor(() => expect(onReleaseVersion).toHaveBeenCalledWith(expect.objectContaining({ id: 1, version: "v1" })));
+  });
+
+  it("shows mock rule match summary and formatted rule response preview", () => {
+    render(
+      <EndpointEditor
+        endpoint={{
+          id: 7,
+          groupId: 3,
+          name: "Get User",
+          method: "GET",
+          path: "/users/{id}",
+          description: "Load a single user",
+          mockEnabled: true
+        }}
+        projectId={1}
+        mockRules={[
+          {
+            id: 11,
+            endpointId: 7,
+            ruleName: "Unauthorized",
+            priority: 100,
+            enabled: true,
+            queryConditions: [{ name: "mode", value: "strict" }],
+            headerConditions: [{ name: "x-scenario", value: "unauthorized" }],
+            statusCode: 401,
+            mediaType: "application/json",
+            body: "{\"error\":\"token expired\"}"
+          }
+        ]}
+        versions={[]}
+      />
+    );
+
+    expect(screen.getByText("Match summary")).toBeInTheDocument();
+    expect(screen.getByText("query mode=strict")).toBeInTheDocument();
+    expect(screen.getByText("header x-scenario=unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("Rule response preview")).toBeInTheDocument();
+
+    const previewBlocks = screen.getAllByText("Rule response preview");
+    const previewBody = previewBlocks[0].parentElement?.querySelector("pre");
+    expect(previewBody).toHaveTextContent('"error": "token expired"');
+  });
+
+});

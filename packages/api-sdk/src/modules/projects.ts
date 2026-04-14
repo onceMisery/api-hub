@@ -138,6 +138,20 @@ export type VersionComparisonSummary = {
   addedResponses: number;
   removedResponses: number;
   modifiedResponses: number;
+  breakingChanges: number;
+};
+
+export type VersionBreakingChange = {
+  type: "endpoint" | "parameter" | "response";
+  level: "high" | "medium" | "low";
+  title: string;
+  detail: string;
+};
+
+export type VersionChangelogEntry = {
+  category: "endpoint" | "parameter" | "response";
+  title: string;
+  detail: string;
 };
 
 export type VersionFieldChange = {
@@ -182,6 +196,8 @@ export type VersionComparisonResult = {
   base: VersionComparisonDescriptor;
   target: VersionComparisonDescriptor;
   summary: VersionComparisonSummary;
+  breakingChanges: VersionBreakingChange[];
+  changelog: VersionChangelogEntry[];
   endpointChanges: VersionFieldChange[];
   parameterChanges: VersionParameterChange[];
   responseChanges: VersionResponseChange[];
@@ -406,6 +422,8 @@ export type MockRuleDetail = {
   statusCode: number;
   mediaType: string;
   body: string;
+  delayMs: number;
+  templateMode: "plain" | "mockjs";
 };
 
 export type MockRuleUpsertItem = {
@@ -418,6 +436,8 @@ export type MockRuleUpsertItem = {
   statusCode: number;
   mediaType: string;
   body: string;
+  delayMs: number;
+  templateMode: "plain" | "mockjs";
 };
 
 export type MockReleaseDetail = {
@@ -456,6 +476,7 @@ export type MockSimulationResult = {
   statusCode: number;
   mediaType: string;
   body: string;
+  delayMs: number;
 };
 
 export type MockRuleTrace = {

@@ -93,7 +93,7 @@ class MockServiceTest {
                         [{"httpStatusCode":200,"mediaType":"application/json","name":"userId","dataType":"string","required":true,"description":"","exampleValue":"u_1001"}]
                         """,
                         """
-                        [{"ruleName":"unauthorized","priority":100,"enabled":true,"queryConditions":[{"name":"mode","value":"strict"}],"headerConditions":[{"name":"x-scenario","value":"unauthorized"}],"statusCode":401,"mediaType":"application/json","body":"{\\"error\\":\\"token expired\\"}"}]
+                        [{"ruleName":"unauthorized","priority":100,"enabled":true,"queryConditions":[{"name":"mode","value":"strict"}],"headerConditions":[{"name":"x-scenario","value":"unauthorized"}],"bodyConditions":[],"statusCode":401,"mediaType":"application/json","body":"{\\"error\\":\\"token expired\\"}","delayMs":240,"templateMode":"plain"}]
                         """,
                         Instant.parse("2026-04-09T12:00:00Z")
                 )));
@@ -109,6 +109,7 @@ class MockServiceTest {
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(response.headers()).containsExactly(new DebugHeader("Content-Type", "application/json"));
         assertThat(response.body()).isEqualTo("{\"error\":\"token expired\"}");
+        assertThat(response.delayMs()).isEqualTo(240);
     }
 
     @Test
@@ -124,7 +125,7 @@ class MockServiceTest {
                         [{"httpStatusCode":200,"mediaType":"application/json","name":"userId","dataType":"string","required":true,"description":"","exampleValue":"u_1001"}]
                         """,
                         """
-                        [{"ruleName":"body-match","priority":120,"enabled":true,"queryConditions":[],"headerConditions":[],"bodyConditions":[{"jsonPath":"$.user.id","expectedValue":"31"}],"statusCode":202,"mediaType":"application/json","body":"{\\"matched\\":true}"}]
+                        [{"ruleName":"body-match","priority":120,"enabled":true,"queryConditions":[],"headerConditions":[],"bodyConditions":[{"jsonPath":"$.user.id","expectedValue":"31"}],"statusCode":202,"mediaType":"application/json","body":"{\\"matched\\":true}","delayMs":0,"templateMode":"plain"}]
                         """,
                         Instant.parse("2026-04-09T12:00:00Z")
                 )));
@@ -161,5 +162,37 @@ class MockServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void shouldRenderDynamicMockJsRuleFromReleasedSnapshot() {
+        given(endpointRepository.listMockEndpoints(1L, "GET")).willReturn(List.of(
+                new EndpointDetail(31L, 21L, "Get User", "GET", "/users/{id}", "Load user", true)));
+        given(endpointRepository.findLatestMockRelease(31L)).willReturn(Optional.of(
+                new MockReleaseDetail(
+                        5L,
+                        31L,
+                        1,
+                        "[]",
+                        """
+                        [{"ruleName":"dynamic-user","priority":120,"enabled":true,"queryConditions":[{"name":"mode","value":"dynamic"}],"headerConditions":[],"bodyConditions":[],"statusCode":200,"mediaType":"application/json","body":"{\\"requestId\\":\\"@guid\\",\\"email\\":\\"@email\\"}","delayMs":520,"templateMode":"mockjs"}]
+                        """,
+                        Instant.parse("2026-04-09T12:00:00Z")
+                )));
+
+        MockService.MockResponse response = mockService.resolve(
+                1L,
+                "GET",
+                "/users/31",
+                Map.of("mode", List.of("dynamic")),
+                Map.of(),
+                "");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.delayMs()).isEqualTo(520);
+        assertThat(response.body()).contains("\"requestId\":");
+        assertThat(response.body()).contains("\"email\":");
+        assertThat(response.body()).doesNotContain("@guid");
+        assertThat(response.body()).doesNotContain("@email");
     }
 }

@@ -53,7 +53,8 @@ class ApiMockSimulationControllerTest {
                         List.of(),
                         401,
                         "application/json",
-                        "{\"error\":\"token expired\"}"
+                        "{\"error\":\"token expired\"}",
+                        220
                 ));
 
         mockMvc.perform(post("/api/v1/endpoints/31/mock-simulations")
@@ -70,7 +71,8 @@ class ApiMockSimulationControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.source").value("rule"))
-                .andExpect(jsonPath("$.data.statusCode").value(401));
+                .andExpect(jsonPath("$.data.statusCode").value(401))
+                .andExpect(jsonPath("$.data.delayMs").value(220));
 
         then(projectService).should().simulateMock(eq(1L), eq(31L), argThat(request ->
                 "{\"user\":{\"id\":31}}".equals(request.bodySample())));

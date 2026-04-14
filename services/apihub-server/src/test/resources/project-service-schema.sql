@@ -152,6 +152,8 @@ CREATE TABLE mock_rule (
   status_code INT NOT NULL DEFAULT 200,
   media_type VARCHAR(128) NOT NULL DEFAULT 'application/json',
   body_json CLOB NOT NULL,
+  delay_ms INT NOT NULL DEFAULT 0,
+  template_mode VARCHAR(16) NOT NULL DEFAULT 'plain',
   created_by BIGINT NOT NULL,
   updated_by BIGINT NOT NULL
 );
