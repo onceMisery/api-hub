@@ -33,6 +33,10 @@ type MockScreenProps = {
 
 type EditableRule = MockRuleUpsertItem & { rowId: string };
 type RuleDraft = { query: string; header: string; body: string };
+const TEMPLATE_MODE_OPTIONS: Array<{ value: MockRuleUpsertItem["templateMode"]; label: string; hint: string }> = [
+  { value: "plain", label: "静态", hint: "原样返回 body 内容" },
+  { value: "mockjs", label: "动态模板", hint: "支持 @guid / @email / items|3 这类 Mock.js 风格语法" }
+];
 
 function nowId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -108,7 +112,9 @@ function makeRule(rule?: Partial<MockRuleUpsertItem>): EditableRule {
     bodyConditions: rule?.bodyConditions ?? [],
     statusCode: rule?.statusCode ?? 200,
     mediaType: rule?.mediaType ?? "application/json",
-    body: rule?.body ?? "{}"
+    body: rule?.body ?? "{}",
+    delayMs: rule?.delayMs ?? 0,
+    templateMode: rule?.templateMode ?? "plain"
   };
 }
 
@@ -253,7 +259,9 @@ export function MockScreen({ projectId }: MockScreenProps) {
           bodyConditions: parseBodyEntries(drafts[rule.rowId]?.body ?? ""),
           statusCode: rule.statusCode,
           mediaType: rule.mediaType.trim() || "application/json",
-          body: rule.body
+          body: rule.body,
+          delayMs: Math.max(rule.delayMs, 0),
+          templateMode: rule.templateMode
         }))
         .filter((rule) => rule.ruleName);
 
@@ -302,7 +310,9 @@ export function MockScreen({ projectId }: MockScreenProps) {
             bodyConditions: parseBodyEntries(drafts[rule.rowId]?.body ?? ""),
             statusCode: rule.statusCode,
             mediaType: rule.mediaType.trim() || "application/json",
-            body: rule.body
+            body: rule.body,
+            delayMs: Math.max(rule.delayMs, 0),
+            templateMode: rule.templateMode
           }))
           .filter((rule) => rule.ruleName),
         draftResponses: buildSimulationResponses(responses),
@@ -526,7 +536,32 @@ export function MockScreen({ projectId }: MockScreenProps) {
                                   <Input onChange={(event) => setRules((current) => current.map((item) => item.rowId === rule.rowId ? { ...item, statusCode: Number(event.target.value) || 200 } : item))} type="number" value={rule.statusCode} />
                                   <Input onChange={(event) => setRules((current) => current.map((item) => item.rowId === rule.rowId ? { ...item, mediaType: event.target.value } : item))} placeholder="application/json" value={rule.mediaType} />
                                 </div>
+                                <div className="grid gap-3 md:grid-cols-[140px_minmax(0,1fr)]">
+                                  <Input
+                                    min={0}
+                                    onChange={(event) => setRules((current) => current.map((item) => item.rowId === rule.rowId ? { ...item, delayMs: Number(event.target.value) || 0 } : item))}
+                                    placeholder="Delay ms"
+                                    type="number"
+                                    value={rule.delayMs}
+                                  />
+                                  <select
+                                    className="h-11 rounded-lg border border-input bg-surface px-3 text-sm text-foreground outline-none ring-0 transition-fast focus:border-primary/35"
+                                    onChange={(event) => setRules((current) => current.map((item) => item.rowId === rule.rowId ? { ...item, templateMode: event.target.value as MockRuleUpsertItem["templateMode"] } : item))}
+                                    value={rule.templateMode}
+                                  >
+                                    {TEMPLATE_MODE_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
                                 <Textarea className="min-h-[100px] font-mono text-xs" onChange={(event) => setRules((current) => current.map((item) => item.rowId === rule.rowId ? { ...item, body: event.target.value } : item))} placeholder='{"ok":true}' value={rule.body} />
+                                <div className="rounded-[1rem] border border-border/70 bg-surface/55 px-3 py-3 text-[11px] leading-6 text-muted-foreground">
+                                  {rule.templateMode === "mockjs"
+                                    ? "动态模板支持示例：@guid、@email、@integer(1,10)、{\"items|3\":[{\"id\":\"@guid\"}]}"
+                                    : "静态模式下 body 将原样返回。Delay ms 会在 Mock 网关和模拟器中同时生效。"}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -562,7 +597,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
 
                         {simulation ? (
                           <>
-                            <div className="grid gap-3 md:grid-cols-3">
+                            <div className="grid gap-3 md:grid-cols-4">
                               <div className="rounded-[1.2rem] bg-surface/70 px-4 py-4">
                                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Source</p>
                                 <p className="mt-2 text-sm font-semibold text-foreground">{simulation.source}</p>
@@ -574,6 +609,10 @@ export function MockScreen({ projectId }: MockScreenProps) {
                               <div className="rounded-[1.2rem] bg-surface/70 px-4 py-4">
                                 <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">HTTP Status</p>
                                 <p className="mt-2 text-sm font-semibold text-foreground">{simulation.statusCode}</p>
+                              </div>
+                              <div className="rounded-[1.2rem] bg-surface/70 px-4 py-4">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Delay</p>
+                                <p className="mt-2 text-sm font-semibold text-foreground">{simulation.delayMs} ms</p>
                               </div>
                             </div>
                             <pre className="scrollbar-thin max-h-[220px] overflow-auto rounded-[1.3rem] bg-background/70 p-4 text-[11px] text-foreground">{simulation.body}</pre>
