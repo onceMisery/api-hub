@@ -40,6 +40,7 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import { ProjectConsoleLayout } from "./project-console-layout";
+import { EndpointAiPanel } from "./endpoint-ai-panel";
 import { filterModules, findFirstEndpointId, flattenProjectTree } from "./tree-utils";
 
 type Props = { projectId: number };
@@ -520,6 +521,19 @@ export function ApiBrowserScreen({ projectId }: Props) {
                     </div>
                   </CardContent>
                 </Card>
+
+                <EndpointAiPanel
+                  endpointId={bundle.endpoint.id}
+                  draft={{
+                    name: basics.name,
+                    method: basics.method,
+                    path: basics.path,
+                    description: basics.description,
+                    parameters,
+                    responses,
+                  }}
+                  onApplyDescription={(content) => setBasics((current) => ({ ...current, description: content }))}
+                />
 
                 {viewMode === "browse" ? (
                   <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">

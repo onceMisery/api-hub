@@ -12,6 +12,7 @@ import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.repository.ProjectRepository;
+import com.apihub.project.service.ProjectWebhookNotifier;
 import com.apihub.testsuite.model.TestSuiteDtos.AssertionResult;
 import com.apihub.testsuite.model.TestSuiteDtos.CreateTriggerRequest;
 import com.apihub.testsuite.model.TestSuiteDtos.CreatedTestSuiteTrigger;
@@ -72,17 +73,20 @@ public class TestSuiteService {
     private final DebugService debugService;
     private final TestSuiteRepository testSuiteRepository;
     private final TestStepScriptEngine testStepScriptEngine;
+    private final ProjectWebhookNotifier projectWebhookNotifier;
 
     public TestSuiteService(ProjectRepository projectRepository,
                             EndpointRepository endpointRepository,
                             DebugService debugService,
                             TestSuiteRepository testSuiteRepository,
-                            TestStepScriptEngine testStepScriptEngine) {
+                            TestStepScriptEngine testStepScriptEngine,
+                            ProjectWebhookNotifier projectWebhookNotifier) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.debugService = debugService;
         this.testSuiteRepository = testSuiteRepository;
         this.testStepScriptEngine = testStepScriptEngine;
+        this.projectWebhookNotifier = projectWebhookNotifier;
     }
 
     @Transactional(readOnly = true)
@@ -411,7 +415,28 @@ public class TestSuiteService {
                 (System.nanoTime() - startedAt) / 1_000_000,
                 new ExecutionReport(results),
                 executorUserId);
-        return getExecution(executorUserId, projectId, executionId);
+        TestExecutionDetail execution = getExecution(executorUserId, projectId, executionId);
+        if ("failed".equals(status) || "error".equals(status)) {
+            projectWebhookNotifier.dispatchProjectEvent(
+                    projectId,
+                    ProjectWebhookNotifier.EVENT_TEST_SUITE_FAILED,
+                    executorUserId,
+                    "test_suite",
+                    suiteId,
+                    suite.name(),
+                    Map.of(
+                            "suiteId", suiteId,
+                            "suiteName", suite.name(),
+                            "executionId", execution.id(),
+                            "status", execution.status(),
+                            "executionSource", execution.executionSource(),
+                            "totalSteps", execution.totalSteps(),
+                            "passedSteps", execution.passedSteps(),
+                            "failedSteps", execution.failedSteps(),
+                            "durationMs", execution.durationMs(),
+                            "executedAt", execution.executedAt().toString()));
+        }
+        return execution;
     }
 
     @Transactional(readOnly = true)

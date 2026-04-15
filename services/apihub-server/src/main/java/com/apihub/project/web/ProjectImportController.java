@@ -37,6 +37,20 @@ public class ProjectImportController {
         return ApiResponse.success(projectImportService.importSmartDocToProject((Long) authentication.getPrincipal(), projectId, request));
     }
 
+    @PostMapping("/projects/{projectId}/imports/postman")
+    public ApiResponse<ImportResult> importPostmanToProject(@PathVariable Long projectId,
+                                                            @RequestBody ImportSpecRequest request,
+                                                            Authentication authentication) {
+        return ApiResponse.success(projectImportService.importPostmanToProject((Long) authentication.getPrincipal(), projectId, request));
+    }
+
+    @PostMapping("/projects/{projectId}/imports/har")
+    public ApiResponse<ImportResult> importHarToProject(@PathVariable Long projectId,
+                                                        @RequestBody ImportSpecRequest request,
+                                                        Authentication authentication) {
+        return ApiResponse.success(projectImportService.importHarToProject((Long) authentication.getPrincipal(), projectId, request));
+    }
+
     @PostMapping("/projects/{projectId}/imports/openapi/preview")
     public ApiResponse<ImportPreview> previewOpenApiToProject(@PathVariable Long projectId,
                                                               @RequestBody ImportSpecRequest request,
@@ -49,6 +63,20 @@ public class ProjectImportController {
                                                                @RequestBody ImportSpecRequest request,
                                                                Authentication authentication) {
         return ApiResponse.success(projectImportService.previewSmartDocToProject((Long) authentication.getPrincipal(), projectId, request));
+    }
+
+    @PostMapping("/projects/{projectId}/imports/postman/preview")
+    public ApiResponse<ImportPreview> previewPostmanToProject(@PathVariable Long projectId,
+                                                              @RequestBody ImportSpecRequest request,
+                                                              Authentication authentication) {
+        return ApiResponse.success(projectImportService.previewPostmanToProject((Long) authentication.getPrincipal(), projectId, request));
+    }
+
+    @PostMapping("/projects/{projectId}/imports/har/preview")
+    public ApiResponse<ImportPreview> previewHarToProject(@PathVariable Long projectId,
+                                                          @RequestBody ImportSpecRequest request,
+                                                          Authentication authentication) {
+        return ApiResponse.success(projectImportService.previewHarToProject((Long) authentication.getPrincipal(), projectId, request));
     }
 
     @PostMapping("/spaces/{spaceId}/imports/openapi-project")
@@ -65,6 +93,20 @@ public class ProjectImportController {
         return ApiResponse.success(projectImportService.importSmartDocAsProject((Long) authentication.getPrincipal(), spaceId, request));
     }
 
+    @PostMapping("/spaces/{spaceId}/imports/postman-project")
+    public ApiResponse<ImportResult> importPostmanAsProject(@PathVariable Long spaceId,
+                                                            @RequestBody ImportProjectRequest request,
+                                                            Authentication authentication) {
+        return ApiResponse.success(projectImportService.importPostmanAsProject((Long) authentication.getPrincipal(), spaceId, request));
+    }
+
+    @PostMapping("/spaces/{spaceId}/imports/har-project")
+    public ApiResponse<ImportResult> importHarAsProject(@PathVariable Long spaceId,
+                                                        @RequestBody ImportProjectRequest request,
+                                                        Authentication authentication) {
+        return ApiResponse.success(projectImportService.importHarAsProject((Long) authentication.getPrincipal(), spaceId, request));
+    }
+
     @PostMapping("/spaces/{spaceId}/imports/openapi-project/preview")
     public ApiResponse<ImportPreview> previewOpenApiAsProject(@PathVariable Long spaceId,
                                                               @RequestBody ImportProjectRequest request,
@@ -77,5 +119,19 @@ public class ProjectImportController {
                                                                @RequestBody ImportProjectRequest request,
                                                                Authentication authentication) {
         return ApiResponse.success(projectImportService.previewSmartDocAsProject((Long) authentication.getPrincipal(), spaceId, request));
+    }
+
+    @PostMapping("/spaces/{spaceId}/imports/postman-project/preview")
+    public ApiResponse<ImportPreview> previewPostmanAsProject(@PathVariable Long spaceId,
+                                                              @RequestBody ImportProjectRequest request,
+                                                              Authentication authentication) {
+        return ApiResponse.success(projectImportService.previewPostmanAsProject((Long) authentication.getPrincipal(), spaceId, request));
+    }
+
+    @PostMapping("/spaces/{spaceId}/imports/har-project/preview")
+    public ApiResponse<ImportPreview> previewHarAsProject(@PathVariable Long spaceId,
+                                                          @RequestBody ImportProjectRequest request,
+                                                          Authentication authentication) {
+        return ApiResponse.success(projectImportService.previewHarAsProject((Long) authentication.getPrincipal(), spaceId, request));
     }
 }

@@ -75,6 +75,18 @@ public class ProjectImportService {
                 Boolean.TRUE.equals(request.createVersionSnapshot()), Boolean.TRUE.equals(request.bootstrapEnvironments()), Boolean.TRUE.equals(request.enableMockByDefault()));
     }
 
+    public ImportResult importPostmanToProject(Long userId, Long projectId, ImportSpecRequest request) {
+        validateSpecImportRequest(request);
+        return importSpec(userId, requireWritableProject(userId, projectId), "postman", request.sourceName(), request.sourceUrl(), request.content(),
+                Boolean.TRUE.equals(request.createVersionSnapshot()), Boolean.TRUE.equals(request.bootstrapEnvironments()), Boolean.TRUE.equals(request.enableMockByDefault()));
+    }
+
+    public ImportResult importHarToProject(Long userId, Long projectId, ImportSpecRequest request) {
+        validateSpecImportRequest(request);
+        return importSpec(userId, requireWritableProject(userId, projectId), "har", request.sourceName(), request.sourceUrl(), request.content(),
+                Boolean.TRUE.equals(request.createVersionSnapshot()), Boolean.TRUE.equals(request.bootstrapEnvironments()), Boolean.TRUE.equals(request.enableMockByDefault()));
+    }
+
     public ImportResult importOpenApiAsProject(Long userId, Long spaceId, ImportProjectRequest request) {
         validateProjectImportRequest(request);
         requireWritableSpace(userId, spaceId);
@@ -93,6 +105,24 @@ public class ProjectImportService {
                 Boolean.TRUE.equals(request.createVersionSnapshot()), Boolean.TRUE.equals(request.bootstrapEnvironments()), Boolean.TRUE.equals(request.enableMockByDefault()));
     }
 
+    public ImportResult importPostmanAsProject(Long userId, Long spaceId, ImportProjectRequest request) {
+        validateProjectImportRequest(request);
+        requireWritableSpace(userId, spaceId);
+        ProjectDetail project = projectRepository.createProject(userId, spaceId, new CreateProjectRequest(
+                request.projectName().trim(), request.projectKey().trim(), normalizeNullableText(request.description()), List.of()));
+        return importSpec(userId, project, "postman", request.sourceName(), request.sourceUrl(), request.content(),
+                Boolean.TRUE.equals(request.createVersionSnapshot()), Boolean.TRUE.equals(request.bootstrapEnvironments()), Boolean.TRUE.equals(request.enableMockByDefault()));
+    }
+
+    public ImportResult importHarAsProject(Long userId, Long spaceId, ImportProjectRequest request) {
+        validateProjectImportRequest(request);
+        requireWritableSpace(userId, spaceId);
+        ProjectDetail project = projectRepository.createProject(userId, spaceId, new CreateProjectRequest(
+                request.projectName().trim(), request.projectKey().trim(), normalizeNullableText(request.description()), List.of()));
+        return importSpec(userId, project, "har", request.sourceName(), request.sourceUrl(), request.content(),
+                Boolean.TRUE.equals(request.createVersionSnapshot()), Boolean.TRUE.equals(request.bootstrapEnvironments()), Boolean.TRUE.equals(request.enableMockByDefault()));
+    }
+
     public ImportPreview previewOpenApiToProject(Long userId, Long projectId, ImportSpecRequest request) {
         validateSpecImportRequest(request);
         return previewSpec(requireWritableProject(userId, projectId), "openapi", request.sourceName(), request.sourceUrl(), request.content());
@@ -101,6 +131,16 @@ public class ProjectImportService {
     public ImportPreview previewSmartDocToProject(Long userId, Long projectId, ImportSpecRequest request) {
         validateSpecImportRequest(request);
         return previewSpec(requireWritableProject(userId, projectId), "smartdoc", request.sourceName(), request.sourceUrl(), request.content());
+    }
+
+    public ImportPreview previewPostmanToProject(Long userId, Long projectId, ImportSpecRequest request) {
+        validateSpecImportRequest(request);
+        return previewSpec(requireWritableProject(userId, projectId), "postman", request.sourceName(), request.sourceUrl(), request.content());
+    }
+
+    public ImportPreview previewHarToProject(Long userId, Long projectId, ImportSpecRequest request) {
+        validateSpecImportRequest(request);
+        return previewSpec(requireWritableProject(userId, projectId), "har", request.sourceName(), request.sourceUrl(), request.content());
     }
 
     public ImportPreview previewOpenApiAsProject(Long userId, Long spaceId, ImportProjectRequest request) {
@@ -113,6 +153,18 @@ public class ProjectImportService {
         validateProjectImportRequest(request);
         requireWritableSpace(userId, spaceId);
         return previewSpec(null, "smartdoc", request.sourceName(), request.sourceUrl(), request.content());
+    }
+
+    public ImportPreview previewPostmanAsProject(Long userId, Long spaceId, ImportProjectRequest request) {
+        validateProjectImportRequest(request);
+        requireWritableSpace(userId, spaceId);
+        return previewSpec(null, "postman", request.sourceName(), request.sourceUrl(), request.content());
+    }
+
+    public ImportPreview previewHarAsProject(Long userId, Long spaceId, ImportProjectRequest request) {
+        validateProjectImportRequest(request);
+        requireWritableSpace(userId, spaceId);
+        return previewSpec(null, "har", request.sourceName(), request.sourceUrl(), request.content());
     }
 
     public ImportResult importOpenApiByPush(String token, ImportSpecRequest request) {
@@ -275,11 +327,15 @@ public class ProjectImportService {
 
     private ParsedSpec parseSpec(String sourceType, String sourceName, String sourceUrl, String rawContent, String fallbackProjectName, boolean enableMockByDefault) {
         JsonNode root = readStructuredContent(resolveImportContent(sourceUrl, rawContent));
-        ParsedSpec parsed = looksLikeOpenApi(root)
-                ? parseOpenApi(root, sourceName, fallbackProjectName, enableMockByDefault)
-                : "smartdoc".equals(sourceType)
-                ? parseSmartDoc(root, sourceName, fallbackProjectName, enableMockByDefault)
-                : null;
+        ParsedSpec parsed = switch (sourceType) {
+            case "openapi" -> parseOpenApi(root, sourceName, fallbackProjectName, enableMockByDefault);
+            case "smartdoc" -> parseSmartDoc(root, sourceName, fallbackProjectName, enableMockByDefault);
+            case "postman" -> parsePostman(root, sourceName, fallbackProjectName, enableMockByDefault);
+            case "har" -> parseHar(root, sourceName, fallbackProjectName, enableMockByDefault);
+            default -> looksLikeOpenApi(root)
+                    ? parseOpenApi(root, sourceName, fallbackProjectName, enableMockByDefault)
+                    : null;
+        };
         if (parsed == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported import content");
         }
@@ -385,6 +441,101 @@ public class ProjectImportService {
         }
 
         return new ParsedSpec(firstNonBlank(sourceName, root.path("name").asText(null), fallbackProjectName, "Imported Project"), List.copyOf(operations), List.of(), warnings);
+    }
+
+    private ParsedSpec parsePostman(JsonNode root, String sourceName, String fallbackProjectName, boolean enableMockByDefault) {
+        JsonNode infoNode = root.path("info");
+        JsonNode itemsNode = root.path("item");
+        if (!itemsNode.isArray()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported Postman collection structure");
+        }
+
+        List<ImportedOperation> operations = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        collectPostmanItems(itemsNode, new ArrayList<>(), operations, warnings, enableMockByDefault);
+        return new ParsedSpec(
+                firstNonBlank(sourceName, infoNode.path("name").asText(null), fallbackProjectName, "Imported Project"),
+                List.copyOf(operations),
+                List.of(),
+                warnings);
+    }
+
+    private void collectPostmanItems(JsonNode itemsNode,
+                                     List<String> folderTrail,
+                                     List<ImportedOperation> operations,
+                                     List<String> warnings,
+                                     boolean enableMockByDefault) {
+        for (JsonNode itemNode : itemsNode) {
+            if (itemNode.path("item").isArray()) {
+                List<String> nextTrail = new ArrayList<>(folderTrail);
+                nextTrail.add(normalizeTitle(firstNonBlank(itemNode.path("name").asText(null), "Folder")));
+                collectPostmanItems(itemNode.path("item"), nextTrail, operations, warnings, enableMockByDefault);
+                continue;
+            }
+            JsonNode requestNode = itemNode.path("request");
+            if (!requestNode.isObject()) {
+                warnings.add("Postman item skipped because request block is missing: " + firstNonBlank(itemNode.path("name").asText(null), "Unnamed item"));
+                continue;
+            }
+            String method = normalizeMethod(firstNonBlank(requestNode.path("method").asText(null), "GET"));
+            String path = normalizePath(extractPostmanPath(requestNode.path("url")));
+            if (path.isBlank()) {
+                warnings.add("Postman item skipped because request URL/path is missing: " + firstNonBlank(itemNode.path("name").asText(null), "Unnamed item"));
+                continue;
+            }
+            String moduleName = folderTrail.isEmpty() ? deriveModuleNameFromPath(path) : folderTrail.get(0);
+            String groupName = folderTrail.size() > 1 ? folderTrail.get(1) : (folderTrail.size() == 1 ? folderTrail.get(0) : "Default Group");
+            List<ParameterUpsertItem> parameters = extractPostmanRequestParameters(requestNode.path("url"), requestNode.path("header"), requestNode.path("body"), path);
+            List<ResponseUpsertItem> responses = extractPostmanResponses(itemNode.path("response"));
+            if (responses.isEmpty()) {
+                responses = List.of(new ResponseUpsertItem(200, "application/json", "body", "object", false, "Imported from Postman", ""));
+            }
+            operations.add(new ImportedOperation(
+                    normalizeTitle(moduleName),
+                    normalizeTitle(groupName),
+                    firstNonBlank(itemNode.path("name").asText(null), humanizePath(method, path)),
+                    method,
+                    path,
+                    firstNonBlank(requestNode.path("description").asText(null), itemNode.path("name").asText(null), ""),
+                    enableMockByDefault,
+                    List.copyOf(deduplicateParameters(parameters)),
+                    List.copyOf(responses)));
+        }
+    }
+
+    private ParsedSpec parseHar(JsonNode root, String sourceName, String fallbackProjectName, boolean enableMockByDefault) {
+        JsonNode entriesNode = root.path("log").path("entries");
+        if (!entriesNode.isArray()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported HAR structure");
+        }
+        List<ImportedOperation> operations = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        for (JsonNode entryNode : entriesNode) {
+            JsonNode requestNode = entryNode.path("request");
+            String method = normalizeMethod(firstNonBlank(requestNode.path("method").asText(null), "GET"));
+            String path = normalizePath(extractPathFromUrl(firstNonBlank(requestNode.path("url").asText(null), "")));
+            if (path.isBlank()) {
+                warnings.add("HAR entry skipped because request URL is missing");
+                continue;
+            }
+            List<ParameterUpsertItem> parameters = extractHarParameters(requestNode, path);
+            List<ResponseUpsertItem> responses = extractHarResponse(entryNode.path("response"));
+            operations.add(new ImportedOperation(
+                    normalizeTitle(deriveModuleNameFromPath(path)),
+                    normalizeTitle(deriveGroupNameFromPath(path)),
+                    humanizePath(method, path),
+                    method,
+                    path,
+                    "Imported from HAR capture",
+                    enableMockByDefault,
+                    List.copyOf(deduplicateParameters(parameters)),
+                    List.copyOf(responses)));
+        }
+        return new ParsedSpec(
+                firstNonBlank(sourceName, root.path("log").path("creator").path("name").asText(null), fallbackProjectName, "Imported Project"),
+                List.copyOf(operations),
+                List.of(),
+                warnings);
     }
 
     private ParsedSpec deduplicateOperations(ParsedSpec parsed) {
@@ -613,6 +764,184 @@ public class ProjectImportService {
         return items;
     }
 
+    private String extractPostmanPath(JsonNode urlNode) {
+        if (urlNode.isTextual()) {
+            return extractPathFromUrl(urlNode.asText(""));
+        }
+        if (urlNode.path("path").isArray()) {
+            List<String> segments = new ArrayList<>();
+            for (JsonNode segment : urlNode.path("path")) {
+                if (!segment.asText("").isBlank()) {
+                    segments.add(segment.asText());
+                }
+            }
+            return "/" + String.join("/", segments);
+        }
+        if (urlNode.hasNonNull("raw")) {
+            return extractPathFromUrl(urlNode.path("raw").asText(""));
+        }
+        return "";
+    }
+
+    private String extractPathFromUrl(String rawUrl) {
+        if (rawUrl == null || rawUrl.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = new URI(rawUrl.replace("{{baseUrl}}", "https://placeholder.local"));
+            return firstNonBlank(uri.getPath(), "");
+        } catch (URISyntaxException ignored) {
+            int queryIndex = rawUrl.indexOf('?');
+            String withoutQuery = queryIndex >= 0 ? rawUrl.substring(0, queryIndex) : rawUrl;
+            String normalized = withoutQuery.replaceAll("^[a-zA-Z]+://[^/]+", "");
+            return normalized.startsWith("/") ? normalized : "/" + normalized;
+        }
+    }
+
+    private List<ParameterUpsertItem> extractPostmanRequestParameters(JsonNode urlNode, JsonNode headersNode, JsonNode bodyNode, String path) {
+        List<ParameterUpsertItem> items = new ArrayList<>();
+        for (String pathSegment : path.split("/")) {
+            if (pathSegment.startsWith(":")) {
+                items.add(new ParameterUpsertItem("path", pathSegment.substring(1), "string", true, "Imported from Postman path parameter", ""));
+            } else if (pathSegment.startsWith("{") && pathSegment.endsWith("}")) {
+                items.add(new ParameterUpsertItem("path", pathSegment.substring(1, pathSegment.length() - 1), "string", true, "Imported from Postman path parameter", ""));
+            }
+        }
+        JsonNode queryNode = urlNode.path("query");
+        if (queryNode.isArray()) {
+            for (JsonNode queryItem : queryNode) {
+                items.add(new ParameterUpsertItem(
+                        "query",
+                        firstNonBlank(queryItem.path("key").asText(null), "query"),
+                        "string",
+                        !queryItem.path("disabled").asBoolean(false),
+                        firstNonBlank(queryItem.path("description").asText(null), "Imported from Postman query"),
+                        firstNonBlank(queryItem.path("value").asText(null), "")));
+            }
+        }
+        if (headersNode.isArray()) {
+            for (JsonNode headerNode : headersNode) {
+                items.add(new ParameterUpsertItem(
+                        "header",
+                        firstNonBlank(headerNode.path("key").asText(null), "header"),
+                        "string",
+                        !headerNode.path("disabled").asBoolean(false),
+                        firstNonBlank(headerNode.path("description").asText(null), "Imported from Postman header"),
+                        firstNonBlank(headerNode.path("value").asText(null), "")));
+            }
+        }
+        if (bodyNode.isObject() && !bodyNode.isMissingNode()) {
+            String mode = normalizeNullableText(bodyNode.path("mode").asText(null));
+            String example = "";
+            if ("raw".equalsIgnoreCase(mode)) {
+                example = firstNonBlank(bodyNode.path("raw").asText(null), "");
+            } else if ("urlencoded".equalsIgnoreCase(mode) && bodyNode.path("urlencoded").isArray()) {
+                List<String> encodedKeys = new ArrayList<>();
+                for (JsonNode item : bodyNode.path("urlencoded")) {
+                    encodedKeys.add(firstNonBlank(item.path("key").asText(null), "field"));
+                }
+                example = String.join("&", encodedKeys);
+            } else if ("formdata".equalsIgnoreCase(mode) && bodyNode.path("formdata").isArray()) {
+                List<String> parts = new ArrayList<>();
+                for (JsonNode item : bodyNode.path("formdata")) {
+                    parts.add(firstNonBlank(item.path("key").asText(null), "field"));
+                }
+                example = String.join(",", parts);
+            }
+            items.add(new ParameterUpsertItem("body", "body", "object", false, "Imported from Postman request body", example));
+        }
+        return items;
+    }
+
+    private List<ResponseUpsertItem> extractPostmanResponses(JsonNode responsesNode) {
+        if (!responsesNode.isArray()) {
+            return List.of();
+        }
+        List<ResponseUpsertItem> items = new ArrayList<>();
+        for (JsonNode responseNode : responsesNode) {
+            String body = firstNonBlank(responseNode.path("body").asText(null), "");
+            String mediaType = firstNonBlank(responseNode.path("header").isArray() ? readHeaderValue(responseNode.path("header"), "Content-Type") : null, "application/json");
+            items.add(new ResponseUpsertItem(
+                    responseNode.path("code").asInt(200),
+                    mediaType,
+                    "body",
+                    inferBodyDataType(body),
+                    false,
+                    firstNonBlank(responseNode.path("name").asText(null), "Imported from Postman example"),
+                    body));
+        }
+        return items;
+    }
+
+    private List<ParameterUpsertItem> extractHarParameters(JsonNode requestNode, String path) {
+        List<ParameterUpsertItem> items = new ArrayList<>();
+        JsonNode queryString = requestNode.path("queryString");
+        if (queryString.isArray()) {
+            for (JsonNode item : queryString) {
+                items.add(new ParameterUpsertItem("query",
+                        firstNonBlank(item.path("name").asText(null), "query"),
+                        "string",
+                        false,
+                        "Imported from HAR query",
+                        firstNonBlank(item.path("value").asText(null), "")));
+            }
+        }
+        JsonNode headers = requestNode.path("headers");
+        if (headers.isArray()) {
+            for (JsonNode item : headers) {
+                items.add(new ParameterUpsertItem("header",
+                        firstNonBlank(item.path("name").asText(null), "header"),
+                        "string",
+                        false,
+                        "Imported from HAR header",
+                        firstNonBlank(item.path("value").asText(null), "")));
+            }
+        }
+        if (requestNode.path("postData").isObject()) {
+            String bodyText = firstNonBlank(requestNode.path("postData").path("text").asText(null), "");
+            items.add(new ParameterUpsertItem("body", "body", inferBodyDataType(bodyText), false, "Imported from HAR request body", bodyText));
+        }
+        for (String pathSegment : path.split("/")) {
+            if (pathSegment.startsWith("{") && pathSegment.endsWith("}")) {
+                items.add(new ParameterUpsertItem("path", pathSegment.substring(1, pathSegment.length() - 1), "string", true, "Imported path parameter", ""));
+            }
+        }
+        return items;
+    }
+
+    private List<ResponseUpsertItem> extractHarResponse(JsonNode responseNode) {
+        String body = firstNonBlank(responseNode.path("content").path("text").asText(null), "");
+        return List.of(new ResponseUpsertItem(
+                responseNode.path("status").asInt(200),
+                firstNonBlank(responseNode.path("content").path("mimeType").asText(null), "application/json"),
+                "body",
+                inferBodyDataType(body),
+                false,
+                "Imported from HAR response",
+                body));
+    }
+
+    private String readHeaderValue(JsonNode headersNode, String targetName) {
+        for (JsonNode headerNode : headersNode) {
+            String headerName = firstNonBlank(headerNode.path("key").asText(null), headerNode.path("name").asText(null), "");
+            if (targetName.equalsIgnoreCase(headerName)) {
+                return firstNonBlank(headerNode.path("value").asText(null), "");
+            }
+        }
+        return null;
+    }
+
+    private String inferBodyDataType(String body) {
+        String normalized = normalizeNullableText(body);
+        if (normalized.isBlank()) {
+            return "object";
+        }
+        if ((normalized.startsWith("{") && normalized.endsWith("}")) || (normalized.startsWith("[") && normalized.endsWith("]"))) {
+            return normalized.startsWith("[") ? "array" : "object";
+        }
+        return "string";
+    }
+
     private JsonNode resolveSchema(JsonNode root, JsonNode schemaNode) {
         JsonNode resolved = resolveRef(root, schemaNode);
         if (resolved == null || resolved.isMissingNode() || resolved.isNull()) {
@@ -834,6 +1163,22 @@ public class ProjectImportService {
             }
         }
         return "Imported APIs";
+    }
+
+    private String deriveGroupNameFromPath(String path) {
+        List<String> segments = new ArrayList<>();
+        for (String segment : path.split("/")) {
+            if (!segment.isBlank() && !segment.startsWith("{")) {
+                segments.add(segment);
+            }
+        }
+        if (segments.size() >= 2) {
+            return normalizeTitle(segments.get(1).replace('-', ' '));
+        }
+        if (segments.size() == 1) {
+            return normalizeTitle(segments.get(0).replace('-', ' '));
+        }
+        return "Default Group";
     }
 
     private String humanizePath(String method, String path) {

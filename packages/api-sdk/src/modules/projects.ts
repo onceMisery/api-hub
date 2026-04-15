@@ -344,6 +344,199 @@ export type AuditLogDetail = {
   createdAt: string;
 };
 
+export type ProjectWebhookEventType =
+  | "version.released"
+  | "mock.released"
+  | "test_suite.failed";
+
+export type ProjectWebhookDetail = {
+  id: number;
+  projectId: number;
+  name: string;
+  targetUrl: string;
+  eventTypes: ProjectWebhookEventType[];
+  enabled: boolean;
+  secretConfigured: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WebhookDeliveryDetail = {
+  id: number;
+  projectId: number;
+  webhookId: number;
+  webhookName: string;
+  eventType: string;
+  targetUrl: string;
+  deliveryStatus: "success" | "failed";
+  responseStatus: number | null;
+  durationMs: number;
+  payloadJson: string;
+  responseBody: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+export type CreateProjectWebhookPayload = {
+  name: string;
+  targetUrl: string;
+  eventTypes: ProjectWebhookEventType[];
+  secret: string;
+  enabled: boolean;
+};
+
+export type UpdateProjectWebhookPayload = CreateProjectWebhookPayload;
+
+export type ProjectAiSettingsDetail = {
+  id: number | null;
+  projectId: number;
+  providerType: "openai_compatible";
+  baseUrl: string;
+  defaultModel: string;
+  descriptionModel: string | null;
+  mockModel: string | null;
+  codeModel: string | null;
+  timeoutMs: number;
+  enabled: boolean;
+  apiKeyConfigured: boolean;
+  updatedAt: string | null;
+};
+
+export type UpdateProjectAiSettingsPayload = {
+  providerType: "openai_compatible";
+  baseUrl: string;
+  apiKey: string;
+  defaultModel: string;
+  descriptionModel?: string | null;
+  mockModel?: string | null;
+  codeModel?: string | null;
+  timeoutMs: number;
+  enabled: boolean;
+};
+
+export type AiConnectionTestResult = {
+  success: boolean;
+  message: string;
+  providerType: string;
+  baseUrl: string;
+  model: string;
+};
+
+export type AiParameterInput = {
+  sectionType: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  description: string;
+  exampleValue: string;
+};
+
+export type AiResponseInput = {
+  httpStatusCode: number;
+  mediaType: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  description: string;
+  exampleValue: string;
+};
+
+export type EndpointAiDraftContext = {
+  name: string;
+  method: string;
+  path: string;
+  description: string;
+  parameters: AiParameterInput[];
+  responses: AiResponseInput[];
+};
+
+export type GenerateEndpointDescriptionPayload = {
+  instructions?: string;
+  draft?: EndpointAiDraftContext;
+};
+
+export type GeneratedDescriptionResult = {
+  content: string;
+};
+
+export type GenerateEndpointMockPayload = {
+  instructions?: string;
+  draft?: EndpointAiDraftContext;
+};
+
+export type GeneratedMockResult = {
+  templateMode: "plain" | "mockjs";
+  body: string;
+};
+
+export type GenerateEndpointCodeSnippetsPayload = {
+  languages?: string[];
+  instructions?: string;
+  draft?: EndpointAiDraftContext;
+};
+
+export type AiCodeSnippet = {
+  language: string;
+  title: string;
+  code: string;
+};
+
+export type GeneratedCodeSnippetsResult = {
+  snippets: AiCodeSnippet[];
+};
+
+export type AiHeaderInput = {
+  name: string;
+  value: string;
+};
+
+export type AiAssertionInput = {
+  type: string;
+  expression?: string;
+  expectedValue: string;
+};
+
+export type AiExtractorInput = {
+  variableName: string;
+  sourceType: string;
+  expression: string;
+};
+
+export type AiSuggestedTestCase = {
+  name: string;
+  category: string;
+  purpose: string;
+  queryString: string;
+  headers: AiHeaderInput[];
+  body: string;
+  assertions: AiAssertionInput[];
+  extractors: AiExtractorInput[];
+};
+
+export type GenerateEndpointTestCasesPayload = {
+  categories?: string[];
+  instructions?: string;
+  draft?: EndpointAiDraftContext;
+};
+
+export type GeneratedTestCasesResult = {
+  cases: AiSuggestedTestCase[];
+};
+
+export type GenerateImpactAnalysisPayload = {
+  baseVersionId: number;
+  targetVersionId?: number | null;
+  instructions?: string;
+};
+
+export type AiImpactAnalysisResult = {
+  level: "high" | "medium" | "low" | string;
+  summary: string;
+  risks: string[];
+  recommendations: string[];
+  compatibilityAdvice: string;
+};
+
 export type CreateDictionaryGroupPayload = {
   name: string;
   description: string;
@@ -407,7 +600,7 @@ export type ImportProjectPayload = {
 export type ImportResult = {
   projectId: number;
   projectName: string;
-  sourceType: "openapi" | "smartdoc";
+  sourceType: "openapi" | "smartdoc" | "postman" | "har";
   createdModules: number;
   createdGroups: number;
   createdEndpoints: number;
@@ -418,7 +611,7 @@ export type ImportResult = {
 };
 
 export type ImportPreview = {
-  sourceType: "openapi" | "smartdoc";
+  sourceType: "openapi" | "smartdoc" | "postman" | "har";
   resolvedName: string;
   totalEndpoints: number;
   createdModules: number;
@@ -1011,6 +1204,58 @@ export function importSmartDocToProject(
   );
 }
 
+export function importPostmanToProject(
+  projectId: number,
+  payload: ImportSpecPayload,
+) {
+  return apiFetch<ImportResult>(
+    `/api/v1/projects/${projectId}/imports/postman`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function previewPostmanToProject(
+  projectId: number,
+  payload: ImportSpecPayload,
+) {
+  return apiFetch<ImportPreview>(
+    `/api/v1/projects/${projectId}/imports/postman/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function importHarToProject(
+  projectId: number,
+  payload: ImportSpecPayload,
+) {
+  return apiFetch<ImportResult>(
+    `/api/v1/projects/${projectId}/imports/har`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function previewHarToProject(
+  projectId: number,
+  payload: ImportSpecPayload,
+) {
+  return apiFetch<ImportPreview>(
+    `/api/v1/projects/${projectId}/imports/har/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
 export function previewSmartDocToProject(
   projectId: number,
   payload: ImportSpecPayload,
@@ -1063,12 +1308,64 @@ export function importSmartDocAsProject(
   );
 }
 
+export function importPostmanAsProject(
+  spaceId: number,
+  payload: ImportProjectPayload,
+) {
+  return apiFetch<ImportResult>(
+    `/api/v1/spaces/${spaceId}/imports/postman-project`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function importHarAsProject(
+  spaceId: number,
+  payload: ImportProjectPayload,
+) {
+  return apiFetch<ImportResult>(
+    `/api/v1/spaces/${spaceId}/imports/har-project`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
 export function previewSmartDocAsProject(
   spaceId: number,
   payload: ImportProjectPayload,
 ) {
   return apiFetch<ImportPreview>(
     `/api/v1/spaces/${spaceId}/imports/smartdoc-project/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function previewPostmanAsProject(
+  spaceId: number,
+  payload: ImportProjectPayload,
+) {
+  return apiFetch<ImportPreview>(
+    `/api/v1/spaces/${spaceId}/imports/postman-project/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function previewHarAsProject(
+  spaceId: number,
+  payload: ImportProjectPayload,
+) {
+  return apiFetch<ImportPreview>(
+    `/api/v1/spaces/${spaceId}/imports/har-project/preview`,
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -1225,6 +1522,58 @@ export function fetchAuditLogs(projectId: number, limit = 80) {
   return apiFetch<AuditLogDetail[]>(`/api/v1/projects/${projectId}/audit-logs?limit=${limit}`);
 }
 
+export function fetchProjectWebhooks(projectId: number) {
+  return apiFetch<ProjectWebhookDetail[]>(`/api/v1/projects/${projectId}/webhooks`);
+}
+
+export function createProjectWebhook(projectId: number, payload: CreateProjectWebhookPayload) {
+  return apiFetch<ProjectWebhookDetail>(`/api/v1/projects/${projectId}/webhooks`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateProjectWebhook(webhookId: number, payload: UpdateProjectWebhookPayload) {
+  return apiFetch<ProjectWebhookDetail>(`/api/v1/webhooks/${webhookId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteProjectWebhook(webhookId: number) {
+  return apiFetch<null>(`/api/v1/webhooks/${webhookId}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchWebhookDeliveries(projectId: number, limit = 60) {
+  return apiFetch<WebhookDeliveryDetail[]>(`/api/v1/projects/${projectId}/webhook-deliveries?limit=${limit}`);
+}
+
+export function testProjectWebhook(projectId: number, webhookId: number) {
+  return apiFetch<WebhookDeliveryDetail>(`/api/v1/projects/${projectId}/webhooks/${webhookId}/test`, {
+    method: "POST",
+  });
+}
+
+export function fetchProjectAiSettings(projectId: number) {
+  return apiFetch<ProjectAiSettingsDetail>(`/api/v1/projects/${projectId}/ai-settings`);
+}
+
+export function updateProjectAiSettings(projectId: number, payload: UpdateProjectAiSettingsPayload) {
+  return apiFetch<ProjectAiSettingsDetail>(`/api/v1/projects/${projectId}/ai-settings`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function testProjectAiSettings(projectId: number, payload: UpdateProjectAiSettingsPayload) {
+  return apiFetch<AiConnectionTestResult>(`/api/v1/projects/${projectId}/ai-settings/test`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function createErrorCode(projectId: number, payload: CreateErrorCodePayload) {
   return apiFetch<ErrorCodeDetail>(`/api/v1/projects/${projectId}/error-codes`, {
     method: "POST",
@@ -1306,6 +1655,41 @@ export function createEndpoint(
 
 export function fetchEndpoint(endpointId: number) {
   return apiFetch<EndpointDetail>(`/api/v1/endpoints/${endpointId}`);
+}
+
+export function generateEndpointDescription(endpointId: number, payload: GenerateEndpointDescriptionPayload) {
+  return apiFetch<GeneratedDescriptionResult>(`/api/v1/endpoints/${endpointId}/ai/description`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function generateEndpointMock(endpointId: number, payload: GenerateEndpointMockPayload) {
+  return apiFetch<GeneratedMockResult>(`/api/v1/endpoints/${endpointId}/ai/mock`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function generateEndpointCodeSnippets(endpointId: number, payload: GenerateEndpointCodeSnippetsPayload) {
+  return apiFetch<GeneratedCodeSnippetsResult>(`/api/v1/endpoints/${endpointId}/ai/code-snippets`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function generateEndpointTestCases(endpointId: number, payload: GenerateEndpointTestCasesPayload) {
+  return apiFetch<GeneratedTestCasesResult>(`/api/v1/endpoints/${endpointId}/ai/test-cases`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function generateEndpointImpactAnalysis(endpointId: number, payload: GenerateImpactAnalysisPayload) {
+  return apiFetch<AiImpactAnalysisResult>(`/api/v1/endpoints/${endpointId}/ai/impact-analysis`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function updateEndpoint(

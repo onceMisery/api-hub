@@ -9,6 +9,7 @@ import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.CreateErrorCodeRequest;
+import com.apihub.project.model.ProjectDtos.CreateProjectWebhookRequest;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.DictionaryGroupDetail;
 import com.apihub.project.model.ProjectDtos.DictionaryItemDetail;
@@ -22,6 +23,7 @@ import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.ProjectWebhookDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
@@ -30,6 +32,8 @@ import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateDictionaryGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateDictionaryItemRequest;
+import com.apihub.project.model.ProjectDtos.UpdateProjectWebhookRequest;
+import com.apihub.project.model.ProjectDtos.WebhookDeliveryDetail;
 import com.apihub.project.model.ProjectDtos.CreateDictionaryGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateDictionaryItemRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -174,6 +178,32 @@ public class ProjectRepository {
             rs.getObject("resource_id", Long.class),
             rs.getString("resource_name"),
             rs.getString("detail_json"),
+            rs.getTimestamp("created_at").toInstant());
+
+    private static final RowMapper<ProjectWebhookDetail> PROJECT_WEBHOOK_ROW_MAPPER = (rs, rowNum) -> new ProjectWebhookDetail(
+            rs.getLong("id"),
+            rs.getLong("project_id"),
+            rs.getString("name"),
+            rs.getString("target_url"),
+            deserializeStringList(rs.getString("event_types_json")),
+            rs.getBoolean("enabled"),
+            !rs.getString("secret_token").isBlank(),
+            rs.getTimestamp("created_at").toInstant(),
+            rs.getTimestamp("updated_at").toInstant());
+
+    private static final RowMapper<WebhookDeliveryDetail> WEBHOOK_DELIVERY_ROW_MAPPER = (rs, rowNum) -> new WebhookDeliveryDetail(
+            rs.getLong("id"),
+            rs.getLong("project_id"),
+            rs.getLong("webhook_id"),
+            rs.getString("webhook_name"),
+            rs.getString("event_type"),
+            rs.getString("target_url"),
+            rs.getString("delivery_status"),
+            rs.getObject("response_status", Integer.class),
+            rs.getLong("duration_ms"),
+            rs.getString("payload_json"),
+            rs.getString("response_body"),
+            rs.getString("error_message"),
             rs.getTimestamp("created_at").toInstant());
 
     private final JdbcTemplate jdbcTemplate;
@@ -1013,6 +1043,195 @@ public class ProjectRepository {
                 """, AUDIT_LOG_ROW_MAPPER, projectId, Math.max(1, limit));
     }
 
+    public List<ProjectWebhookDetail> listProjectWebhooks(Long projectId) {
+        return jdbcTemplate.query("""
+                select id,
+                       project_id,
+                       name,
+                       target_url,
+                       event_types_json,
+                       enabled,
+                       secret_token,
+                       created_at,
+                       updated_at
+                from project_webhook
+                where project_id = ?
+                order by updated_at desc, id desc
+                """, PROJECT_WEBHOOK_ROW_MAPPER, projectId);
+    }
+
+    public ProjectWebhookDetail createProjectWebhook(Long userId, Long projectId, CreateProjectWebhookRequest request) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into project_webhook (project_id, name, target_url, secret_token, event_types_json, enabled, created_by, updated_by)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, projectId);
+            statement.setString(2, request.name());
+            statement.setString(3, request.targetUrl());
+            statement.setString(4, normalizeNullableString(request.secret()));
+            statement.setString(5, serializeStringList(request.eventTypes()));
+            statement.setBoolean(6, !Boolean.FALSE.equals(request.enabled()));
+            statement.setLong(7, userId);
+            statement.setLong(8, userId);
+            return statement;
+        }, keyHolder);
+        return findProjectWebhook(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
+    public ProjectWebhookDetail updateProjectWebhook(Long userId, Long webhookId, UpdateProjectWebhookRequest request) {
+        String currentSecret = jdbcTemplate.query("""
+                select secret_token
+                from project_webhook
+                where id = ?
+                """, rs -> rs.next() ? rs.getString("secret_token") : "", webhookId);
+        jdbcTemplate.update("""
+                update project_webhook
+                set name = ?,
+                    target_url = ?,
+                    secret_token = ?,
+                    event_types_json = ?,
+                    enabled = ?,
+                    updated_by = ?
+                where id = ?
+                """,
+                request.name(),
+                request.targetUrl(),
+                request.secret() == null ? currentSecret : normalizeNullableString(request.secret()),
+                serializeStringList(request.eventTypes()),
+                !Boolean.FALSE.equals(request.enabled()),
+                userId,
+                webhookId);
+        return findProjectWebhook(webhookId).orElseThrow();
+    }
+
+    public void deleteProjectWebhook(Long webhookId) {
+        jdbcTemplate.update("delete from project_webhook where id = ?", webhookId);
+    }
+
+    public Optional<ProjectWebhookDetail> findProjectWebhook(Long webhookId) {
+        return jdbcTemplate.query("""
+                select id,
+                       project_id,
+                       name,
+                       target_url,
+                       event_types_json,
+                       enabled,
+                       secret_token,
+                       created_at,
+                       updated_at
+                from project_webhook
+                where id = ?
+                """, PROJECT_WEBHOOK_ROW_MAPPER, webhookId).stream().findFirst();
+    }
+
+    public Optional<ProjectWebhookSecretRecord> findProjectWebhookSecret(Long webhookId) {
+        return jdbcTemplate.query("""
+                select id,
+                       project_id,
+                       name,
+                       target_url,
+                       secret_token,
+                       event_types_json,
+                       enabled
+                from project_webhook
+                where id = ?
+                """, (rs, rowNum) -> new ProjectWebhookSecretRecord(
+                rs.getLong("id"),
+                rs.getLong("project_id"),
+                rs.getString("name"),
+                rs.getString("target_url"),
+                rs.getString("secret_token"),
+                deserializeStringList(rs.getString("event_types_json")),
+                rs.getBoolean("enabled")), webhookId).stream().findFirst();
+    }
+
+    public Optional<ProjectWebhookReference> findProjectWebhookReference(Long webhookId) {
+        return jdbcTemplate.query("""
+                select id, project_id, name
+                from project_webhook
+                where id = ?
+                """, (rs, rowNum) -> new ProjectWebhookReference(
+                rs.getLong("id"),
+                rs.getLong("project_id"),
+                rs.getString("name")), webhookId).stream().findFirst();
+    }
+
+    public List<ProjectWebhookSecretRecord> listEnabledWebhookTargets(Long projectId) {
+        return jdbcTemplate.query("""
+                select id,
+                       project_id,
+                       name,
+                       target_url,
+                       secret_token,
+                       event_types_json,
+                       enabled
+                from project_webhook
+                where project_id = ?
+                  and enabled = true
+                order by id
+                """, (rs, rowNum) -> new ProjectWebhookSecretRecord(
+                rs.getLong("id"),
+                rs.getLong("project_id"),
+                rs.getString("name"),
+                rs.getString("target_url"),
+                rs.getString("secret_token"),
+                deserializeStringList(rs.getString("event_types_json")),
+                rs.getBoolean("enabled")), projectId);
+    }
+
+    public void createWebhookDelivery(Long projectId,
+                                      Long webhookId,
+                                      String eventType,
+                                      String targetUrl,
+                                      String deliveryStatus,
+                                      Integer responseStatus,
+                                      long durationMs,
+                                      String payloadJson,
+                                      String responseBody,
+                                      String errorMessage) {
+        jdbcTemplate.update("""
+                insert into webhook_delivery (
+                    project_id, webhook_id, event_type, target_url, delivery_status, response_status,
+                    duration_ms, payload_json, response_body, error_message
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                projectId,
+                webhookId,
+                eventType,
+                targetUrl,
+                deliveryStatus,
+                responseStatus,
+                durationMs,
+                payloadJson,
+                responseBody,
+                errorMessage);
+    }
+
+    public List<WebhookDeliveryDetail> listWebhookDeliveries(Long projectId, int limit) {
+        return jdbcTemplate.query("""
+                select delivery.id,
+                       delivery.project_id,
+                       delivery.webhook_id,
+                       webhook.name as webhook_name,
+                       delivery.event_type,
+                       delivery.target_url,
+                       delivery.delivery_status,
+                       delivery.response_status,
+                       delivery.duration_ms,
+                       delivery.payload_json,
+                       delivery.response_body,
+                       delivery.error_message,
+                       delivery.created_at
+                from webhook_delivery delivery
+                join project_webhook webhook on webhook.id = delivery.webhook_id
+                where delivery.project_id = ?
+                order by delivery.created_at desc, delivery.id desc
+                limit ?
+                """, WEBHOOK_DELIVERY_ROW_MAPPER, projectId, Math.max(1, limit));
+    }
+
     public ErrorCodeDetail updateErrorCode(Long errorCodeId, UpdateErrorCodeRequest request) {
         jdbcTemplate.update("""
                 update error_code
@@ -1312,6 +1531,18 @@ public class ProjectRepository {
         }
     }
 
+    private static List<String> deserializeStringList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(json, new TypeReference<List<String>>() {
+            });
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to parse string list JSON", exception);
+        }
+    }
+
     private String serializeEntries(List<EnvironmentEntry> entries) {
         try {
             return OBJECT_MAPPER.writeValueAsString(entries == null ? List.of() : entries);
@@ -1325,6 +1556,14 @@ public class ProjectRepository {
             return OBJECT_MAPPER.writeValueAsString(rules == null ? List.of() : rules);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize debug target rule JSON", exception);
+        }
+    }
+
+    private String serializeStringList(List<String> items) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(items == null ? List.of() : items);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize string list JSON", exception);
         }
     }
 
@@ -1359,6 +1598,20 @@ public class ProjectRepository {
     }
 
     public record ErrorCodeReference(Long id, Long projectId) {
+    }
+
+    public record ProjectWebhookReference(Long id, Long projectId, String name) {
+    }
+
+    public record ProjectWebhookSecretRecord(
+            Long id,
+            Long projectId,
+            String name,
+            String targetUrl,
+            String secretToken,
+            List<String> eventTypes,
+            boolean enabled
+    ) {
     }
 
     public record ModuleVersionTagRecord(

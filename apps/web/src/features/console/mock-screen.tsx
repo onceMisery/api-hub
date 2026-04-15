@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 
+import { MockAiGeneratorCard } from "./mock-ai-generator-card";
 import { ProjectConsoleLayout } from "./project-console-layout";
 
 type MockScreenProps = {
@@ -344,6 +345,27 @@ export function MockScreen({ projectId }: MockScreenProps) {
     });
   }
 
+  function applyAiMock(body: string) {
+    if (!body.trim()) {
+      return;
+    }
+    if (rules.length === 0) {
+      const nextRule = makeRule({
+        ruleName: "AI 智能生成",
+        body,
+        templateMode: "plain",
+      });
+      setRules([nextRule]);
+      setDrafts({ [nextRule.rowId]: { query: "", header: "", body: "" } });
+      return;
+    }
+    setRules((current) =>
+      current.map((item, index) =>
+        index === 0 ? { ...item, body, templateMode: "plain" } : item,
+      ),
+    );
+  }
+
   return (
     <ProjectConsoleLayout description="在项目级控制 Mock 运行时开放方式，并为每个接口单独编辑规则、预演命中结果、发布可用版本。" projectId={projectId} title="Mock">
       <div className="space-y-6">
@@ -571,6 +593,17 @@ export function MockScreen({ projectId }: MockScreenProps) {
                   </Card>
 
                   <div className="space-y-6">
+                    <MockAiGeneratorCard
+                      endpointId={selectedItem.endpointId}
+                      endpoint={{
+                        name: selectedItem.endpointName,
+                        method: selectedItem.method,
+                        path: selectedItem.path,
+                      }}
+                      responses={responses}
+                      onApplyGenerated={applyAiMock}
+                    />
+
                     <Card className="rounded-[2rem] border-border/80 bg-card/84">
                       <CardContent className="space-y-4 p-6">
                         <div className="flex items-center gap-2">

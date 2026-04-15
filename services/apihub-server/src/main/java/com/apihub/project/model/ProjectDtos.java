@@ -250,6 +250,54 @@ public final class ProjectDtos {
     ) {
     }
 
+    public record ProjectWebhookDetail(
+            Long id,
+            Long projectId,
+            String name,
+            String targetUrl,
+            List<String> eventTypes,
+            boolean enabled,
+            boolean secretConfigured,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+    }
+
+    public record CreateProjectWebhookRequest(
+            String name,
+            String targetUrl,
+            List<String> eventTypes,
+            String secret,
+            Boolean enabled
+    ) {
+    }
+
+    public record UpdateProjectWebhookRequest(
+            String name,
+            String targetUrl,
+            List<String> eventTypes,
+            String secret,
+            Boolean enabled
+    ) {
+    }
+
+    public record WebhookDeliveryDetail(
+            Long id,
+            Long projectId,
+            Long webhookId,
+            String webhookName,
+            String eventType,
+            String targetUrl,
+            String deliveryStatus,
+            Integer responseStatus,
+            long durationMs,
+            String payloadJson,
+            String responseBody,
+            String errorMessage,
+            Instant createdAt
+    ) {
+    }
+
     public record CreateGroupRequest(String name) {
     }
 

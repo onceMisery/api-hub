@@ -26,6 +26,7 @@ import com.apihub.project.model.ProjectDtos.CreateDictionaryGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateDictionaryItemRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateErrorCodeRequest;
+import com.apihub.project.model.ProjectDtos.CreateProjectWebhookRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
 import com.apihub.project.model.ProjectDtos.AuditLogDetail;
@@ -50,6 +51,7 @@ import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.ProjectWebhookDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
@@ -60,7 +62,9 @@ import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
+import com.apihub.project.model.ProjectDtos.UpdateProjectWebhookRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
+import com.apihub.project.model.ProjectDtos.WebhookDeliveryDetail;
 import com.apihub.project.repository.ProjectRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,6 +77,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -87,19 +92,22 @@ public class ProjectService {
     private final DebugTargetRuleValidator debugTargetRuleValidator;
     private final AuthUserRepository authUserRepository;
     private final VersionComparisonService versionComparisonService;
+    private final ProjectWebhookNotifier projectWebhookNotifier;
 
     public ProjectService(ProjectRepository projectRepository,
                           EndpointRepository endpointRepository,
                           MockRuntimeResolver mockRuntimeResolver,
                           DebugTargetRuleValidator debugTargetRuleValidator,
                           AuthUserRepository authUserRepository,
-                          VersionComparisonService versionComparisonService) {
+                          VersionComparisonService versionComparisonService,
+                          ProjectWebhookNotifier projectWebhookNotifier) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.mockRuntimeResolver = mockRuntimeResolver;
         this.debugTargetRuleValidator = debugTargetRuleValidator;
         this.authUserRepository = authUserRepository;
         this.versionComparisonService = versionComparisonService;
+        this.projectWebhookNotifier = projectWebhookNotifier;
     }
 
     @Transactional(readOnly = true)
@@ -811,6 +819,8 @@ public class ProjectService {
 
     public MockReleaseDetail publishMockRelease(Long userId, Long endpointId) {
         requireEndpointWriteAccess(userId, endpointId);
+        EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId).orElseThrow();
+        EndpointDetail endpoint = endpointRepository.findEndpoint(endpointId).orElseThrow();
 
         String responseSnapshotJson = writeJson(endpointRepository.listResponses(endpointId).stream()
                 .map(response -> new MockSimulationResponseItem(
@@ -839,7 +849,21 @@ public class ProjectService {
                 .toList());
 
         MockReleaseDetail release = endpointRepository.createMockRelease(userId, endpointId, responseSnapshotJson, rulesSnapshotJson);
-        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "mock.release.publish", "endpoint", endpointId, "endpoint#" + endpointId, Map.of("releaseId", release.id()));
+        recordAudit(endpointReference.projectId(), userId, "mock.release.publish", "endpoint", endpointId, endpoint.name(), Map.of("releaseId", release.id(), "releaseNo", release.releaseNo()));
+        projectWebhookNotifier.dispatchProjectEvent(
+                endpointReference.projectId(),
+                ProjectWebhookNotifier.EVENT_MOCK_RELEASED,
+                userId,
+                "endpoint",
+                endpointId,
+                endpoint.name(),
+                Map.of(
+                        "releaseId", release.id(),
+                        "releaseNo", release.releaseNo(),
+                        "endpointId", endpointId,
+                        "endpointName", endpoint.name(),
+                        "method", endpoint.method(),
+                        "path", endpoint.path()));
         return release;
     }
 
@@ -898,13 +922,29 @@ public class ProjectService {
 
     public EndpointDetail releaseVersion(Long userId, Long endpointId, Long versionId) {
         requireEndpointWriteAccess(userId, endpointId);
+        EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId).orElseThrow();
         VersionDetail version = endpointRepository.findVersion(versionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found"));
         if (!endpointId.equals(version.endpointId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found");
         }
         EndpointDetail released = endpointRepository.releaseVersion(userId, endpointId, versionId);
-        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "version.release", "version", versionId, version.version(), Map.of("endpointId", endpointId));
+        recordAudit(endpointReference.projectId(), userId, "version.release", "version", versionId, version.version(), Map.of("endpointId", endpointId));
+        projectWebhookNotifier.dispatchProjectEvent(
+                endpointReference.projectId(),
+                ProjectWebhookNotifier.EVENT_VERSION_RELEASED,
+                userId,
+                "version",
+                versionId,
+                version.version(),
+                Map.of(
+                        "endpointId", endpointId,
+                        "endpointName", released.name(),
+                        "method", released.method(),
+                        "path", released.path(),
+                        "versionId", versionId,
+                        "versionLabel", version.version(),
+                        "releasedAt", released.releasedAt() == null ? "" : released.releasedAt().toString()));
         return released;
     }
 
@@ -997,6 +1037,13 @@ public class ProjectService {
         return project;
     }
 
+    private ProjectRepository.ProjectWebhookReference requireProjectWebhookWriteAccess(Long userId, Long webhookId) {
+        ProjectRepository.ProjectWebhookReference reference = projectRepository.findProjectWebhookReference(webhookId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Webhook not found"));
+        requireProjectWriteAccess(userId, reference.projectId());
+        return reference;
+    }
+
     private ProjectRepository.ModuleReference requireModuleReadAccess(Long userId, Long moduleId) {
         ProjectRepository.ModuleReference module = projectRepository.findModuleReference(moduleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Module not found"));
@@ -1081,6 +1128,33 @@ public class ProjectService {
         }
     }
 
+    private void validateProjectWebhookRequest(UpdateProjectWebhookRequest request) {
+        if (request == null || request.name() == null || request.name().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Webhook name is required");
+        }
+        if (request.targetUrl() == null || request.targetUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Webhook target URL is required");
+        }
+        String normalizedUrl = request.targetUrl().trim().toLowerCase();
+        if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Webhook target URL must use http or https");
+        }
+        List<String> eventTypes = request.eventTypes() == null ? List.of() : request.eventTypes().stream()
+                .filter(item -> item != null && !item.isBlank())
+                .map(String::trim)
+                .toList();
+        if (eventTypes.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Webhook event types are required");
+        }
+        Set<String> supported = Set.of(
+                ProjectWebhookNotifier.EVENT_VERSION_RELEASED,
+                ProjectWebhookNotifier.EVENT_MOCK_RELEASED,
+                ProjectWebhookNotifier.EVENT_TEST_SUITE_FAILED);
+        if (eventTypes.stream().anyMatch(item -> !supported.contains(item))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported webhook event type");
+        }
+    }
+
     private String writeJson(Object value) {
         try {
             return OBJECT_MAPPER.writeValueAsString(value);
@@ -1093,6 +1167,55 @@ public class ProjectService {
     public List<AuditLogDetail> listAuditLogs(Long userId, Long projectId, int limit) {
         requireProjectReadAccess(userId, projectId);
         return projectRepository.listAuditLogs(projectId, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectWebhookDetail> listProjectWebhooks(Long userId, Long projectId) {
+        requireProjectReadAccess(userId, projectId);
+        return projectRepository.listProjectWebhooks(projectId);
+    }
+
+    public ProjectWebhookDetail createProjectWebhook(Long userId, Long projectId, CreateProjectWebhookRequest request) {
+        requireProjectWriteAccess(userId, projectId);
+        validateProjectWebhookRequest(new UpdateProjectWebhookRequest(
+                request == null ? null : request.name(),
+                request == null ? null : request.targetUrl(),
+                request == null ? null : request.eventTypes(),
+                request == null ? null : request.secret(),
+                request == null ? null : request.enabled()));
+        ProjectWebhookDetail created = projectRepository.createProjectWebhook(userId, projectId, request);
+        recordAudit(projectId, userId, "webhook.create", "project_webhook", created.id(), created.name(), Map.of("targetUrl", created.targetUrl()));
+        return created;
+    }
+
+    public ProjectWebhookDetail updateProjectWebhook(Long userId, Long webhookId, UpdateProjectWebhookRequest request) {
+        ProjectRepository.ProjectWebhookReference reference = requireProjectWebhookWriteAccess(userId, webhookId);
+        validateProjectWebhookRequest(request);
+        ProjectWebhookDetail updated = projectRepository.updateProjectWebhook(userId, webhookId, request);
+        recordAudit(reference.projectId(), userId, "webhook.update", "project_webhook", updated.id(), updated.name(), Map.of("targetUrl", updated.targetUrl()));
+        return updated;
+    }
+
+    public void deleteProjectWebhook(Long userId, Long webhookId) {
+        ProjectRepository.ProjectWebhookReference reference = requireProjectWebhookWriteAccess(userId, webhookId);
+        projectRepository.deleteProjectWebhook(webhookId);
+        recordAudit(reference.projectId(), userId, "webhook.delete", "project_webhook", webhookId, reference.name(), Map.of());
+    }
+
+    @Transactional(readOnly = true)
+    public List<WebhookDeliveryDetail> listWebhookDeliveries(Long userId, Long projectId, int limit) {
+        requireProjectReadAccess(userId, projectId);
+        return projectRepository.listWebhookDeliveries(projectId, limit);
+    }
+
+    public WebhookDeliveryDetail testProjectWebhook(Long userId, Long projectId, Long webhookId) {
+        ProjectRepository.ProjectWebhookReference reference = requireProjectWebhookWriteAccess(userId, webhookId);
+        if (!reference.projectId().equals(projectId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Webhook not found");
+        }
+        WebhookDeliveryDetail delivery = projectWebhookNotifier.dispatchWebhookTest(projectId, webhookId, userId);
+        recordAudit(projectId, userId, "webhook.test", "project_webhook", webhookId, reference.name(), Map.of("deliveryId", delivery.id()));
+        return delivery;
     }
 
     private void recordAudit(Long projectId,
