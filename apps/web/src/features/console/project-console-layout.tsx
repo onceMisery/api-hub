@@ -36,6 +36,7 @@ import { clearTokens } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { href: "search", icon: Search, label: "搜索" },
   { href: "api", icon: LayoutDashboard, label: "接口列表" },
   { href: "debug", icon: TestTube2, label: "调试台" },
   { href: "environments", icon: Wrench, label: "环境" },
