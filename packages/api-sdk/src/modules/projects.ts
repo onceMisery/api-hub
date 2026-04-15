@@ -537,6 +537,29 @@ export type AiImpactAnalysisResult = {
   compatibilityAdvice: string;
 };
 
+export type AskProjectQuestionPayload = {
+  question: string;
+  endpointId?: number | null;
+  scopeHint?: string | null;
+};
+
+export type AiReferenceItem = {
+  endpointId: number;
+  title: string;
+  method: string;
+  path: string;
+  sourceType: string;
+  snippet: string;
+};
+
+export type ProjectAiAnswerResult = {
+  question: string;
+  answer: string;
+  hasContext: boolean;
+  references: AiReferenceItem[];
+  matchedEndpointIds: number[];
+};
+
 export type CreateDictionaryGroupPayload = {
   name: string;
   description: string;
@@ -1687,6 +1710,13 @@ export function generateEndpointTestCases(endpointId: number, payload: GenerateE
 
 export function generateEndpointImpactAnalysis(endpointId: number, payload: GenerateImpactAnalysisPayload) {
   return apiFetch<AiImpactAnalysisResult>(`/api/v1/endpoints/${endpointId}/ai/impact-analysis`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function askProjectAiQuestion(projectId: number, payload: AskProjectQuestionPayload) {
+  return apiFetch<ProjectAiAnswerResult>(`/api/v1/projects/${projectId}/ai/ask`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

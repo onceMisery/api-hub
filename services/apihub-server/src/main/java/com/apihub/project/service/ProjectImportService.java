@@ -7,6 +7,7 @@ import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.doc.model.EndpointDetail;
 import com.apihub.doc.repository.EndpointRepository;
+import com.apihub.ai.service.AiRagService;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
@@ -57,10 +58,12 @@ public class ProjectImportService {
 
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
+    private final AiRagService aiRagService;
 
-    public ProjectImportService(ProjectRepository projectRepository, EndpointRepository endpointRepository) {
+    public ProjectImportService(ProjectRepository projectRepository, EndpointRepository endpointRepository, AiRagService aiRagService) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
+        this.aiRagService = aiRagService;
     }
 
     public ImportResult importOpenApiToProject(Long userId, Long projectId, ImportSpecRequest request) {
@@ -245,6 +248,7 @@ public class ProjectImportService {
 
             endpointRepository.replaceParameters(endpoint.id(), operation.parameters());
             endpointRepository.replaceResponses(endpoint.id(), operation.responses());
+            aiRagService.reindexEndpoint(endpoint.id());
 
             if (createVersionSnapshot) {
                 endpointRepository.createVersion(userId, endpoint.id(), new CreateVersionRequest(

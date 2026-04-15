@@ -169,4 +169,30 @@ public final class AiDtos {
             String compatibilityAdvice
     ) {
     }
+
+    public record AskProjectQuestionRequest(
+            String question,
+            Long endpointId,
+            String scopeHint
+    ) {
+    }
+
+    public record AiReferenceItem(
+            Long endpointId,
+            String title,
+            String method,
+            String path,
+            String sourceType,
+            String snippet
+    ) {
+    }
+
+    public record ProjectAiAnswerResult(
+            String question,
+            String answer,
+            boolean hasContext,
+            List<AiReferenceItem> references,
+            List<Long> matchedEndpointIds
+    ) {
+    }
 }

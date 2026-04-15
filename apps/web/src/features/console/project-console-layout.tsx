@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquareMore,
   Search,
   Share2,
   TestTube2,
@@ -41,7 +42,8 @@ const navItems = [
   { href: "versions", icon: Workflow, label: "版本" },
   { href: "mock", icon: Waypoints, label: "Mock" },
   { href: "notifications", icon: Bell, label: "通知" },
-  { href: "ai", icon: Bot, label: "AI" },
+  { href: "ai", icon: Bot, label: "AI配置" },
+  { href: "ai-assistant", icon: MessageSquareMore, label: "AI助手" },
   { href: "dictionary", icon: BookMarked, label: "字典中心" },
   { href: "share", icon: Share2, label: "分享" },
   { href: "test-suites", icon: FlaskConical, label: "测试套件" },
@@ -163,7 +165,7 @@ export function ProjectConsoleLayout({ children, projectId, title }: ProjectCons
 
         <nav className="space-y-1 border-b border-border px-3 py-4">
           {navItems.map((item) => {
-            const active = pathname.includes(`/${item.href}`);
+            const active = pathname.split("/").includes(item.href);
             return (
               <Link
                 className={cn(

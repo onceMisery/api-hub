@@ -12,6 +12,7 @@ import com.apihub.doc.model.ParameterDetail;
 import com.apihub.doc.model.ResponseDetail;
 import com.apihub.doc.model.VersionComparisonResult;
 import com.apihub.doc.model.VersionDetail;
+import com.apihub.ai.service.AiRagService;
 import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.doc.service.VersionComparisonService;
 import com.apihub.mock.model.MockDtos.MockReleaseDetail;
@@ -89,6 +90,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
     private final MockRuntimeResolver mockRuntimeResolver;
+    private final AiRagService aiRagService;
     private final DebugTargetRuleValidator debugTargetRuleValidator;
     private final AuthUserRepository authUserRepository;
     private final VersionComparisonService versionComparisonService;
@@ -97,6 +99,7 @@ public class ProjectService {
     public ProjectService(ProjectRepository projectRepository,
                           EndpointRepository endpointRepository,
                           MockRuntimeResolver mockRuntimeResolver,
+                          AiRagService aiRagService,
                           DebugTargetRuleValidator debugTargetRuleValidator,
                           AuthUserRepository authUserRepository,
                           VersionComparisonService versionComparisonService,
@@ -104,6 +107,7 @@ public class ProjectService {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.mockRuntimeResolver = mockRuntimeResolver;
+        this.aiRagService = aiRagService;
         this.debugTargetRuleValidator = debugTargetRuleValidator;
         this.authUserRepository = authUserRepository;
         this.versionComparisonService = versionComparisonService;
@@ -266,6 +270,7 @@ public class ProjectService {
     public ModuleDetail updateModule(Long userId, Long moduleId, UpdateModuleRequest request) {
         ProjectRepository.ModuleReference module = requireModuleWriteAccess(userId, moduleId);
         ModuleDetail updated = projectRepository.updateModule(moduleId, request);
+        aiRagService.reindexModule(moduleId);
         recordAudit(module.projectId(), userId, "module.update", "module", updated.id(), updated.name(), Map.of());
         return updated;
     }
@@ -276,6 +281,7 @@ public class ProjectService {
 
     public void deleteModule(Long userId, Long moduleId) {
         ProjectRepository.ModuleReference module = requireModuleWriteAccess(userId, moduleId);
+        aiRagService.deleteModuleIndex(moduleId);
         projectRepository.deleteModule(moduleId);
         recordAudit(module.projectId(), userId, "module.delete", "module", moduleId, "module#" + moduleId, Map.of());
     }
@@ -341,6 +347,7 @@ public class ProjectService {
     public GroupDetail updateGroup(Long userId, Long groupId, UpdateGroupRequest request) {
         ProjectRepository.GroupReference group = requireGroupWriteAccess(userId, groupId);
         GroupDetail updated = projectRepository.updateGroup(groupId, request);
+        aiRagService.reindexGroup(groupId);
         recordAudit(group.projectId(), userId, "group.update", "group", updated.id(), updated.name(), Map.of("moduleId", group.moduleId()));
         return updated;
     }
@@ -351,6 +358,7 @@ public class ProjectService {
 
     public void deleteGroup(Long userId, Long groupId) {
         ProjectRepository.GroupReference group = requireGroupWriteAccess(userId, groupId);
+        aiRagService.deleteGroupIndex(groupId);
         projectRepository.deleteGroup(groupId);
         recordAudit(group.projectId(), userId, "group.delete", "group", groupId, "group#" + groupId, Map.of("moduleId", group.moduleId()));
     }
@@ -698,6 +706,7 @@ public class ProjectService {
     public EndpointDetail createEndpoint(Long userId, Long groupId, CreateEndpointRequest request) {
         ProjectRepository.GroupReference group = requireGroupWriteAccess(userId, groupId);
         EndpointDetail created = endpointRepository.createEndpoint(userId, group, request);
+        aiRagService.reindexEndpoint(created.id());
         recordAudit(group.projectId(), userId, "endpoint.create", "endpoint", created.id(), created.name(), Map.of("method", created.method(), "path", created.path()));
         return created;
     }
@@ -724,6 +733,7 @@ public class ProjectService {
                 request.path() != null ? request.path() : current.path(),
                 request.description() != null ? request.description() : current.description(),
                 request.mockEnabled() != null ? request.mockEnabled() : current.mockEnabled()));
+        aiRagService.reindexEndpoint(updated.id());
         Long projectId = endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId();
         recordAudit(projectId, userId, "endpoint.update", "endpoint", updated.id(), updated.name(), Map.of("method", updated.method(), "path", updated.path()));
         return updated;
@@ -737,6 +747,7 @@ public class ProjectService {
         requireEndpointWriteAccess(userId, endpointId);
         Long projectId = endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId();
         endpointRepository.deleteEndpoint(endpointId);
+        aiRagService.deleteEndpointIndex(endpointId);
         recordAudit(projectId, userId, "endpoint.delete", "endpoint", endpointId, "endpoint#" + endpointId, Map.of());
     }
 
@@ -758,6 +769,7 @@ public class ProjectService {
     public void replaceParameters(Long userId, Long endpointId, List<ParameterUpsertItem> items) {
         requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceParameters(endpointId, items);
+        aiRagService.reindexEndpoint(endpointId);
         recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "endpoint.parameters.replace", "endpoint", endpointId, "endpoint#" + endpointId, Map.of("count", items == null ? 0 : items.size()));
     }
 
@@ -779,6 +791,7 @@ public class ProjectService {
     public void replaceResponses(Long userId, Long endpointId, List<ResponseUpsertItem> items) {
         requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceResponses(endpointId, items);
+        aiRagService.reindexEndpoint(endpointId);
         recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "endpoint.responses.replace", "endpoint", endpointId, "endpoint#" + endpointId, Map.of("count", items == null ? 0 : items.size()));
     }
 

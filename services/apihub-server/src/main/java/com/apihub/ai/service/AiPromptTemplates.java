@@ -13,7 +13,7 @@ final class AiPromptTemplates {
     static String descriptionSystemPrompt() {
         return """
                 你是资深 API 文档架构师。
-                任务是基于接口定义生成简体中文接口说明。
+                任务是基于接口定义生成简洁中文接口说明。
                 输出要求：
                 1. 只输出可直接写入文档的正文，不要加标题前缀，不要输出 Markdown 代码块。
                 2. 说明中要覆盖用途、关键参数、响应要点和典型使用场景。
@@ -40,8 +40,8 @@ final class AiPromptTemplates {
                 输出要求：
                 1. 只输出 JSON。
                 2. JSON 结构必须是 {"snippets":[{"language":"...","title":"...","code":"..."}]}。
-                3. code 字段必须是完整、可读、贴近真实项目实践的示例。
-                4. 如果是 curl，优先生成一条可直接执行的命令；如果是 Java / Python / TypeScript，优先生成最常见标准库或主流写法。
+                3. code 字段必须完整、可读、贴近真实项目实践。
+                4. 如果是 curl，优先生成可以直接执行的命令；如果是 Java / Python / TypeScript，优先生成主流标准库或主流写法。
                 """;
     }
 
@@ -54,7 +54,7 @@ final class AiPromptTemplates {
                 2. JSON 结构必须是 {"cases":[{"name":"...","category":"...","purpose":"...","queryString":"...","headers":[{"name":"...","value":"..."}],"body":"...","assertions":[{"type":"...","expression":"...","expectedValue":"..."}],"extractors":[{"variableName":"...","sourceType":"...","expression":"..."}]}]}。
                 3. assertions.type 只允许使用 status_equals、status_not_equals、body_contains、body_not_contains、response_time_lte、json_path_equals、json_path_exists、json_path_not_empty。
                 4. extractors.sourceType 只允许使用 body_json_path、response_header、response_status。
-                5. 输出的 body 字段必须是字符串；没有请求体时可输出空字符串。
+                5. body 字段必须是字符串；没有请求体时输出空字符串。
                 """;
     }
 
@@ -65,14 +65,24 @@ final class AiPromptTemplates {
                 输出要求：
                 1. 只输出 JSON。
                 2. JSON 结构必须是 {"level":"high|medium|low","summary":"...","risks":["..."],"recommendations":["..."],"compatibilityAdvice":"..."}。
-                3. 必须优先关注路径变更、方法变更、字段删除、必填新增、类型变化等破坏性修改。
+                3. 必须优先关注路径变更、方法变更、字段删除、必填新增、类型变更等破坏性修改。
+                """;
+    }
+
+    static String assistantSystemPrompt() {
+        return """
+                You are an API documentation assistant for one project.
+                Answer only from the provided context.
+                If the context is insufficient, say so directly instead of inventing details.
+                Output JSON with the shape:
+                {"answer":"...","hasContext":true}
+                Keep the answer concise and practical.
                 """;
     }
 
     static String buildDescriptionPrompt(ResolvedEndpointContext context, String instructions) {
         return """
                 请为下面接口生成文档说明。
-
                 接口名称：%s
                 请求方法：%s
                 请求路径：%s
@@ -84,7 +94,7 @@ final class AiPromptTemplates {
                 响应结构：
                 %s
 
-                额外要求：
+                附加要求：
                 %s
                 """.formatted(
                 safe(context.name()),
@@ -99,7 +109,6 @@ final class AiPromptTemplates {
     static String buildMockPrompt(ResolvedEndpointContext context, String instructions) {
         return """
                 请为下面接口生成一份高保真的 JSON 响应示例。
-
                 接口名称：%s
                 请求方法：%s
                 请求路径：%s
@@ -108,7 +117,7 @@ final class AiPromptTemplates {
                 响应结构：
                 %s
 
-                额外要求：
+                附加要求：
                 %s
                 """.formatted(
                 safe(context.name()),
@@ -125,7 +134,6 @@ final class AiPromptTemplates {
                                   String instructions) {
         return """
                 请根据下面接口定义生成代码示例。
-
                 接口名称：%s
                 请求方法：%s
                 请求路径：%s
@@ -141,7 +149,7 @@ final class AiPromptTemplates {
                 目标语言：
                 %s
 
-                额外要求：
+                附加要求：
                 %s
                 """.formatted(
                 safe(context.name()),
@@ -160,7 +168,6 @@ final class AiPromptTemplates {
                                       String instructions) {
         return """
                 请根据下面接口生成测试用例建议。
-
                 接口名称：%s
                 请求方法：%s
                 请求路径：%s
@@ -175,7 +182,7 @@ final class AiPromptTemplates {
                 期望覆盖分类：
                 %s
 
-                额外要求：
+                附加要求：
                 %s
                 """.formatted(
                 safe(context.name()),
@@ -185,21 +192,41 @@ final class AiPromptTemplates {
                 renderParameters(context),
                 renderResponses(context),
                 categories.stream().collect(Collectors.joining(", ")),
-                normalizeInstructions(instructions, "至少覆盖正常流程、边界值、非法输入和权限/鉴权场景。"));
+                normalizeInstructions(instructions, "至少覆盖正常流程、边界值、异常情况和权限场景。"));
     }
 
     static String buildImpactPrompt(String comparisonJson, String instructions) {
         return """
                 请基于下面的接口 Diff 结果生成影响分析。
-
                 Diff JSON：
                 %s
 
-                额外要求：
+                附加要求：
                 %s
                 """.formatted(
                 comparisonJson,
                 normalizeInstructions(instructions, "请明确指出是否属于破坏性变更，并给出前后端协同建议。"));
+    }
+
+    static String buildAssistantPrompt(String projectName, String question, String scopeHint, String contextBundle) {
+        return """
+                Project: %s
+                Scope: %s
+                Question: %s
+
+                Context:
+                %s
+
+                Rules:
+                - Use only the Context above.
+                - If the Context is weak, say so clearly.
+                - Return JSON with keys answer and hasContext.
+                - Keep the answer short and actionable.
+                """.formatted(
+                safe(projectName),
+                safe(scopeHint),
+                safe(question),
+                contextBundle == null || contextBundle.isBlank() ? "(empty)" : contextBundle.trim());
     }
 
     private static String renderParameters(ResolvedEndpointContext context) {
