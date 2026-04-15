@@ -2,6 +2,7 @@ package com.apihub.project.model;
 
 import com.apihub.doc.model.EndpointDetail;
 
+import java.time.Instant;
 import java.util.List;
 
 public final class ProjectDtos {
@@ -105,6 +106,134 @@ public final class ProjectDtos {
     }
 
     public record ModuleDetail(Long id, Long projectId, String name) {
+    }
+
+    public record CreateModuleVersionTagRequest(String tagName, String description) {
+    }
+
+    public record ModuleVersionTagEndpointSnapshot(
+            Long endpointId,
+            String endpointName,
+            String method,
+            String path,
+            String groupName,
+            Long releasedVersionId,
+            String releasedVersionLabel,
+            Instant releasedAt
+    ) {
+    }
+
+    public record ModuleVersionTagDetail(
+            Long id,
+            Long moduleId,
+            String tagName,
+            String description,
+            int endpointCount,
+            int releasedEndpointCount,
+            List<ModuleVersionTagEndpointSnapshot> endpoints,
+            Instant createdAt
+    ) {
+    }
+
+    public record DictionaryGroupDetail(
+            Long id,
+            Long projectId,
+            String name,
+            String description,
+            int itemCount
+    ) {
+    }
+
+    public record CreateDictionaryGroupRequest(String name, String description) {
+    }
+
+    public record UpdateDictionaryGroupRequest(String name, String description) {
+    }
+
+    public record ImportDictionaryItemPayload(
+            String code,
+            String value,
+            String description,
+            Integer sortOrder
+    ) {
+    }
+
+    public record ImportDictionaryGroupPayload(
+            String name,
+            String description,
+            List<ImportDictionaryItemPayload> items
+    ) {
+    }
+
+    public record ImportDictionaryRequest(List<ImportDictionaryGroupPayload> groups) {
+    }
+
+    public record DictionaryImportResult(
+            int createdGroups,
+            int updatedGroups,
+            int createdItems,
+            int updatedItems
+    ) {
+    }
+
+    public record DictionaryItemDetail(
+            Long id,
+            Long groupId,
+            String code,
+            String value,
+            String description,
+            int sortOrder
+    ) {
+    }
+
+    public record CreateDictionaryItemRequest(String code, String value, String description, Integer sortOrder) {
+    }
+
+    public record UpdateDictionaryItemRequest(String code, String value, String description, Integer sortOrder) {
+    }
+
+    public record ErrorCodeDetail(
+            Long id,
+            Long projectId,
+            String code,
+            String name,
+            String description,
+            String solution,
+            Integer httpStatus
+    ) {
+    }
+
+    public record CreateErrorCodeRequest(
+            String code,
+            String name,
+            String description,
+            String solution,
+            Integer httpStatus
+    ) {
+    }
+
+    public record UpdateErrorCodeRequest(
+            String code,
+            String name,
+            String description,
+            String solution,
+            Integer httpStatus
+    ) {
+    }
+
+    public record ImportErrorCodeItemPayload(
+            String code,
+            String name,
+            String description,
+            String solution,
+            Integer httpStatus
+    ) {
+    }
+
+    public record ImportErrorCodeRequest(List<ImportErrorCodeItemPayload> items) {
+    }
+
+    public record ErrorCodeImportResult(int createdCount, int updatedCount) {
     }
 
     public record CreateGroupRequest(String name) {

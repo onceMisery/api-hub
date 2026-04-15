@@ -2,6 +2,7 @@ import type { EndpointTreeItem, ModuleTreeItem } from "@api-hub/api-sdk";
 
 export type FlattenedEndpoint = {
   endpoint: EndpointTreeItem;
+  moduleId: number;
   groupName: string;
   moduleName: string;
 };
@@ -11,6 +12,7 @@ export function flattenProjectTree(modules: ModuleTreeItem[]): FlattenedEndpoint
     module.groups.flatMap((group) =>
       group.endpoints.map((endpoint) => ({
         endpoint,
+        moduleId: module.id,
         groupName: group.name,
         moduleName: module.name
       }))

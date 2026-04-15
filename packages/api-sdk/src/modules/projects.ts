@@ -209,6 +209,33 @@ export type ModuleDetail = {
   name: string;
 };
 
+export type CreateModuleVersionTagPayload = {
+  tagName: string;
+  description: string;
+};
+
+export type ModuleVersionTagEndpointSnapshot = {
+  endpointId: number;
+  endpointName: string;
+  method: string;
+  path: string;
+  groupName: string;
+  releasedVersionId: number | null;
+  releasedVersionLabel: string | null;
+  releasedAt: string | null;
+};
+
+export type ModuleVersionTagDetail = {
+  id: number;
+  moduleId: number;
+  tagName: string;
+  description: string | null;
+  endpointCount: number;
+  releasedEndpointCount: number;
+  endpoints: ModuleVersionTagEndpointSnapshot[];
+  createdAt: string;
+};
+
 export type GroupDetail = {
   id: number;
   moduleId: number;
@@ -235,6 +262,100 @@ export type EnvironmentDetail = {
   debugHostMode: "inherit" | "append" | "override";
   debugAllowedHosts: DebugTargetRule[];
 };
+
+export type DictionaryGroupDetail = {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  itemCount: number;
+};
+
+export type DictionaryItemDetail = {
+  id: number;
+  groupId: number;
+  code: string;
+  value: string;
+  description: string | null;
+  sortOrder: number;
+};
+
+export type ErrorCodeDetail = {
+  id: number;
+  projectId: number;
+  code: string;
+  name: string;
+  description: string | null;
+  solution: string | null;
+  httpStatus: number | null;
+};
+
+export type ImportDictionaryItemPayload = {
+  code: string;
+  value: string;
+  description?: string;
+  sortOrder?: number | null;
+};
+
+export type ImportDictionaryGroupPayload = {
+  name: string;
+  description?: string;
+  items?: ImportDictionaryItemPayload[];
+};
+
+export type ImportDictionaryPayload = {
+  groups: ImportDictionaryGroupPayload[];
+};
+
+export type DictionaryImportResult = {
+  createdGroups: number;
+  updatedGroups: number;
+  createdItems: number;
+  updatedItems: number;
+};
+
+export type ImportErrorCodeItemPayload = {
+  code: string;
+  name: string;
+  description?: string;
+  solution?: string;
+  httpStatus?: number | null;
+};
+
+export type ImportErrorCodePayload = {
+  items: ImportErrorCodeItemPayload[];
+};
+
+export type ErrorCodeImportResult = {
+  createdCount: number;
+  updatedCount: number;
+};
+
+export type CreateDictionaryGroupPayload = {
+  name: string;
+  description: string;
+};
+
+export type UpdateDictionaryGroupPayload = CreateDictionaryGroupPayload;
+
+export type CreateDictionaryItemPayload = {
+  code: string;
+  value: string;
+  description: string;
+  sortOrder: number;
+};
+
+export type UpdateDictionaryItemPayload = CreateDictionaryItemPayload;
+
+export type CreateErrorCodePayload = {
+  code: string;
+  name: string;
+  description: string;
+  solution: string;
+  httpStatus: number | null;
+};
+
+export type UpdateErrorCodePayload = CreateErrorCodePayload;
 
 export type UpdateProjectPayload = {
   name: string;
@@ -985,6 +1106,17 @@ export function deleteModule(moduleId: number) {
   });
 }
 
+export function fetchModuleVersionTags(moduleId: number) {
+  return apiFetch<ModuleVersionTagDetail[]>(`/api/v1/modules/${moduleId}/version-tags`);
+}
+
+export function createModuleVersionTag(moduleId: number, payload: CreateModuleVersionTagPayload) {
+  return apiFetch<ModuleVersionTagDetail>(`/api/v1/modules/${moduleId}/version-tags`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function createGroup(moduleId: number, payload: CreateGroupPayload) {
   return apiFetch<GroupDetail>(`/api/v1/modules/${moduleId}/groups`, {
     method: "POST",
@@ -996,6 +1128,92 @@ export function fetchEnvironments(projectId: number) {
   return apiFetch<EnvironmentDetail[]>(
     `/api/v1/projects/${projectId}/environments`,
   );
+}
+
+export function fetchDictionaryGroups(projectId: number) {
+  return apiFetch<DictionaryGroupDetail[]>(`/api/v1/projects/${projectId}/dictionary-groups`);
+}
+
+export function createDictionaryGroup(projectId: number, payload: CreateDictionaryGroupPayload) {
+  return apiFetch<DictionaryGroupDetail>(`/api/v1/projects/${projectId}/dictionary-groups`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function importDictionaryGroups(projectId: number, payload: ImportDictionaryPayload) {
+  return apiFetch<DictionaryImportResult>(`/api/v1/projects/${projectId}/dictionary-groups/import`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDictionaryGroup(groupId: number, payload: UpdateDictionaryGroupPayload) {
+  return apiFetch<DictionaryGroupDetail>(`/api/v1/dictionary-groups/${groupId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDictionaryGroup(groupId: number) {
+  return apiFetch<null>(`/api/v1/dictionary-groups/${groupId}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchDictionaryItems(groupId: number) {
+  return apiFetch<DictionaryItemDetail[]>(`/api/v1/dictionary-groups/${groupId}/items`);
+}
+
+export function createDictionaryItem(groupId: number, payload: CreateDictionaryItemPayload) {
+  return apiFetch<DictionaryItemDetail>(`/api/v1/dictionary-groups/${groupId}/items`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDictionaryItem(itemId: number, payload: UpdateDictionaryItemPayload) {
+  return apiFetch<DictionaryItemDetail>(`/api/v1/dictionary-items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDictionaryItem(itemId: number) {
+  return apiFetch<null>(`/api/v1/dictionary-items/${itemId}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchErrorCodes(projectId: number) {
+  return apiFetch<ErrorCodeDetail[]>(`/api/v1/projects/${projectId}/error-codes`);
+}
+
+export function createErrorCode(projectId: number, payload: CreateErrorCodePayload) {
+  return apiFetch<ErrorCodeDetail>(`/api/v1/projects/${projectId}/error-codes`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function importErrorCodes(projectId: number, payload: ImportErrorCodePayload) {
+  return apiFetch<ErrorCodeImportResult>(`/api/v1/projects/${projectId}/error-codes/import`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateErrorCode(errorCodeId: number, payload: UpdateErrorCodePayload) {
+  return apiFetch<ErrorCodeDetail>(`/api/v1/error-codes/${errorCodeId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteErrorCode(errorCodeId: number) {
+  return apiFetch<null>(`/api/v1/error-codes/${errorCodeId}`, {
+    method: "DELETE",
+  });
 }
 
 export function createEnvironment(

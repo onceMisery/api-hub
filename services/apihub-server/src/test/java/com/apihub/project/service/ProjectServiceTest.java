@@ -12,8 +12,16 @@ import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.mock.model.MockDtos.MockSimulationRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.CreateErrorCodeRequest;
+import com.apihub.project.model.ProjectDtos.CreateDictionaryItemRequest;
+import com.apihub.project.model.ProjectDtos.CreateDictionaryGroupRequest;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
+import com.apihub.project.model.ProjectDtos.ImportDictionaryGroupPayload;
+import com.apihub.project.model.ProjectDtos.ImportDictionaryItemPayload;
+import com.apihub.project.model.ProjectDtos.ImportDictionaryRequest;
+import com.apihub.project.model.ProjectDtos.ImportErrorCodeItemPayload;
+import com.apihub.project.model.ProjectDtos.ImportErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.mock.model.MockDtos.MockSimulationResponseItem;
@@ -23,9 +31,13 @@ import com.apihub.mock.service.MockRuntimeResolver;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.UpdateErrorCodeRequest;
+import com.apihub.project.model.ProjectDtos.UpdateDictionaryItemRequest;
+import com.apihub.project.model.ProjectDtos.UpdateDictionaryGroupRequest;
 import com.apihub.doc.repository.EndpointRepository;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
+import com.apihub.project.model.ProjectDtos.CreateModuleVersionTagRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
 import com.apihub.project.repository.ProjectRepository;
@@ -114,6 +126,39 @@ class ProjectServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void shouldImportDictionaryGroupsAndErrorCodes() {
+        var dictionaryResult = projectService.importDictionaryGroups(1L, 1L, new ImportDictionaryRequest(java.util.List.of(
+                new ImportDictionaryGroupPayload(
+                        "UserStatus",
+                        "用户状态字典",
+                        java.util.List.of(
+                                new ImportDictionaryItemPayload("ACTIVE", "已激活", "更新已有项", 1),
+                                new ImportDictionaryItemPayload("LOCKED", "已锁定", "新增项", 20))),
+                new ImportDictionaryGroupPayload(
+                        "OrderStatus",
+                        "订单状态字典",
+                        java.util.List.of(
+                                new ImportDictionaryItemPayload("CREATED", "已创建", "新分组新项", 0))))));
+
+        var errorCodeResult = projectService.importErrorCodes(1L, 1L, new ImportErrorCodeRequest(java.util.List.of(
+                new ImportErrorCodeItemPayload("USER_NOT_FOUND", "用户不存在", "更新已有错误码", "检查用户 ID", 404),
+                new ImportErrorCodeItemPayload("ORDER_CLOSED", "订单已关闭", "新增错误码", "检查订单状态", 409))));
+
+        assertThat(dictionaryResult.createdGroups()).isEqualTo(1);
+        assertThat(dictionaryResult.updatedGroups()).isEqualTo(1);
+        assertThat(dictionaryResult.createdItems()).isEqualTo(2);
+        assertThat(dictionaryResult.updatedItems()).isEqualTo(1);
+        assertThat(projectService.listDictionaryGroups(1L, 1L))
+                .extracting("name", "itemCount")
+                .contains(tuple("UserStatus", 2), tuple("OrderStatus", 1));
+        assertThat(projectService.listErrorCodes(1L, 1L))
+                .extracting("code", "name")
+                .contains(tuple("USER_NOT_FOUND", "用户不存在"), tuple("ORDER_CLOSED", "订单已关闭"));
+        assertThat(errorCodeResult.createdCount()).isEqualTo(1);
+        assertThat(errorCodeResult.updatedCount()).isEqualTo(1);
     }
 
     @Test
@@ -541,5 +586,57 @@ class ProjectServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void shouldCreateAndListModuleVersionTags() {
+        projectService.releaseVersion(1L, 1L, 1L);
+
+        var tag = projectService.createModuleVersionTag(1L, 1L, new CreateModuleVersionTagRequest(
+                "v1.0.0-release",
+                "Freeze current core module"));
+
+        assertThat(tag.tagName()).isEqualTo("v1.0.0-release");
+        assertThat(tag.endpointCount()).isEqualTo(1);
+        assertThat(tag.releasedEndpointCount()).isEqualTo(1);
+        assertThat(tag.endpoints()).singleElement().satisfies(item -> {
+            assertThat(item.endpointId()).isEqualTo(1L);
+            assertThat(item.releasedVersionLabel()).isEqualTo("v1");
+        });
+
+        assertThat(projectService.listModuleVersionTags(1L, 1L))
+                .singleElement()
+                .extracting("tagName", "releasedEndpointCount")
+                .containsExactly("v1.0.0-release", 1);
+    }
+
+    @Test
+    void shouldManageDictionaryGroupsItemsAndErrorCodes() {
+        var group = projectService.createDictionaryGroup(1L, 1L, new CreateDictionaryGroupRequest("OrderStatus", "订单状态"));
+        assertThat(projectService.listDictionaryGroups(1L, 1L)).extracting("name").contains("OrderStatus");
+
+        var updatedGroup = projectService.updateDictionaryGroup(1L, group.id(), new UpdateDictionaryGroupRequest("OrderState", "订单状态字典"));
+        assertThat(updatedGroup.name()).isEqualTo("OrderState");
+
+        var item = projectService.createDictionaryItem(1L, group.id(), new CreateDictionaryItemRequest("PAID", "已支付", "支付完成", 10));
+        assertThat(projectService.listDictionaryItems(1L, group.id())).extracting("code").contains("PAID");
+
+        var updatedItem = projectService.updateDictionaryItem(1L, item.id(), new UpdateDictionaryItemRequest("PAID", "已付款", "支付已完成", 20));
+        assertThat(updatedItem.value()).isEqualTo("已付款");
+
+        var errorCode = projectService.createErrorCode(1L, 1L, new CreateErrorCodeRequest("ORDER_NOT_FOUND", "订单不存在", "找不到订单", "检查订单号", 404));
+        assertThat(projectService.listErrorCodes(1L, 1L)).extracting("code").contains("ORDER_NOT_FOUND");
+
+        var updatedErrorCode = projectService.updateErrorCode(1L, errorCode.id(), new UpdateErrorCodeRequest("ORDER_NOT_FOUND", "订单未找到", "未找到订单记录", "确认订单是否已创建", 404));
+        assertThat(updatedErrorCode.name()).isEqualTo("订单未找到");
+
+        projectService.deleteDictionaryItem(1L, item.id());
+        assertThat(projectService.listDictionaryItems(1L, group.id())).extracting("code").doesNotContain("PAID");
+
+        projectService.deleteDictionaryGroup(1L, group.id());
+        assertThat(projectService.listDictionaryGroups(1L, 1L)).extracting("name").doesNotContain("OrderState");
+
+        projectService.deleteErrorCode(1L, errorCode.id());
+        assertThat(projectService.listErrorCodes(1L, 1L)).extracting("code").doesNotContain("ORDER_NOT_FOUND");
     }
 }

@@ -8,19 +8,29 @@ import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.CreateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
+import com.apihub.project.model.ProjectDtos.DictionaryGroupDetail;
+import com.apihub.project.model.ProjectDtos.DictionaryItemDetail;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
+import com.apihub.project.model.ProjectDtos.ErrorCodeDetail;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
+import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.UpdateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
+import com.apihub.project.model.ProjectDtos.UpdateDictionaryGroupRequest;
+import com.apihub.project.model.ProjectDtos.UpdateDictionaryItemRequest;
+import com.apihub.project.model.ProjectDtos.CreateDictionaryGroupRequest;
+import com.apihub.project.model.ProjectDtos.CreateDictionaryItemRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -28,6 +38,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -90,6 +101,24 @@ public class ProjectRepository {
             rs.getLong("project_id"),
             rs.getString("name"));
 
+    private static final RowMapper<ModuleVersionTagRecord> MODULE_VERSION_TAG_ROW_MAPPER = (rs, rowNum) -> new ModuleVersionTagRecord(
+            rs.getLong("id"),
+            rs.getLong("module_id"),
+            rs.getString("tag_name"),
+            rs.getString("description"),
+            rs.getString("snapshot_json"),
+            rs.getTimestamp("created_at").toInstant());
+
+    private static final RowMapper<ModuleVersionTagEndpointSnapshot> MODULE_VERSION_TAG_ENDPOINT_ROW_MAPPER = (rs, rowNum) -> new ModuleVersionTagEndpointSnapshot(
+            rs.getLong("endpoint_id"),
+            rs.getString("endpoint_name"),
+            rs.getString("http_method"),
+            rs.getString("path"),
+            rs.getString("group_name"),
+            rs.getObject("released_version_id", Long.class),
+            rs.getString("released_version_label"),
+            rs.getTimestamp("released_at") == null ? null : rs.getTimestamp("released_at").toInstant());
+
     private static final RowMapper<GroupDetail> GROUP_ROW_MAPPER = (rs, rowNum) -> new GroupDetail(
             rs.getLong("id"),
             rs.getLong("module_id"),
@@ -109,6 +138,30 @@ public class ProjectRepository {
             rs.getString("auth_value"),
             rs.getString("debug_host_mode"),
             deserializeDebugRules(rs.getString("debug_allowed_hosts_json")));
+
+    private static final RowMapper<DictionaryGroupDetail> DICTIONARY_GROUP_ROW_MAPPER = (rs, rowNum) -> new DictionaryGroupDetail(
+            rs.getLong("id"),
+            rs.getLong("project_id"),
+            rs.getString("name"),
+            rs.getString("description"),
+            rs.getInt("item_count"));
+
+    private static final RowMapper<DictionaryItemDetail> DICTIONARY_ITEM_ROW_MAPPER = (rs, rowNum) -> new DictionaryItemDetail(
+            rs.getLong("id"),
+            rs.getLong("group_id"),
+            rs.getString("code"),
+            rs.getString("item_value"),
+            rs.getString("description"),
+            rs.getInt("sort_order"));
+
+    private static final RowMapper<ErrorCodeDetail> ERROR_CODE_ROW_MAPPER = (rs, rowNum) -> new ErrorCodeDetail(
+            rs.getLong("id"),
+            rs.getLong("project_id"),
+            rs.getString("code"),
+            rs.getString("name"),
+            rs.getString("description"),
+            rs.getString("solution"),
+            rs.getObject("http_status", Integer.class));
 
     private final JdbcTemplate jdbcTemplate;
     public ProjectRepository(JdbcTemplate jdbcTemplate) {
@@ -558,6 +611,61 @@ public class ProjectRepository {
         jdbcTemplate.update("delete from module where id = ?", moduleId);
     }
 
+    public List<ModuleVersionTagRecord> listModuleVersionTags(Long moduleId) {
+        return jdbcTemplate.query("""
+                select id, module_id, tag_name, description, snapshot_json, created_at
+                from module_version_tag
+                where module_id = ?
+                order by created_at desc, id desc
+                """, MODULE_VERSION_TAG_ROW_MAPPER, moduleId);
+    }
+
+    public ModuleVersionTagRecord createModuleVersionTag(Long userId, Long moduleId, String tagName, String description, String snapshotJson) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into module_version_tag (module_id, tag_name, description, snapshot_json, created_by)
+                    values (?, ?, ?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, moduleId);
+            statement.setString(2, tagName);
+            statement.setString(3, description);
+            statement.setString(4, snapshotJson);
+            statement.setLong(5, userId);
+            return statement;
+        }, keyHolder);
+        return findModuleVersionTag(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
+    public Optional<ModuleVersionTagRecord> findModuleVersionTag(Long tagId) {
+        return jdbcTemplate.query("""
+                select id, module_id, tag_name, description, snapshot_json, created_at
+                from module_version_tag
+                where id = ?
+                """, MODULE_VERSION_TAG_ROW_MAPPER, tagId).stream().findFirst();
+    }
+
+    public List<ModuleVersionTagEndpointSnapshot> listModuleEndpointReleaseSnapshots(Long moduleId) {
+        return jdbcTemplate.query("""
+                select endpoint.id as endpoint_id,
+                       endpoint.name as endpoint_name,
+                       endpoint.http_method,
+                       endpoint.path,
+                       coalesce(api_group.name, 'Ungrouped') as group_name,
+                       endpoint.released_version_id,
+                       case
+                           when released_version.id is null then null
+                           else coalesce(released_version.version_label, concat('r', released_version.revision_no))
+                       end as released_version_label,
+                       endpoint.released_at
+                from api_endpoint endpoint
+                left join api_group on api_group.id = endpoint.group_id
+                left join api_version released_version on released_version.id = endpoint.released_version_id
+                where endpoint.module_id = ?
+                order by endpoint.sort_order, endpoint.id
+                """, MODULE_VERSION_TAG_ENDPOINT_ROW_MAPPER, moduleId);
+    }
+
     public List<GroupDetail> listGroups(Long moduleId) {
         return jdbcTemplate.query("""
                 select id, module_id, name
@@ -642,6 +750,233 @@ public class ProjectRepository {
                 where project_id = ?
                 order by is_default desc, id
                 """, ENVIRONMENT_ROW_MAPPER, projectId);
+    }
+
+    public List<DictionaryGroupDetail> listDictionaryGroups(Long projectId) {
+        return jdbcTemplate.query("""
+                select g.id,
+                       g.project_id,
+                       g.name,
+                       g.description,
+                       (select count(*) from dict_item i where i.group_id = g.id) as item_count
+                from dict_group g
+                where g.project_id = ?
+                order by g.id
+                """, DICTIONARY_GROUP_ROW_MAPPER, projectId);
+    }
+
+    public Optional<DictionaryGroupReference> findDictionaryGroupReference(Long groupId) {
+        return jdbcTemplate.query("""
+                select id, project_id
+                from dict_group
+                where id = ?
+                """, (rs, rowNum) -> new DictionaryGroupReference(rs.getLong("id"), rs.getLong("project_id")), groupId).stream().findFirst();
+    }
+
+    public Optional<DictionaryGroupDetail> findDictionaryGroupByProjectAndName(Long projectId, String name) {
+        return jdbcTemplate.query("""
+                select g.id,
+                       g.project_id,
+                       g.name,
+                       g.description,
+                       (select count(*) from dict_item i where i.group_id = g.id) as item_count
+                from dict_group g
+                where g.project_id = ?
+                  and lower(g.name) = lower(?)
+                order by g.id
+                limit 1
+                """, DICTIONARY_GROUP_ROW_MAPPER, projectId, name).stream().findFirst();
+    }
+
+    public DictionaryGroupDetail createDictionaryGroup(Long userId, Long projectId, CreateDictionaryGroupRequest request) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into dict_group (project_id, name, description, created_by, updated_by)
+                    values (?, ?, ?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, projectId);
+            statement.setString(2, request.name());
+            statement.setString(3, request.description());
+            statement.setLong(4, userId);
+            statement.setLong(5, userId);
+            return statement;
+        }, keyHolder);
+        return findDictionaryGroup(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
+    public Optional<DictionaryGroupDetail> findDictionaryGroup(Long groupId) {
+        return jdbcTemplate.query("""
+                select g.id,
+                       g.project_id,
+                       g.name,
+                       g.description,
+                       (select count(*) from dict_item i where i.group_id = g.id) as item_count
+                from dict_group g
+                where g.id = ?
+                """, DICTIONARY_GROUP_ROW_MAPPER, groupId).stream().findFirst();
+    }
+
+    public DictionaryGroupDetail updateDictionaryGroup(Long groupId, UpdateDictionaryGroupRequest request) {
+        jdbcTemplate.update("""
+                update dict_group
+                set name = ?, description = ?
+                where id = ?
+                """, request.name(), request.description(), groupId);
+        return findDictionaryGroup(groupId).orElseThrow();
+    }
+
+    public void deleteDictionaryGroup(Long groupId) {
+        jdbcTemplate.update("delete from dict_item where group_id = ?", groupId);
+        jdbcTemplate.update("delete from dict_group where id = ?", groupId);
+    }
+
+    public List<DictionaryItemDetail> listDictionaryItems(Long groupId) {
+        return jdbcTemplate.query("""
+                select id, group_id, code, item_value, description, sort_order
+                from dict_item
+                where group_id = ?
+                order by sort_order, id
+                """, DICTIONARY_ITEM_ROW_MAPPER, groupId);
+    }
+
+    public DictionaryItemDetail createDictionaryItem(Long userId, Long groupId, CreateDictionaryItemRequest request) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into dict_item (group_id, code, item_value, description, sort_order, created_by, updated_by)
+                    values (?, ?, ?, ?, ?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, groupId);
+            statement.setString(2, request.code());
+            statement.setString(3, request.value());
+            statement.setString(4, request.description());
+            statement.setInt(5, request.sortOrder() == null ? 0 : request.sortOrder());
+            statement.setLong(6, userId);
+            statement.setLong(7, userId);
+            return statement;
+        }, keyHolder);
+        return findDictionaryItem(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
+    public Optional<DictionaryItemDetail> findDictionaryItem(Long itemId) {
+        return jdbcTemplate.query("""
+                select id, group_id, code, item_value, description, sort_order
+                from dict_item
+                where id = ?
+                """, DICTIONARY_ITEM_ROW_MAPPER, itemId).stream().findFirst();
+    }
+
+    public Optional<DictionaryItemReference> findDictionaryItemReference(Long itemId) {
+        return jdbcTemplate.query("""
+                select i.id, i.group_id, g.project_id
+                from dict_item i
+                join dict_group g on g.id = i.group_id
+                where i.id = ?
+                """, (rs, rowNum) -> new DictionaryItemReference(rs.getLong("id"), rs.getLong("group_id"), rs.getLong("project_id")), itemId).stream().findFirst();
+    }
+
+    public Optional<DictionaryItemDetail> findDictionaryItemByGroupAndCode(Long groupId, String code) {
+        return jdbcTemplate.query("""
+                select id, group_id, code, item_value, description, sort_order
+                from dict_item
+                where group_id = ?
+                  and lower(code) = lower(?)
+                order by id
+                limit 1
+                """, DICTIONARY_ITEM_ROW_MAPPER, groupId, code).stream().findFirst();
+    }
+
+    public DictionaryItemDetail updateDictionaryItem(Long itemId, UpdateDictionaryItemRequest request) {
+        jdbcTemplate.update("""
+                update dict_item
+                set code = ?, item_value = ?, description = ?, sort_order = ?
+                where id = ?
+                """, request.code(), request.value(), request.description(), request.sortOrder() == null ? 0 : request.sortOrder(), itemId);
+        return findDictionaryItem(itemId).orElseThrow();
+    }
+
+    public void deleteDictionaryItem(Long itemId) {
+        jdbcTemplate.update("delete from dict_item where id = ?", itemId);
+    }
+
+    public List<ErrorCodeDetail> listErrorCodes(Long projectId) {
+        return jdbcTemplate.query("""
+                select id, project_id, code, name, description, solution, http_status
+                from error_code
+                where project_id = ?
+                order by id
+                """, ERROR_CODE_ROW_MAPPER, projectId);
+    }
+
+    public ErrorCodeDetail createErrorCode(Long userId, Long projectId, CreateErrorCodeRequest request) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    insert into error_code (project_id, code, name, description, solution, http_status, created_by, updated_by)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, projectId);
+            statement.setString(2, request.code());
+            statement.setString(3, request.name());
+            statement.setString(4, request.description());
+            statement.setString(5, request.solution());
+            if (request.httpStatus() == null) {
+                statement.setObject(6, null);
+            } else {
+                statement.setInt(6, request.httpStatus());
+            }
+            statement.setLong(7, userId);
+            statement.setLong(8, userId);
+            return statement;
+        }, keyHolder);
+        return findErrorCode(requireGeneratedId(keyHolder)).orElseThrow();
+    }
+
+    public Optional<ErrorCodeDetail> findErrorCode(Long errorCodeId) {
+        return jdbcTemplate.query("""
+                select id, project_id, code, name, description, solution, http_status
+                from error_code
+                where id = ?
+                """, ERROR_CODE_ROW_MAPPER, errorCodeId).stream().findFirst();
+    }
+
+    public Optional<ErrorCodeReference> findErrorCodeReference(Long errorCodeId) {
+        return jdbcTemplate.query("""
+                select id, project_id
+                from error_code
+                where id = ?
+                """, (rs, rowNum) -> new ErrorCodeReference(rs.getLong("id"), rs.getLong("project_id")), errorCodeId).stream().findFirst();
+    }
+
+    public Optional<ErrorCodeDetail> findErrorCodeByProjectAndCode(Long projectId, String code) {
+        return jdbcTemplate.query("""
+                select id, project_id, code, name, description, solution, http_status
+                from error_code
+                where project_id = ?
+                  and lower(code) = lower(?)
+                order by id
+                limit 1
+                """, ERROR_CODE_ROW_MAPPER, projectId, code).stream().findFirst();
+    }
+
+    public ErrorCodeDetail updateErrorCode(Long errorCodeId, UpdateErrorCodeRequest request) {
+        jdbcTemplate.update("""
+                update error_code
+                set code = ?, name = ?, description = ?, solution = ?, http_status = ?
+                where id = ?
+                """,
+                request.code(),
+                request.name(),
+                request.description(),
+                request.solution(),
+                request.httpStatus(),
+                errorCodeId);
+        return findErrorCode(errorCodeId).orElseThrow();
+    }
+
+    public void deleteErrorCode(Long errorCodeId) {
+        jdbcTemplate.update("delete from error_code where id = ?", errorCodeId);
     }
 
     public Optional<EnvironmentDetail> findEnvironment(Long environmentId) {
@@ -962,6 +1297,25 @@ public class ProjectRepository {
     }
 
     public record ModuleReference(Long id, Long projectId) {
+    }
+
+    public record DictionaryGroupReference(Long id, Long projectId) {
+    }
+
+    public record DictionaryItemReference(Long id, Long groupId, Long projectId) {
+    }
+
+    public record ErrorCodeReference(Long id, Long projectId) {
+    }
+
+    public record ModuleVersionTagRecord(
+            Long id,
+            Long moduleId,
+            String tagName,
+            String description,
+            String snapshotJson,
+            Instant createdAt
+    ) {
     }
 
     public record GroupReference(Long id, Long moduleId, Long projectId) {

@@ -64,6 +64,38 @@ CREATE TABLE environment (
   created_by BIGINT NOT NULL
 );
 
+CREATE TABLE dict_group (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL
+);
+
+CREATE TABLE dict_item (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  code VARCHAR(128) NOT NULL,
+  item_value VARCHAR(256) NOT NULL,
+  description TEXT,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL
+);
+
+CREATE TABLE error_code (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  code VARCHAR(128) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  solution TEXT,
+  http_status INT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL
+);
+
 CREATE TABLE module (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,
@@ -71,6 +103,17 @@ CREATE TABLE module (
   module_key VARCHAR(64) NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_by BIGINT NOT NULL
+);
+
+CREATE TABLE module_version_tag (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  module_id BIGINT NOT NULL,
+  tag_name VARCHAR(64) NOT NULL,
+  description TEXT,
+  snapshot_json CLOB NOT NULL,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (module_id, tag_name)
 );
 
 CREATE TABLE api_group (

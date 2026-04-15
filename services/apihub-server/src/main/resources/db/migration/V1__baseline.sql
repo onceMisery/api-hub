@@ -86,6 +86,44 @@ CREATE TABLE environment (
   UNIQUE KEY uk_environment_project_name (project_id, name)
 );
 
+CREATE TABLE dict_group (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE dict_item (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  code VARCHAR(128) NOT NULL,
+  item_value VARCHAR(256) NOT NULL,
+  description TEXT,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE error_code (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  code VARCHAR(128) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  solution TEXT,
+  http_status INT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
 CREATE TABLE module (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,
@@ -96,6 +134,18 @@ CREATE TABLE module (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_module_project_key (project_id, module_key)
+);
+
+CREATE TABLE module_version_tag (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  module_id BIGINT NOT NULL,
+  tag_name VARCHAR(64) NOT NULL,
+  description TEXT,
+  snapshot_json JSON NOT NULL,
+  created_by BIGINT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uk_module_version_tag_module_name (module_id, tag_name),
+  KEY idx_module_version_tag_module_created (module_id, created_at DESC, id DESC)
 );
 
 CREATE TABLE api_group (

@@ -450,7 +450,7 @@ public class EndpointRepository {
                         template_mode,
                         created_by,
                         updated_by
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     endpointId,
                     item.ruleName(),

@@ -63,6 +63,20 @@ INSERT INTO project_share_link (id, project_id, share_code, name, description, e
 VALUES (3, 1, 'expired-share-code', 'Expired Docs', 'Seed expired share', TRUE, TIMESTAMP '2020-01-01 00:00:00', 1, TIMESTAMP '2026-04-11 10:10:00', TIMESTAMP '2026-04-11 10:10:00');
 
 ALTER TABLE environment ALTER COLUMN id RESTART WITH 2;
+
+INSERT INTO dict_group (id, project_id, name, description, created_by, updated_by)
+VALUES (1, 1, 'UserStatus', '用户状态字典', 1, 1);
+
+INSERT INTO dict_item (id, group_id, code, item_value, description, sort_order, created_by, updated_by)
+VALUES (1, 1, 'ACTIVE', '激活', '正常启用', 0, 1, 1);
+
+INSERT INTO error_code (id, project_id, code, name, description, solution, http_status, created_by, updated_by)
+VALUES (1, 1, 'USER_NOT_FOUND', '用户不存在', '指定用户不存在', '检查用户 ID 是否正确', 404, 1, 1);
+
+ALTER TABLE dict_group ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE dict_item ALTER COLUMN id RESTART WITH 2;
+ALTER TABLE error_code ALTER COLUMN id RESTART WITH 2;
+
 ALTER TABLE module ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_group ALTER COLUMN id RESTART WITH 2;
 ALTER TABLE api_endpoint ALTER COLUMN id RESTART WITH 2;

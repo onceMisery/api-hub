@@ -22,17 +22,30 @@ import com.apihub.mock.model.MockDtos.MockRuleDetail;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
 import com.apihub.mock.service.MockRuntimeResolver;
 import com.apihub.project.model.ProjectDtos.CreateGroupRequest;
+import com.apihub.project.model.ProjectDtos.CreateDictionaryGroupRequest;
+import com.apihub.project.model.ProjectDtos.CreateDictionaryItemRequest;
 import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
+import com.apihub.project.model.ProjectDtos.CreateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
+import com.apihub.project.model.ProjectDtos.DictionaryGroupDetail;
+import com.apihub.project.model.ProjectDtos.DictionaryImportResult;
+import com.apihub.project.model.ProjectDtos.DictionaryItemDetail;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.EndpointTreeItem;
+import com.apihub.project.model.ProjectDtos.ErrorCodeDetail;
+import com.apihub.project.model.ProjectDtos.ErrorCodeImportResult;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.GroupTreeItem;
+import com.apihub.project.model.ProjectDtos.ImportDictionaryRequest;
+import com.apihub.project.model.ProjectDtos.ImportErrorCodeRequest;
+import com.apihub.project.model.ProjectDtos.CreateModuleVersionTagRequest;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleTreeItem;
+import com.apihub.project.model.ProjectDtos.ModuleVersionTagDetail;
+import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
@@ -40,18 +53,23 @@ import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectDocPushRequest;
+import com.apihub.project.model.ProjectDtos.UpdateDictionaryGroupRequest;
+import com.apihub.project.model.ProjectDtos.UpdateDictionaryItemRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
+import com.apihub.project.model.ProjectDtos.UpdateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateModuleRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectRequest;
 import com.apihub.project.repository.ProjectRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -59,7 +77,7 @@ import java.util.List;
 public class ProjectService {
 
     private static final long LEGACY_FALLBACK_SPACE_ID = 1L;
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
@@ -242,6 +260,33 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    public List<ModuleVersionTagDetail> listModuleVersionTags(Long userId, Long moduleId) {
+        requireModuleReadAccess(userId, moduleId);
+        return projectRepository.listModuleVersionTags(moduleId).stream()
+                .map(this::toModuleVersionTagDetail)
+                .toList();
+    }
+
+    public ModuleVersionTagDetail createModuleVersionTag(Long userId, Long moduleId, CreateModuleVersionTagRequest request) {
+        requireModuleWriteAccess(userId, moduleId);
+        if (request == null || request.tagName() == null || request.tagName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Module version tag name is required");
+        }
+
+        List<ModuleVersionTagEndpointSnapshot> snapshots = projectRepository.listModuleEndpointReleaseSnapshots(moduleId).stream()
+                .sorted(Comparator.comparing(ModuleVersionTagEndpointSnapshot::path).thenComparing(ModuleVersionTagEndpointSnapshot::method))
+                .toList();
+        String snapshotJson = writeJson(snapshots);
+        ProjectRepository.ModuleVersionTagRecord record = projectRepository.createModuleVersionTag(
+                userId,
+                moduleId,
+                request.tagName().trim(),
+                request.description() == null ? "" : request.description().trim(),
+                snapshotJson);
+        return toModuleVersionTagDetail(record);
+    }
+
+    @Transactional(readOnly = true)
     public List<GroupDetail> listGroups(Long moduleId) {
         return listGroups(1L, moduleId);
     }
@@ -321,6 +366,10 @@ public class ProjectService {
         }
     }
 
+    private String normalizeNullableText(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     public void deleteEnvironment(Long environmentId) {
         deleteEnvironment(1L, environmentId);
     }
@@ -328,6 +377,200 @@ public class ProjectService {
     public void deleteEnvironment(Long userId, Long environmentId) {
         requireEnvironmentWriteAccess(userId, environmentId);
         projectRepository.deleteEnvironment(environmentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DictionaryGroupDetail> listDictionaryGroups(Long userId, Long projectId) {
+        requireProjectReadAccess(userId, projectId);
+        return projectRepository.listDictionaryGroups(projectId);
+    }
+
+    public DictionaryGroupDetail createDictionaryGroup(Long userId, Long projectId, CreateDictionaryGroupRequest request) {
+        requireProjectWriteAccess(userId, projectId);
+        if (request == null || request.name() == null || request.name().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary group name is required");
+        }
+        return projectRepository.createDictionaryGroup(userId, projectId, request);
+    }
+
+    public DictionaryImportResult importDictionaryGroups(Long userId, Long projectId, ImportDictionaryRequest request) {
+        requireProjectWriteAccess(userId, projectId);
+        if (request == null || request.groups() == null || request.groups().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary import groups are required");
+        }
+
+        int createdGroups = 0;
+        int updatedGroups = 0;
+        int createdItems = 0;
+        int updatedItems = 0;
+
+        for (var groupPayload : request.groups()) {
+            if (groupPayload == null || groupPayload.name() == null || groupPayload.name().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary group name is required");
+            }
+
+            String groupName = groupPayload.name().trim();
+            DictionaryGroupDetail existingGroup = projectRepository.findDictionaryGroupByProjectAndName(projectId, groupName).orElse(null);
+            DictionaryGroupDetail targetGroup;
+            if (existingGroup == null) {
+                targetGroup = projectRepository.createDictionaryGroup(userId, projectId, new CreateDictionaryGroupRequest(
+                        groupName,
+                        normalizeNullableText(groupPayload.description())));
+                createdGroups++;
+            } else {
+                targetGroup = projectRepository.updateDictionaryGroup(existingGroup.id(), new UpdateDictionaryGroupRequest(
+                        groupName,
+                        normalizeNullableText(groupPayload.description())));
+                updatedGroups++;
+            }
+
+            if (groupPayload.items() == null || groupPayload.items().isEmpty()) {
+                continue;
+            }
+
+            for (var itemPayload : groupPayload.items()) {
+                if (itemPayload == null || itemPayload.code() == null || itemPayload.code().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary item code is required");
+                }
+                if (itemPayload.value() == null || itemPayload.value().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary item value is required");
+                }
+
+                String code = itemPayload.code().trim();
+                DictionaryItemDetail existingItem = projectRepository.findDictionaryItemByGroupAndCode(targetGroup.id(), code).orElse(null);
+                if (existingItem == null) {
+                    projectRepository.createDictionaryItem(userId, targetGroup.id(), new CreateDictionaryItemRequest(
+                            code,
+                            itemPayload.value().trim(),
+                            normalizeNullableText(itemPayload.description()),
+                            itemPayload.sortOrder() == null ? 0 : itemPayload.sortOrder()));
+                    createdItems++;
+                } else {
+                    projectRepository.updateDictionaryItem(existingItem.id(), new UpdateDictionaryItemRequest(
+                            code,
+                            itemPayload.value().trim(),
+                            normalizeNullableText(itemPayload.description()),
+                            itemPayload.sortOrder() == null ? existingItem.sortOrder() : itemPayload.sortOrder()));
+                    updatedItems++;
+                }
+            }
+        }
+
+        return new DictionaryImportResult(createdGroups, updatedGroups, createdItems, updatedItems);
+    }
+
+    public DictionaryGroupDetail updateDictionaryGroup(Long userId, Long groupId, UpdateDictionaryGroupRequest request) {
+        ProjectRepository.DictionaryGroupReference group = projectRepository.findDictionaryGroupReference(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary group not found"));
+        requireProjectWriteAccess(userId, group.projectId());
+        return projectRepository.updateDictionaryGroup(groupId, request);
+    }
+
+    public void deleteDictionaryGroup(Long userId, Long groupId) {
+        ProjectRepository.DictionaryGroupReference group = projectRepository.findDictionaryGroupReference(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary group not found"));
+        requireProjectWriteAccess(userId, group.projectId());
+        projectRepository.deleteDictionaryGroup(groupId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DictionaryItemDetail> listDictionaryItems(Long userId, Long groupId) {
+        ProjectRepository.DictionaryGroupReference group = projectRepository.findDictionaryGroupReference(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary group not found"));
+        requireProjectReadAccess(userId, group.projectId());
+        return projectRepository.listDictionaryItems(groupId);
+    }
+
+    public DictionaryItemDetail createDictionaryItem(Long userId, Long groupId, CreateDictionaryItemRequest request) {
+        ProjectRepository.DictionaryGroupReference group = projectRepository.findDictionaryGroupReference(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary group not found"));
+        requireProjectWriteAccess(userId, group.projectId());
+        if (request == null || request.code() == null || request.code().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary item code is required");
+        }
+        return projectRepository.createDictionaryItem(userId, groupId, request);
+    }
+
+    public DictionaryItemDetail updateDictionaryItem(Long userId, Long itemId, UpdateDictionaryItemRequest request) {
+        ProjectRepository.DictionaryItemReference item = projectRepository.findDictionaryItemReference(itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary item not found"));
+        requireProjectWriteAccess(userId, item.projectId());
+        return projectRepository.updateDictionaryItem(itemId, request);
+    }
+
+    public void deleteDictionaryItem(Long userId, Long itemId) {
+        ProjectRepository.DictionaryItemReference item = projectRepository.findDictionaryItemReference(itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary item not found"));
+        requireProjectWriteAccess(userId, item.projectId());
+        projectRepository.deleteDictionaryItem(itemId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ErrorCodeDetail> listErrorCodes(Long userId, Long projectId) {
+        requireProjectReadAccess(userId, projectId);
+        return projectRepository.listErrorCodes(projectId);
+    }
+
+    public ErrorCodeDetail createErrorCode(Long userId, Long projectId, CreateErrorCodeRequest request) {
+        requireProjectWriteAccess(userId, projectId);
+        if (request == null || request.code() == null || request.code().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error code is required");
+        }
+        return projectRepository.createErrorCode(userId, projectId, request);
+    }
+
+    public ErrorCodeImportResult importErrorCodes(Long userId, Long projectId, ImportErrorCodeRequest request) {
+        requireProjectWriteAccess(userId, projectId);
+        if (request == null || request.items() == null || request.items().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error code import items are required");
+        }
+
+        int createdCount = 0;
+        int updatedCount = 0;
+        for (var payload : request.items()) {
+            if (payload == null || payload.code() == null || payload.code().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error code is required");
+            }
+            if (payload.name() == null || payload.name().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error code name is required");
+            }
+
+            String code = payload.code().trim();
+            ErrorCodeDetail existing = projectRepository.findErrorCodeByProjectAndCode(projectId, code).orElse(null);
+            if (existing == null) {
+                projectRepository.createErrorCode(userId, projectId, new CreateErrorCodeRequest(
+                        code,
+                        payload.name().trim(),
+                        normalizeNullableText(payload.description()),
+                        normalizeNullableText(payload.solution()),
+                        payload.httpStatus()));
+                createdCount++;
+            } else {
+                projectRepository.updateErrorCode(existing.id(), new UpdateErrorCodeRequest(
+                        code,
+                        payload.name().trim(),
+                        normalizeNullableText(payload.description()),
+                        normalizeNullableText(payload.solution()),
+                        payload.httpStatus()));
+                updatedCount++;
+            }
+        }
+
+        return new ErrorCodeImportResult(createdCount, updatedCount);
+    }
+
+    public ErrorCodeDetail updateErrorCode(Long userId, Long errorCodeId, UpdateErrorCodeRequest request) {
+        ProjectRepository.ErrorCodeReference errorCode = projectRepository.findErrorCodeReference(errorCodeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Error code not found"));
+        requireProjectWriteAccess(userId, errorCode.projectId());
+        return projectRepository.updateErrorCode(errorCodeId, request);
+    }
+
+    public void deleteErrorCode(Long userId, Long errorCodeId) {
+        ProjectRepository.ErrorCodeReference errorCode = projectRepository.findErrorCodeReference(errorCodeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Error code not found"));
+        requireProjectWriteAccess(userId, errorCode.projectId());
+        projectRepository.deleteErrorCode(errorCodeId);
     }
 
     @Transactional(readOnly = true)
@@ -780,6 +1023,31 @@ public class ProjectService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize mock release snapshot", exception);
         }
+    }
+
+    private List<ModuleVersionTagEndpointSnapshot> readModuleVersionTagSnapshot(String snapshotJson) {
+        try {
+            if (snapshotJson == null || snapshotJson.isBlank()) {
+                return List.of();
+            }
+            return OBJECT_MAPPER.readerForListOf(ModuleVersionTagEndpointSnapshot.class).readValue(snapshotJson);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to parse module version tag snapshot", exception);
+        }
+    }
+
+    private ModuleVersionTagDetail toModuleVersionTagDetail(ProjectRepository.ModuleVersionTagRecord record) {
+        List<ModuleVersionTagEndpointSnapshot> endpoints = readModuleVersionTagSnapshot(record.snapshotJson());
+        int releasedCount = (int) endpoints.stream().filter(item -> item.releasedVersionId() != null).count();
+        return new ModuleVersionTagDetail(
+                record.id(),
+                record.moduleId(),
+                record.tagName(),
+                record.description(),
+                endpoints.size(),
+                releasedCount,
+                endpoints,
+                record.createdAt());
     }
 
     private void validateProjectMemberRequest(UpsertProjectMemberRequest request) {
