@@ -34,7 +34,7 @@ import static org.mockito.BDDMockito.given;
         "spring.datasource.username=sa",
         "spring.datasource.password="
 })
-@Import({TestSuiteService.class, TestSuiteRepository.class, ProjectRepository.class, EndpointRepository.class})
+@Import({TestSuiteService.class, TestSuiteRepository.class, ProjectRepository.class, EndpointRepository.class, TestStepScriptEngine.class})
 @Sql(scripts = "/project-service-schema.sql")
 @Sql(scripts = "/project-service-data.sql")
 class TestSuiteServiceTest {
@@ -149,9 +149,11 @@ class TestSuiteServiceTest {
                         "id=2002",
                         List.of(new DebugHeader("X-Trace-Id", "suite-run")),
                         "{\"trace\":true}",
+                        "",
+                        "",
                         List.of(
-                                new TestAssertionItem("status_equals", "200"),
-                                new TestAssertionItem("body_contains", "ok")),
+                                new TestAssertionItem("status_equals", null, "200"),
+                                new TestAssertionItem("body_contains", null, "ok")),
                         List.of(new TestExtractorItem("traceId", "response_header", "X-Trace-Id")))));
 
         assertThat(updated.steps())
@@ -214,7 +216,9 @@ class TestSuiteServiceTest {
                         "",
                         List.of(),
                         "{}",
-                        List.of(new TestAssertionItem("status_equals", "200")),
+                        "",
+                        "",
+                        List.of(new TestAssertionItem("status_equals", null, "200")),
                         List.of(new TestExtractorItem("token", "body_json_path", "$.data.token"))),
                 new TestStepUpsertItem(
                         1L,
@@ -224,7 +228,9 @@ class TestSuiteServiceTest {
                         "",
                         List.of(new DebugHeader("Authorization", "Bearer {{token}}")),
                         "{}",
-                        List.of(new TestAssertionItem("status_equals", "200")),
+                        "",
+                        "",
+                        List.of(new TestAssertionItem("status_equals", null, "200")),
                         List.of())));
 
         given(debugService.execute(org.mockito.ArgumentMatchers.eq(4L), any()))

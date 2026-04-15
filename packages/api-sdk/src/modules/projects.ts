@@ -331,6 +331,19 @@ export type ErrorCodeImportResult = {
   updatedCount: number;
 };
 
+export type AuditLogDetail = {
+  id: number;
+  projectId: number;
+  actorUserId: number;
+  actorDisplayName: string;
+  actionType: string;
+  resourceType: string;
+  resourceId: number | null;
+  resourceName: string | null;
+  detailJson: string;
+  createdAt: string;
+};
+
 export type CreateDictionaryGroupPayload = {
   name: string;
   description: string;
@@ -662,7 +675,16 @@ export type DebugHistoryFilters = {
 };
 
 export type TestAssertionItem = {
-  type: "status_equals" | "body_contains";
+  type:
+    | "status_equals"
+    | "status_not_equals"
+    | "body_contains"
+    | "body_not_contains"
+    | "response_time_lte"
+    | "json_path_equals"
+    | "json_path_exists"
+    | "json_path_not_empty";
+  expression?: string;
   expectedValue: string;
 };
 
@@ -680,6 +702,8 @@ export type TestStepUpsertItem = {
   queryString: string;
   headers: DebugHeader[];
   body: string;
+  preScript: string;
+  postScript: string;
   assertions: TestAssertionItem[];
   extractors: TestExtractorItem[];
 };
@@ -710,6 +734,8 @@ export type TestStepDetail = {
   queryString: string;
   headers: DebugHeader[];
   body: string;
+  preScript: string;
+  postScript: string;
   assertions: TestAssertionItem[];
   extractors: TestExtractorItem[];
 };
@@ -821,6 +847,7 @@ export type TriggerExecutionReceipt = {
 
 export type TestAssertionResult = {
   type: string;
+  expression?: string | null;
   expectedValue: string;
   passed: boolean;
   actualValue: string;
@@ -838,8 +865,13 @@ export type TestExecutionStepResult = {
   environmentName: string;
   finalUrl: string | null;
   status: "passed" | "failed" | "error";
+  startedAt: string | null;
+  finishedAt: string | null;
   responseStatusCode: number | null;
   durationMs: number;
+  requestQueryString: string | null;
+  requestHeaders: DebugHeader[];
+  requestBody: string | null;
   responseBody: string | null;
   responseHeaders: DebugHeader[];
   assertions: TestAssertionResult[];
@@ -1187,6 +1219,10 @@ export function deleteDictionaryItem(itemId: number) {
 
 export function fetchErrorCodes(projectId: number) {
   return apiFetch<ErrorCodeDetail[]>(`/api/v1/projects/${projectId}/error-codes`);
+}
+
+export function fetchAuditLogs(projectId: number, limit = 80) {
+  return apiFetch<AuditLogDetail[]>(`/api/v1/projects/${projectId}/audit-logs?limit=${limit}`);
 }
 
 export function createErrorCode(projectId: number, payload: CreateErrorCodePayload) {

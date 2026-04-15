@@ -15,6 +15,7 @@ import com.apihub.project.model.ProjectDtos.DictionaryItemDetail;
 import com.apihub.project.model.ProjectDtos.EnvironmentEntry;
 import com.apihub.project.model.ProjectDtos.EnvironmentDetail;
 import com.apihub.project.model.ProjectDtos.ErrorCodeDetail;
+import com.apihub.project.model.ProjectDtos.AuditLogDetail;
 import com.apihub.project.model.ProjectDtos.GroupDetail;
 import com.apihub.project.model.ProjectDtos.ModuleDetail;
 import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
@@ -162,6 +163,18 @@ public class ProjectRepository {
             rs.getString("description"),
             rs.getString("solution"),
             rs.getObject("http_status", Integer.class));
+
+    private static final RowMapper<AuditLogDetail> AUDIT_LOG_ROW_MAPPER = (rs, rowNum) -> new AuditLogDetail(
+            rs.getLong("id"),
+            rs.getLong("project_id"),
+            rs.getLong("actor_user_id"),
+            rs.getString("actor_display_name"),
+            rs.getString("action_type"),
+            rs.getString("resource_type"),
+            rs.getObject("resource_id", Long.class),
+            rs.getString("resource_name"),
+            rs.getString("detail_json"),
+            rs.getTimestamp("created_at").toInstant());
 
     private final JdbcTemplate jdbcTemplate;
     public ProjectRepository(JdbcTemplate jdbcTemplate) {
@@ -958,6 +971,46 @@ public class ProjectRepository {
                 order by id
                 limit 1
                 """, ERROR_CODE_ROW_MAPPER, projectId, code).stream().findFirst();
+    }
+
+    public void createAuditLog(Long projectId,
+                               Long actorUserId,
+                               String actionType,
+                               String resourceType,
+                               Long resourceId,
+                               String resourceName,
+                               String detailJson) {
+        jdbcTemplate.update("""
+                insert into audit_log (project_id, actor_user_id, action_type, resource_type, resource_id, resource_name, detail_json)
+                values (?, ?, ?, ?, ?, ?, ?)
+                """,
+                projectId,
+                actorUserId,
+                actionType,
+                resourceType,
+                resourceId,
+                resourceName,
+                detailJson);
+    }
+
+    public List<AuditLogDetail> listAuditLogs(Long projectId, int limit) {
+        return jdbcTemplate.query("""
+                select audit.id,
+                       audit.project_id,
+                       audit.actor_user_id,
+                       coalesce(user_entry.display_name, user_entry.username, concat('User#', audit.actor_user_id)) as actor_display_name,
+                       audit.action_type,
+                       audit.resource_type,
+                       audit.resource_id,
+                       audit.resource_name,
+                       audit.detail_json,
+                       audit.created_at
+                from audit_log audit
+                left join sys_user user_entry on user_entry.id = audit.actor_user_id
+                where audit.project_id = ?
+                order by audit.created_at desc, audit.id desc
+                limit ?
+                """, AUDIT_LOG_ROW_MAPPER, projectId, Math.max(1, limit));
     }
 
     public ErrorCodeDetail updateErrorCode(Long errorCodeId, UpdateErrorCodeRequest request) {

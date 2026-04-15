@@ -3,6 +3,7 @@ package com.apihub.testsuite.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.apihub.debug.model.DebugDtos.DebugHeader;
 import com.apihub.testsuite.model.TestSuiteDtos.ExecutionReport;
 import com.apihub.testsuite.model.TestSuiteDtos.TestDashboardExecutionItem;
@@ -33,7 +34,7 @@ import java.util.Optional;
 @Repository
 public class TestSuiteRepository {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -132,6 +133,8 @@ public class TestSuiteRepository {
                        step.query_string,
                        step.request_headers_json,
                        step.request_body,
+                       step.pre_script,
+                       step.post_script,
                        step.assertions_json,
                        step.extractors_json
                 from test_step step
@@ -153,6 +156,8 @@ public class TestSuiteRepository {
                 rs.getString("query_string"),
                 deserializeHeaders(rs.getString("request_headers_json")),
                 rs.getString("request_body"),
+                rs.getString("pre_script"),
+                rs.getString("post_script"),
                 deserializeAssertions(rs.getString("assertions_json")),
                 deserializeExtractors(rs.getString("extractors_json"))), suiteId);
     }
@@ -172,12 +177,14 @@ public class TestSuiteRepository {
                         query_string,
                         request_headers_json,
                         request_body,
+                        pre_script,
+                        post_script,
                         assertions_json,
                         extractors_json,
                         created_by,
                         updated_by
                     )
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     suiteId,
                     step.endpointId(),
@@ -188,6 +195,8 @@ public class TestSuiteRepository {
                     normalizeNullable(step.queryString()),
                     serializeHeaders(step.headers()),
                     normalizeNullable(step.body()),
+                    normalizeNullable(step.preScript()),
+                    normalizeNullable(step.postScript()),
                     serializeAssertions(step.assertions()),
                     serializeExtractors(step.extractors()),
                     userId,

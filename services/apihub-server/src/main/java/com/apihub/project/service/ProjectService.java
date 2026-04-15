@@ -28,6 +28,7 @@ import com.apihub.project.model.ProjectDtos.CreateModuleRequest;
 import com.apihub.project.model.ProjectDtos.CreateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.CreateProjectRequest;
 import com.apihub.project.model.ProjectDtos.CreateSpaceRequest;
+import com.apihub.project.model.ProjectDtos.AuditLogDetail;
 import com.apihub.project.model.ProjectDtos.CreateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.DebugTargetRuleEntry;
 import com.apihub.project.model.ProjectDtos.DictionaryGroupDetail;
@@ -71,6 +72,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Transactional
@@ -145,7 +147,11 @@ public class ProjectService {
     public ProjectDetail createProject(Long userId, Long spaceId, CreateProjectRequest request) {
         Long targetSpaceId = resolveTargetSpaceId(userId, spaceId);
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
-        return projectRepository.createProject(userId, targetSpaceId, request);
+        ProjectDetail created = projectRepository.createProject(userId, targetSpaceId, request);
+        recordAudit(created.id(), userId, "project.create", "project", created.id(), created.name(), Map.of(
+                "projectKey", created.projectKey(),
+                "spaceId", created.spaceId() == null ? 0L : created.spaceId()));
+        return created;
     }
 
     @Transactional(readOnly = true)
@@ -168,12 +174,14 @@ public class ProjectService {
                 ? request.debugAllowedHosts()
                 : current.debugAllowedHosts();
         debugTargetRuleValidator.validateRules(debugAllowedHosts);
-        return projectRepository.updateProject(
+        ProjectDetail updated = projectRepository.updateProject(
                 userId,
                 projectId,
                 request.name() != null ? request.name() : current.name(),
                 request.description() != null ? request.description() : current.description(),
                 debugAllowedHosts);
+        recordAudit(projectId, userId, "project.update", "project", updated.id(), updated.name(), Map.of("projectKey", updated.projectKey()));
+        return updated;
     }
 
     @Transactional(readOnly = true)
@@ -238,7 +246,9 @@ public class ProjectService {
 
     public ModuleDetail createModule(Long userId, Long projectId, CreateModuleRequest request) {
         requireProjectWriteAccess(userId, projectId);
-        return projectRepository.createModule(userId, projectId, request);
+        ModuleDetail created = projectRepository.createModule(userId, projectId, request);
+        recordAudit(projectId, userId, "module.create", "module", created.id(), created.name(), Map.of());
+        return created;
     }
 
     public ModuleDetail updateModule(Long moduleId, UpdateModuleRequest request) {
@@ -246,8 +256,10 @@ public class ProjectService {
     }
 
     public ModuleDetail updateModule(Long userId, Long moduleId, UpdateModuleRequest request) {
-        requireModuleWriteAccess(userId, moduleId);
-        return projectRepository.updateModule(moduleId, request);
+        ProjectRepository.ModuleReference module = requireModuleWriteAccess(userId, moduleId);
+        ModuleDetail updated = projectRepository.updateModule(moduleId, request);
+        recordAudit(module.projectId(), userId, "module.update", "module", updated.id(), updated.name(), Map.of());
+        return updated;
     }
 
     public void deleteModule(Long moduleId) {
@@ -255,8 +267,9 @@ public class ProjectService {
     }
 
     public void deleteModule(Long userId, Long moduleId) {
-        requireModuleWriteAccess(userId, moduleId);
+        ProjectRepository.ModuleReference module = requireModuleWriteAccess(userId, moduleId);
         projectRepository.deleteModule(moduleId);
+        recordAudit(module.projectId(), userId, "module.delete", "module", moduleId, "module#" + moduleId, Map.of());
     }
 
     @Transactional(readOnly = true)
@@ -283,7 +296,12 @@ public class ProjectService {
                 request.tagName().trim(),
                 request.description() == null ? "" : request.description().trim(),
                 snapshotJson);
-        return toModuleVersionTagDetail(record);
+        ModuleVersionTagDetail detail = toModuleVersionTagDetail(record);
+        ProjectRepository.ModuleReference module = projectRepository.findModuleReference(moduleId).orElseThrow();
+        recordAudit(module.projectId(), userId, "module.tag.create", "module_version_tag", detail.id(), detail.tagName(), Map.of(
+                "moduleId", moduleId,
+                "endpointCount", detail.endpointCount()));
+        return detail;
     }
 
     @Transactional(readOnly = true)
@@ -302,8 +320,10 @@ public class ProjectService {
     }
 
     public GroupDetail createGroup(Long userId, Long moduleId, CreateGroupRequest request) {
-        requireModuleWriteAccess(userId, moduleId);
-        return projectRepository.createGroup(userId, moduleId, request);
+        ProjectRepository.ModuleReference module = requireModuleWriteAccess(userId, moduleId);
+        GroupDetail created = projectRepository.createGroup(userId, moduleId, request);
+        recordAudit(module.projectId(), userId, "group.create", "group", created.id(), created.name(), Map.of("moduleId", moduleId));
+        return created;
     }
 
     public GroupDetail updateGroup(Long groupId, UpdateGroupRequest request) {
@@ -311,8 +331,10 @@ public class ProjectService {
     }
 
     public GroupDetail updateGroup(Long userId, Long groupId, UpdateGroupRequest request) {
-        requireGroupWriteAccess(userId, groupId);
-        return projectRepository.updateGroup(groupId, request);
+        ProjectRepository.GroupReference group = requireGroupWriteAccess(userId, groupId);
+        GroupDetail updated = projectRepository.updateGroup(groupId, request);
+        recordAudit(group.projectId(), userId, "group.update", "group", updated.id(), updated.name(), Map.of("moduleId", group.moduleId()));
+        return updated;
     }
 
     public void deleteGroup(Long groupId) {
@@ -320,8 +342,9 @@ public class ProjectService {
     }
 
     public void deleteGroup(Long userId, Long groupId) {
-        requireGroupWriteAccess(userId, groupId);
+        ProjectRepository.GroupReference group = requireGroupWriteAccess(userId, groupId);
         projectRepository.deleteGroup(groupId);
+        recordAudit(group.projectId(), userId, "group.delete", "group", groupId, "group#" + groupId, Map.of("moduleId", group.moduleId()));
     }
 
     @Transactional(readOnly = true)
@@ -344,7 +367,9 @@ public class ProjectService {
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode());
         validateEnvironmentAuthMode(request.authMode());
-        return projectRepository.createEnvironment(userId, projectId, request);
+        EnvironmentDetail created = projectRepository.createEnvironment(userId, projectId, request);
+        recordAudit(projectId, userId, "environment.create", "environment", created.id(), created.name(), Map.of("baseUrl", created.baseUrl()));
+        return created;
     }
 
     public EnvironmentDetail updateEnvironment(Long environmentId, UpdateEnvironmentRequest request) {
@@ -356,7 +381,9 @@ public class ProjectService {
         debugTargetRuleValidator.validateRules(request.debugAllowedHosts() != null ? request.debugAllowedHosts() : current.debugAllowedHosts());
         debugTargetRuleValidator.validateEnvironmentMode(request.debugHostMode() != null ? request.debugHostMode() : current.debugHostMode());
         validateEnvironmentAuthMode(request.authMode() != null ? request.authMode() : current.authMode());
-        return projectRepository.updateEnvironment(environmentId, request);
+        EnvironmentDetail updated = projectRepository.updateEnvironment(environmentId, request);
+        recordAudit(updated.projectId(), userId, "environment.update", "environment", updated.id(), updated.name(), Map.of("baseUrl", updated.baseUrl()));
+        return updated;
     }
 
     private void validateEnvironmentAuthMode(String authMode) {
@@ -375,8 +402,9 @@ public class ProjectService {
     }
 
     public void deleteEnvironment(Long userId, Long environmentId) {
-        requireEnvironmentWriteAccess(userId, environmentId);
+        EnvironmentDetail environment = requireEnvironmentWriteAccess(userId, environmentId);
         projectRepository.deleteEnvironment(environmentId);
+        recordAudit(environment.projectId(), userId, "environment.delete", "environment", environmentId, environment.name(), Map.of());
     }
 
     @Transactional(readOnly = true)
@@ -390,7 +418,9 @@ public class ProjectService {
         if (request == null || request.name() == null || request.name().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary group name is required");
         }
-        return projectRepository.createDictionaryGroup(userId, projectId, request);
+        DictionaryGroupDetail created = projectRepository.createDictionaryGroup(userId, projectId, request);
+        recordAudit(projectId, userId, "dictionary.group.create", "dictionary_group", created.id(), created.name(), Map.of());
+        return created;
     }
 
     public DictionaryImportResult importDictionaryGroups(Long userId, Long projectId, ImportDictionaryRequest request) {
@@ -463,7 +493,9 @@ public class ProjectService {
         ProjectRepository.DictionaryGroupReference group = projectRepository.findDictionaryGroupReference(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary group not found"));
         requireProjectWriteAccess(userId, group.projectId());
-        return projectRepository.updateDictionaryGroup(groupId, request);
+        DictionaryGroupDetail updated = projectRepository.updateDictionaryGroup(groupId, request);
+        recordAudit(group.projectId(), userId, "dictionary.group.update", "dictionary_group", updated.id(), updated.name(), Map.of());
+        return updated;
     }
 
     public void deleteDictionaryGroup(Long userId, Long groupId) {
@@ -471,6 +503,7 @@ public class ProjectService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary group not found"));
         requireProjectWriteAccess(userId, group.projectId());
         projectRepository.deleteDictionaryGroup(groupId);
+        recordAudit(group.projectId(), userId, "dictionary.group.delete", "dictionary_group", groupId, "dictionary_group#" + groupId, Map.of());
     }
 
     @Transactional(readOnly = true)
@@ -488,14 +521,18 @@ public class ProjectService {
         if (request == null || request.code() == null || request.code().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dictionary item code is required");
         }
-        return projectRepository.createDictionaryItem(userId, groupId, request);
+        DictionaryItemDetail created = projectRepository.createDictionaryItem(userId, groupId, request);
+        recordAudit(group.projectId(), userId, "dictionary.item.create", "dictionary_item", created.id(), created.code(), Map.of("groupId", groupId));
+        return created;
     }
 
     public DictionaryItemDetail updateDictionaryItem(Long userId, Long itemId, UpdateDictionaryItemRequest request) {
         ProjectRepository.DictionaryItemReference item = projectRepository.findDictionaryItemReference(itemId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary item not found"));
         requireProjectWriteAccess(userId, item.projectId());
-        return projectRepository.updateDictionaryItem(itemId, request);
+        DictionaryItemDetail updated = projectRepository.updateDictionaryItem(itemId, request);
+        recordAudit(item.projectId(), userId, "dictionary.item.update", "dictionary_item", updated.id(), updated.code(), Map.of("groupId", item.groupId()));
+        return updated;
     }
 
     public void deleteDictionaryItem(Long userId, Long itemId) {
@@ -503,6 +540,7 @@ public class ProjectService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dictionary item not found"));
         requireProjectWriteAccess(userId, item.projectId());
         projectRepository.deleteDictionaryItem(itemId);
+        recordAudit(item.projectId(), userId, "dictionary.item.delete", "dictionary_item", itemId, "dictionary_item#" + itemId, Map.of("groupId", item.groupId()));
     }
 
     @Transactional(readOnly = true)
@@ -516,7 +554,9 @@ public class ProjectService {
         if (request == null || request.code() == null || request.code().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error code is required");
         }
-        return projectRepository.createErrorCode(userId, projectId, request);
+        ErrorCodeDetail created = projectRepository.createErrorCode(userId, projectId, request);
+        recordAudit(projectId, userId, "error_code.create", "error_code", created.id(), created.code(), Map.of("name", created.name()));
+        return created;
     }
 
     public ErrorCodeImportResult importErrorCodes(Long userId, Long projectId, ImportErrorCodeRequest request) {
@@ -563,7 +603,9 @@ public class ProjectService {
         ProjectRepository.ErrorCodeReference errorCode = projectRepository.findErrorCodeReference(errorCodeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Error code not found"));
         requireProjectWriteAccess(userId, errorCode.projectId());
-        return projectRepository.updateErrorCode(errorCodeId, request);
+        ErrorCodeDetail updated = projectRepository.updateErrorCode(errorCodeId, request);
+        recordAudit(errorCode.projectId(), userId, "error_code.update", "error_code", updated.id(), updated.code(), Map.of("name", updated.name()));
+        return updated;
     }
 
     public void deleteErrorCode(Long userId, Long errorCodeId) {
@@ -571,6 +613,7 @@ public class ProjectService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Error code not found"));
         requireProjectWriteAccess(userId, errorCode.projectId());
         projectRepository.deleteErrorCode(errorCodeId);
+        recordAudit(errorCode.projectId(), userId, "error_code.delete", "error_code", errorCodeId, "error_code#" + errorCodeId, Map.of());
     }
 
     @Transactional(readOnly = true)
@@ -609,7 +652,9 @@ public class ProjectService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove the last project admin");
         }
 
-        return projectRepository.saveProjectMember(projectId, targetMember.userId(), request);
+        ProjectMemberDetail saved = projectRepository.saveProjectMember(projectId, targetMember.userId(), request);
+        recordAudit(projectId, userId, "project.member.upsert", "project_member", saved.userId(), saved.username(), Map.of("roleCode", saved.roleCode()));
+        return saved;
     }
 
     public void deleteProjectMember(Long projectId, Long memberUserId) {
@@ -624,6 +669,7 @@ public class ProjectService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot remove the last project admin");
         }
         projectRepository.deleteProjectMember(projectId, memberUserId);
+        recordAudit(projectId, userId, "project.member.delete", "project_member", member.userId(), member.username(), Map.of("roleCode", member.roleCode()));
     }
 
     @Transactional(readOnly = true)
@@ -642,7 +688,10 @@ public class ProjectService {
     }
 
     public EndpointDetail createEndpoint(Long userId, Long groupId, CreateEndpointRequest request) {
-        return endpointRepository.createEndpoint(userId, requireGroupWriteAccess(userId, groupId), request);
+        ProjectRepository.GroupReference group = requireGroupWriteAccess(userId, groupId);
+        EndpointDetail created = endpointRepository.createEndpoint(userId, group, request);
+        recordAudit(group.projectId(), userId, "endpoint.create", "endpoint", created.id(), created.name(), Map.of("method", created.method(), "path", created.path()));
+        return created;
     }
 
     @Transactional(readOnly = true)
@@ -661,12 +710,15 @@ public class ProjectService {
 
     public EndpointDetail updateEndpoint(Long userId, Long endpointId, UpdateEndpointRequest request) {
         EndpointDetail current = requireEndpointWriteAccess(userId, endpointId);
-        return endpointRepository.updateEndpoint(userId, endpointId, new UpdateEndpointRequest(
+        EndpointDetail updated = endpointRepository.updateEndpoint(userId, endpointId, new UpdateEndpointRequest(
                 request.name() != null ? request.name() : current.name(),
                 request.method() != null ? request.method() : current.method(),
                 request.path() != null ? request.path() : current.path(),
                 request.description() != null ? request.description() : current.description(),
                 request.mockEnabled() != null ? request.mockEnabled() : current.mockEnabled()));
+        Long projectId = endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId();
+        recordAudit(projectId, userId, "endpoint.update", "endpoint", updated.id(), updated.name(), Map.of("method", updated.method(), "path", updated.path()));
+        return updated;
     }
 
     public void deleteEndpoint(Long endpointId) {
@@ -675,7 +727,9 @@ public class ProjectService {
 
     public void deleteEndpoint(Long userId, Long endpointId) {
         requireEndpointWriteAccess(userId, endpointId);
+        Long projectId = endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId();
         endpointRepository.deleteEndpoint(endpointId);
+        recordAudit(projectId, userId, "endpoint.delete", "endpoint", endpointId, "endpoint#" + endpointId, Map.of());
     }
 
     @Transactional(readOnly = true)
@@ -696,6 +750,7 @@ public class ProjectService {
     public void replaceParameters(Long userId, Long endpointId, List<ParameterUpsertItem> items) {
         requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceParameters(endpointId, items);
+        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "endpoint.parameters.replace", "endpoint", endpointId, "endpoint#" + endpointId, Map.of("count", items == null ? 0 : items.size()));
     }
 
     @Transactional(readOnly = true)
@@ -716,6 +771,7 @@ public class ProjectService {
     public void replaceResponses(Long userId, Long endpointId, List<ResponseUpsertItem> items) {
         requireEndpointWriteAccess(userId, endpointId);
         endpointRepository.replaceResponses(endpointId, items);
+        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "endpoint.responses.replace", "endpoint", endpointId, "endpoint#" + endpointId, Map.of("count", items == null ? 0 : items.size()));
     }
 
     @Transactional(readOnly = true)
@@ -782,7 +838,9 @@ public class ProjectService {
                         rule.templateMode()))
                 .toList());
 
-        return endpointRepository.createMockRelease(userId, endpointId, responseSnapshotJson, rulesSnapshotJson);
+        MockReleaseDetail release = endpointRepository.createMockRelease(userId, endpointId, responseSnapshotJson, rulesSnapshotJson);
+        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "mock.release.publish", "endpoint", endpointId, "endpoint#" + endpointId, Map.of("releaseId", release.id()));
+        return release;
     }
 
     public MockSimulationResult simulateMock(Long endpointId, MockSimulationRequest request) {
@@ -829,7 +887,9 @@ public class ProjectService {
 
     public VersionDetail createVersion(Long userId, Long endpointId, CreateVersionRequest request) {
         requireEndpointWriteAccess(userId, endpointId);
-        return endpointRepository.createVersion(userId, endpointId, request);
+        VersionDetail created = endpointRepository.createVersion(userId, endpointId, request);
+        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "version.create", "version", created.id(), created.version(), Map.of("endpointId", endpointId));
+        return created;
     }
 
     public EndpointDetail releaseVersion(Long endpointId, Long versionId) {
@@ -843,7 +903,9 @@ public class ProjectService {
         if (!endpointId.equals(version.endpointId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found");
         }
-        return endpointRepository.releaseVersion(userId, endpointId, versionId);
+        EndpointDetail released = endpointRepository.releaseVersion(userId, endpointId, versionId);
+        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "version.release", "version", versionId, version.version(), Map.of("endpointId", endpointId));
+        return released;
     }
 
     public EndpointDetail clearEndpointRelease(Long endpointId) {
@@ -852,7 +914,9 @@ public class ProjectService {
 
     public EndpointDetail clearEndpointRelease(Long userId, Long endpointId) {
         requireEndpointWriteAccess(userId, endpointId);
-        return endpointRepository.clearReleasedVersion(userId, endpointId);
+        EndpointDetail cleared = endpointRepository.clearReleasedVersion(userId, endpointId);
+        recordAudit(endpointRepository.findEndpointReference(endpointId).orElseThrow().projectId(), userId, "version.release.clear", "endpoint", endpointId, cleared.name(), Map.of());
+        return cleared;
     }
 
     @Transactional(readOnly = true)
@@ -1023,6 +1087,29 @@ public class ProjectService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize mock release snapshot", exception);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuditLogDetail> listAuditLogs(Long userId, Long projectId, int limit) {
+        requireProjectReadAccess(userId, projectId);
+        return projectRepository.listAuditLogs(projectId, limit);
+    }
+
+    private void recordAudit(Long projectId,
+                             Long actorUserId,
+                             String actionType,
+                             String resourceType,
+                             Long resourceId,
+                             String resourceName,
+                             Map<String, Object> detail) {
+        projectRepository.createAuditLog(
+                projectId,
+                actorUserId,
+                actionType,
+                resourceType,
+                resourceId,
+                resourceName,
+                writeJson(detail));
     }
 
     private List<ModuleVersionTagEndpointSnapshot> readModuleVersionTagSnapshot(String snapshotJson) {

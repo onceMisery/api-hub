@@ -13,7 +13,7 @@ public final class TestSuiteDtos {
     public record UpsertTestSuiteRequest(String name, String description) {
     }
 
-    public record TestAssertionItem(String type, String expectedValue) {
+    public record TestAssertionItem(String type, String expression, String expectedValue) {
     }
 
     public record TestExtractorItem(String variableName, String sourceType, String expression) {
@@ -27,6 +27,8 @@ public final class TestSuiteDtos {
             String queryString,
             List<DebugHeader> headers,
             String body,
+            String preScript,
+            String postScript,
             List<TestAssertionItem> assertions,
             List<TestExtractorItem> extractors
     ) {
@@ -59,6 +61,8 @@ public final class TestSuiteDtos {
             String queryString,
             List<DebugHeader> headers,
             String body,
+            String preScript,
+            String postScript,
             List<TestAssertionItem> assertions,
             List<TestExtractorItem> extractors
     ) {
@@ -177,6 +181,7 @@ public final class TestSuiteDtos {
 
     public record AssertionResult(
             String type,
+            String expression,
             String expectedValue,
             boolean passed,
             String actualValue,
@@ -203,8 +208,13 @@ public final class TestSuiteDtos {
             String environmentName,
             String finalUrl,
             String status,
+            Instant startedAt,
+            Instant finishedAt,
             Integer responseStatusCode,
             long durationMs,
+            String requestQueryString,
+            List<DebugHeader> requestHeaders,
+            String requestBody,
             String responseBody,
             List<DebugHeader> responseHeaders,
             List<AssertionResult> assertions,

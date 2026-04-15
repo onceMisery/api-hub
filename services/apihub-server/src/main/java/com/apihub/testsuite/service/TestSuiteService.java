@@ -71,15 +71,18 @@ public class TestSuiteService {
     private final EndpointRepository endpointRepository;
     private final DebugService debugService;
     private final TestSuiteRepository testSuiteRepository;
+    private final TestStepScriptEngine testStepScriptEngine;
 
     public TestSuiteService(ProjectRepository projectRepository,
                             EndpointRepository endpointRepository,
                             DebugService debugService,
-                            TestSuiteRepository testSuiteRepository) {
+                            TestSuiteRepository testSuiteRepository,
+                            TestStepScriptEngine testStepScriptEngine) {
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.debugService = debugService;
         this.testSuiteRepository = testSuiteRepository;
+        this.testStepScriptEngine = testStepScriptEngine;
     }
 
     @Transactional(readOnly = true)
@@ -275,9 +278,21 @@ public class TestSuiteService {
 
         for (TestStepDetail step : steps) {
             try {
-                String resolvedQueryString = substituteVariables(step.queryString(), variables);
-                List<DebugHeader> resolvedHeaders = substituteHeaders(step.headers(), variables);
-                String resolvedBody = substituteVariables(step.body(), variables);
+                Instant stepStartedAt = Instant.now();
+                TestStepScriptEngine.MutableRequest mutableRequest = new TestStepScriptEngine.MutableRequest(
+                        step.queryString(),
+                        step.body(),
+                        step.headers());
+                testStepScriptEngine.runPreScript(
+                        step.preScript(),
+                        step.endpointId(),
+                        step.environmentId(),
+                        step.name(),
+                        mutableRequest,
+                        variables);
+                String resolvedQueryString = substituteVariables(mutableRequest.getQueryString(), variables);
+                List<DebugHeader> resolvedHeaders = substituteHeaders(mutableRequest.toHeaders(), variables);
+                String resolvedBody = substituteVariables(mutableRequest.getBody(), variables);
                 ExecuteDebugResponse response = debugService.execute(executorUserId, new ExecuteDebugRequest(
                         step.environmentId(),
                         step.endpointId(),
@@ -286,7 +301,18 @@ public class TestSuiteService {
                         resolvedBody));
                 List<AssertionResult> assertions = evaluateAssertions(step.assertions(), response);
                 List<ExtractedVariableResult> extractedVariables = extractVariables(step.extractors(), response, variables);
+                testStepScriptEngine.runPostScript(
+                        step.postScript(),
+                        step.endpointId(),
+                        step.environmentId(),
+                        step.name(),
+                        mutableRequest,
+                        response,
+                        assertions,
+                        extractedVariables,
+                        variables);
                 boolean stepPassed = assertions.stream().allMatch(AssertionResult::passed);
+                Instant stepFinishedAt = Instant.now();
                 if (stepPassed) {
                     passedSteps++;
                 } else {
@@ -303,14 +329,20 @@ public class TestSuiteService {
                         step.environmentName(),
                         response.finalUrl(),
                         stepPassed ? "passed" : "failed",
+                        stepStartedAt,
+                        stepFinishedAt,
                         response.statusCode(),
                         response.durationMs(),
+                        resolvedQueryString,
+                        resolvedHeaders,
+                        resolvedBody,
                         response.responseBody(),
                         response.responseHeaders(),
                         assertions,
                         extractedVariables,
                         null));
             } catch (ResponseStatusException exception) {
+                Instant stepFinishedAt = Instant.now();
                 failedSteps++;
                 hasErrors = true;
                 results.add(new TestExecutionStepResult(
@@ -324,14 +356,20 @@ public class TestSuiteService {
                         step.environmentName(),
                         null,
                         "error",
+                        stepFinishedAt,
+                        stepFinishedAt,
                         null,
                         0,
+                        null,
+                        List.of(),
+                        null,
                         null,
                         List.of(),
                         List.of(),
                         List.of(),
                         exception.getReason() == null ? exception.getMessage() : exception.getReason()));
             } catch (RuntimeException exception) {
+                Instant stepFinishedAt = Instant.now();
                 failedSteps++;
                 hasErrors = true;
                 results.add(new TestExecutionStepResult(
@@ -345,8 +383,13 @@ public class TestSuiteService {
                         step.environmentName(),
                         null,
                         "error",
+                        stepFinishedAt,
+                        stepFinishedAt,
                         null,
                         0,
+                        null,
+                        List.of(),
+                        null,
                         null,
                         List.of(),
                         List.of(),
@@ -423,6 +466,8 @@ public class TestSuiteService {
                     item.queryString() == null ? "" : item.queryString(),
                     normalizeHeaders(item.headers()),
                     item.body() == null ? "" : item.body(),
+                    item.preScript() == null ? "" : item.preScript(),
+                    item.postScript() == null ? "" : item.postScript(),
                     normalizeAssertions(item.assertions()),
                     normalizeExtractors(item.extractors())));
         }
@@ -453,14 +498,21 @@ public class TestSuiteService {
                 continue;
             }
             String type = assertion.type().trim().toLowerCase();
+            String expression = assertion.expression() == null ? "" : assertion.expression().trim();
             String expectedValue = assertion.expectedValue() == null ? "" : assertion.expectedValue().trim();
-            if (!List.of("status_equals", "body_contains").contains(type)) {
+            if (!List.of("status_equals", "status_not_equals", "body_contains", "body_not_contains", "response_time_lte", "json_path_equals", "json_path_exists", "json_path_not_empty").contains(type)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported test assertion type");
             }
-            if (expectedValue.isBlank()) {
+            if (List.of("status_equals", "status_not_equals", "body_contains", "body_not_contains", "response_time_lte").contains(type) && expectedValue.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Test assertion expected value is required");
             }
-            normalized.add(new TestAssertionItem(type, expectedValue));
+            if (List.of("json_path_equals", "json_path_exists", "json_path_not_empty").contains(type) && expression.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Test assertion expression is required");
+            }
+            if ("json_path_equals".equals(type) && expectedValue.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Test assertion expected value is required");
+            }
+            normalized.add(new TestAssertionItem(type, expression, expectedValue));
         }
         return normalized;
     }
@@ -506,17 +558,64 @@ public class TestSuiteService {
             if ("status_equals".equals(assertion.type())) {
                 String actual = String.valueOf(response.statusCode());
                 boolean passed = actual.equals(assertion.expectedValue());
-                results.add(new AssertionResult(assertion.type(), assertion.expectedValue(), passed, actual, passed ? "HTTP status matched" : "HTTP status mismatched"));
+                results.add(new AssertionResult(assertion.type(), assertion.expression(), assertion.expectedValue(), passed, actual, passed ? "HTTP status matched" : "HTTP status mismatched"));
+                continue;
+            }
+            if ("status_not_equals".equals(assertion.type())) {
+                String actual = String.valueOf(response.statusCode());
+                boolean passed = !actual.equals(assertion.expectedValue());
+                results.add(new AssertionResult(assertion.type(), assertion.expression(), assertion.expectedValue(), passed, actual, passed ? "HTTP status is different as expected" : "HTTP status unexpectedly matched"));
+                continue;
+            }
+            if ("response_time_lte".equals(assertion.type())) {
+                long limit = Long.parseLong(assertion.expectedValue());
+                String actual = String.valueOf(response.durationMs());
+                boolean passed = response.durationMs() <= limit;
+                results.add(new AssertionResult(assertion.type(), assertion.expression(), assertion.expectedValue(), passed, actual, passed ? "Response time within threshold" : "Response time exceeded threshold"));
                 continue;
             }
             String body = response.responseBody() == null ? "" : response.responseBody();
-            boolean passed = body.contains(assertion.expectedValue());
+            if ("body_contains".equals(assertion.type())) {
+                boolean passed = body.contains(assertion.expectedValue());
+                results.add(new AssertionResult(
+                        assertion.type(),
+                        assertion.expression(),
+                        assertion.expectedValue(),
+                        passed,
+                        passed ? assertion.expectedValue() : abbreviate(body),
+                        passed ? "Response body contains expected text" : "Response body does not contain expected text"));
+                continue;
+            }
+            if ("body_not_contains".equals(assertion.type())) {
+                boolean passed = !body.contains(assertion.expectedValue());
+                results.add(new AssertionResult(
+                        assertion.type(),
+                        assertion.expression(),
+                        assertion.expectedValue(),
+                        passed,
+                        abbreviate(body),
+                        passed ? "Response body does not contain forbidden text" : "Response body contains forbidden text"));
+                continue;
+            }
+            JsonNode bodyNode = readBodyNode(body);
+            String actual = resolveJsonPath(bodyNode, assertion.expression());
+            if ("json_path_exists".equals(assertion.type())) {
+                boolean passed = actual != null;
+                results.add(new AssertionResult(assertion.type(), assertion.expression(), assertion.expectedValue(), passed, actual == null ? "" : actual, passed ? "JSONPath value exists" : "JSONPath value not found"));
+                continue;
+            }
+            if ("json_path_not_empty".equals(assertion.type())) {
+                boolean passed = actual != null && !actual.isBlank() && !"null".equalsIgnoreCase(actual);
+                results.add(new AssertionResult(assertion.type(), assertion.expression(), assertion.expectedValue(), passed, actual == null ? "" : actual, passed ? "JSONPath value is not empty" : "JSONPath value is empty"));
+                continue;
+            }
             results.add(new AssertionResult(
                     assertion.type(),
+                    assertion.expression(),
                     assertion.expectedValue(),
-                    passed,
-                    passed ? assertion.expectedValue() : abbreviate(body),
-                    passed ? "Response body contains expected text" : "Response body does not contain expected text"));
+                    actual != null && actual.equals(assertion.expectedValue()),
+                    actual == null ? "" : actual,
+                    actual != null && actual.equals(assertion.expectedValue()) ? "JSONPath value matched" : "JSONPath value mismatched"));
         }
         return results;
     }

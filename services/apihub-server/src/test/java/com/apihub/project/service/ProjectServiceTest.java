@@ -162,6 +162,20 @@ class ProjectServiceTest {
     }
 
     @Test
+    void shouldRecordAuditLogsForProjectWrites() {
+        var module = projectService.createModule(1L, 1L, new CreateModuleRequest("Audit Module"));
+        projectService.createDictionaryGroup(1L, 1L, new CreateDictionaryGroupRequest("AuditDict", "audit"));
+
+        assertThat(projectService.listAuditLogs(1L, 1L, 20))
+                .extracting("actionType", "resourceType")
+                .contains(
+                        tuple("module.create", "module"),
+                        tuple("dictionary.group.create", "dictionary_group"));
+        assertThat(projectService.listAuditLogs(1L, 1L, 20))
+                .anySatisfy(log -> assertThat(log.resourceId()).isEqualTo(module.id()));
+    }
+
+    @Test
     void shouldAllowEditorToWriteProjectResources() {
         var module = projectService.createModule(3L, 1L, new CreateModuleRequest("Editor Module"));
 

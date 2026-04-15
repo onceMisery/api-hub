@@ -236,6 +236,20 @@ public final class ProjectDtos {
     public record ErrorCodeImportResult(int createdCount, int updatedCount) {
     }
 
+    public record AuditLogDetail(
+            Long id,
+            Long projectId,
+            Long actorUserId,
+            String actorDisplayName,
+            String actionType,
+            String resourceType,
+            Long resourceId,
+            String resourceName,
+            String detailJson,
+            Instant createdAt
+    ) {
+    }
+
     public record CreateGroupRequest(String name) {
     }
 

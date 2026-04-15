@@ -280,6 +280,8 @@ CREATE TABLE test_step (
   query_string CLOB,
   request_headers_json CLOB NOT NULL,
   request_body CLOB,
+  pre_script CLOB,
+  post_script CLOB,
   assertions_json CLOB NOT NULL,
   extractors_json CLOB NOT NULL,
   created_by BIGINT NOT NULL,
@@ -341,3 +343,17 @@ CREATE TABLE test_suite_schedule (
 
 CREATE UNIQUE INDEX uk_test_suite_schedule_suite_id ON test_suite_schedule (suite_id);
 CREATE INDEX idx_test_suite_schedule_next_run ON test_suite_schedule (enabled, next_run_at, id);
+
+CREATE TABLE audit_log (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  actor_user_id BIGINT NOT NULL,
+  action_type VARCHAR(64) NOT NULL,
+  resource_type VARCHAR(64) NOT NULL,
+  resource_id BIGINT,
+  resource_name VARCHAR(255),
+  detail_json CLOB NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_audit_log_project_created ON audit_log (project_id, created_at DESC, id DESC);
