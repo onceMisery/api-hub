@@ -33,28 +33,28 @@ public class AiSettingsService {
 
     @Transactional(readOnly = true)
     public ProjectAiSettingsDetail getProjectAiSettings(Long userId, Long projectId) {
-        requireProjectWriteAccess(userId, projectId);
+        requireProjectReadAccess(userId, projectId);
         return aiSettingsRepository.findByProjectId(projectId)
-                .map(AiSettingsRepository::toDetail)
-                .orElseGet(() -> defaultDetail(projectId));
+                .map(record -> AiSettingsRepository.toDetail(record, canManageProjectAiSettings(userId, projectId)))
+                .orElseGet(() -> defaultDetail(projectId, canManageProjectAiSettings(userId, projectId)));
     }
 
     public ProjectAiSettingsDetail updateProjectAiSettings(Long userId,
                                                            Long projectId,
                                                            UpdateProjectAiSettingsRequest request) {
-        requireProjectWriteAccess(userId, projectId);
+        requireProjectAdminAccess(userId, projectId);
         ProjectAiSettingsRecord current = aiSettingsRepository.findByProjectId(projectId).orElse(null);
         UpdateProjectAiSettingsRequest normalized = normalizeForSave(request, current);
         validate(normalized, current != null && current.apiKey() != null && !current.apiKey().isBlank());
         ProjectAiSettingsRecord saved = aiSettingsRepository.save(userId, projectId, normalized, current);
-        return AiSettingsRepository.toDetail(saved);
+        return AiSettingsRepository.toDetail(saved, true);
     }
 
     @Transactional(readOnly = true)
     public AiConnectionTestResult testProjectAiSettings(Long userId,
                                                         Long projectId,
                                                         UpdateProjectAiSettingsRequest request) {
-        requireProjectWriteAccess(userId, projectId);
+        requireProjectAdminAccess(userId, projectId);
         ProjectAiSettingsRecord current = aiSettingsRepository.findByProjectId(projectId).orElse(null);
         UpdateProjectAiSettingsRequest normalized = normalizeForTest(request, current);
         validate(normalized, normalized.apiKey() != null && !normalized.apiKey().isBlank());
@@ -94,7 +94,7 @@ public class AiSettingsService {
         return settings;
     }
 
-    private ProjectAiSettingsDetail defaultDetail(Long projectId) {
+    private ProjectAiSettingsDetail defaultDetail(Long projectId, boolean canManage) {
         return new ProjectAiSettingsDetail(
                 null,
                 projectId,
@@ -107,6 +107,7 @@ public class AiSettingsService {
                 30000,
                 false,
                 false,
+                canManage,
                 null);
     }
 
@@ -159,10 +160,20 @@ public class AiSettingsService {
         }
     }
 
-    private void requireProjectWriteAccess(Long userId, Long projectId) {
-        if (!projectRepository.canWriteProject(userId, projectId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project write access is required");
+    private void requireProjectReadAccess(Long userId, Long projectId) {
+        if (!projectRepository.canAccessProject(userId, projectId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found");
         }
+    }
+
+    private void requireProjectAdminAccess(Long userId, Long projectId) {
+        if (!projectRepository.canManageProjectAiSettings(userId, projectId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Project administrator access is required");
+        }
+    }
+
+    private boolean canManageProjectAiSettings(Long userId, Long projectId) {
+        return projectRepository.canManageProjectAiSettings(userId, projectId);
     }
 
     private String normalizeProviderType(String value) {

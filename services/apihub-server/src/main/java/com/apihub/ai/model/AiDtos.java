@@ -20,6 +20,7 @@ public final class AiDtos {
             int timeoutMs,
             boolean enabled,
             boolean apiKeyConfigured,
+            boolean canManage,
             Instant updatedAt
     ) {
     }

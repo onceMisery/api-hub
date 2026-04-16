@@ -52,10 +52,12 @@ import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.ProjectResourcePermissionDetail;
 import com.apihub.project.model.ProjectDtos.ProjectWebhookDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.ProjectTreeResponse;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
+import com.apihub.project.model.ProjectDtos.UpsertProjectResourcePermissionRequest;
 import com.apihub.project.model.ProjectDtos.UpdateProjectDocPushRequest;
 import com.apihub.project.model.ProjectDtos.UpdateDictionaryGroupRequest;
 import com.apihub.project.model.ProjectDtos.UpdateDictionaryItemRequest;
@@ -249,7 +251,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<ModuleDetail> listModules(Long userId, Long projectId) {
         requireProjectReadAccess(userId, projectId);
-        return projectRepository.listModules(projectId);
+        return projectRepository.listModules(userId, projectId);
     }
 
     public ModuleDetail createModule(Long projectId, CreateModuleRequest request) {
@@ -326,7 +328,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<GroupDetail> listGroups(Long userId, Long moduleId) {
         requireModuleReadAccess(userId, moduleId);
-        return projectRepository.listGroups(moduleId);
+        return projectRepository.listGroups(userId, moduleId);
     }
 
     public GroupDetail createGroup(Long moduleId, CreateGroupRequest request) {
@@ -686,6 +688,45 @@ public class ProjectService {
         }
         projectRepository.deleteProjectMember(projectId, memberUserId);
         recordAudit(projectId, userId, "project.member.delete", "project_member", member.userId(), member.username(), Map.of("roleCode", member.roleCode()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectResourcePermissionDetail> listProjectResourcePermissions(Long userId, Long projectId) {
+        requireProjectMemberAdminAccess(userId, projectId);
+        return projectRepository.listProjectResourcePermissions(projectId);
+    }
+
+    public ProjectResourcePermissionDetail saveProjectResourcePermission(Long userId,
+                                                                         Long projectId,
+                                                                         UpsertProjectResourcePermissionRequest request) {
+        requireProjectMemberAdminAccess(userId, projectId);
+        ProjectResourcePermissionRequest normalized = normalizeProjectResourcePermissionRequest(projectId, request);
+        ProjectResourcePermissionDetail saved = projectRepository.saveProjectResourcePermission(
+                userId,
+                projectId,
+                normalized.targetUserId(),
+                normalized.resourceType(),
+                normalized.resourceId(),
+                normalized.permissionLevel());
+        recordAudit(projectId, userId, "project.permission.upsert", "project_resource_permission", saved.id(), saved.username(), Map.of(
+                "resourceType", saved.resourceType(),
+                "resourceId", saved.resourceId(),
+                "permissionLevel", saved.permissionLevel()));
+        return saved;
+    }
+
+    public void deleteProjectResourcePermission(Long userId, Long projectId, Long permissionId) {
+        requireProjectMemberAdminAccess(userId, projectId);
+        ProjectRepository.ProjectResourcePermissionReference reference = projectRepository.findProjectResourcePermissionReference(permissionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource permission not found"));
+        if (!projectId.equals(reference.projectId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource permission not found");
+        }
+        projectRepository.deleteProjectResourcePermission(permissionId);
+        recordAudit(projectId, userId, "project.permission.delete", "project_resource_permission", permissionId, reference.userId() + "", Map.of(
+                "resourceType", reference.resourceType(),
+                "resourceId", reference.resourceId(),
+                "permissionLevel", reference.permissionLevel()));
     }
 
     @Transactional(readOnly = true)
@@ -1073,13 +1114,17 @@ public class ProjectService {
     private ProjectRepository.GroupReference requireGroupReadAccess(Long userId, Long groupId) {
         ProjectRepository.GroupReference group = projectRepository.findGroupReference(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
-        requireProjectReadAccess(userId, group.projectId());
+        if (!projectRepository.canAccessProject(userId, group.projectId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found");
+        }
         return group;
     }
 
     private ProjectRepository.GroupReference requireGroupWriteAccess(Long userId, Long groupId) {
         ProjectRepository.GroupReference group = requireGroupReadAccess(userId, groupId);
-        requireProjectWriteAccess(userId, group.projectId());
+        if (!projectRepository.canWriteGroup(userId, groupId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Group write access denied");
+        }
         return group;
     }
 
@@ -1095,7 +1140,9 @@ public class ProjectService {
         EndpointDetail endpoint = requireEndpointReadAccess(userId, endpointId);
         EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
-        requireProjectWriteAccess(userId, endpointReference.projectId());
+        if (!projectRepository.canWriteGroup(userId, endpointReference.groupId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Endpoint write access denied");
+        }
         return endpoint;
     }
 
@@ -1283,5 +1330,52 @@ public class ProjectService {
         if (!List.of("project_admin", "editor", "tester", "viewer").contains(request.roleCode())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported project member role");
         }
+    }
+
+    private ProjectResourcePermissionRequest normalizeProjectResourcePermissionRequest(Long projectId,
+                                                                                      UpsertProjectResourcePermissionRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Resource permission request is required");
+        }
+        String resourceType = normalizeLowercase(request.resourceType());
+        if (!Set.of("project", "group").contains(resourceType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported resource type");
+        }
+        String permissionLevel = normalizeLowercase(request.permissionLevel());
+        if (!Set.of("preview", "manage").contains(permissionLevel)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported permission level");
+        }
+        String username = request.username() == null ? "" : request.username().trim();
+        if (username.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is required");
+        }
+        var targetUser = authUserRepository.findActiveByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found"));
+        Long resourceId = request.resourceId();
+        if ("project".equals(resourceType)) {
+            resourceId = projectId;
+        } else {
+            if (resourceId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group id is required");
+            }
+            ProjectRepository.GroupReference group = projectRepository.findGroupReference(resourceId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+            if (!projectId.equals(group.projectId())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found");
+            }
+        }
+        return new ProjectResourcePermissionRequest(targetUser.id(), resourceType, resourceId, permissionLevel);
+    }
+
+    private String normalizeLowercase(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private record ProjectResourcePermissionRequest(
+            Long targetUserId,
+            String resourceType,
+            Long resourceId,
+            String permissionLevel
+    ) {
     }
 }

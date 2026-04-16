@@ -23,9 +23,11 @@ import com.apihub.project.model.ProjectDtos.ModuleVersionTagEndpointSnapshot;
 import com.apihub.project.model.ProjectDtos.ProjectDetail;
 import com.apihub.project.model.ProjectDtos.ProjectDocPushSettings;
 import com.apihub.project.model.ProjectDtos.ProjectMemberDetail;
+import com.apihub.project.model.ProjectDtos.ProjectResourcePermissionDetail;
 import com.apihub.project.model.ProjectDtos.ProjectWebhookDetail;
 import com.apihub.project.model.ProjectDtos.SpaceSummary;
 import com.apihub.project.model.ProjectDtos.UpsertProjectMemberRequest;
+import com.apihub.project.model.ProjectDtos.UpsertProjectResourcePermissionRequest;
 import com.apihub.project.model.ProjectDtos.UpdateEnvironmentRequest;
 import com.apihub.project.model.ProjectDtos.UpdateErrorCodeRequest;
 import com.apihub.project.model.ProjectDtos.UpdateGroupRequest;
@@ -72,7 +74,11 @@ public class ProjectRepository {
             rs.getString("name"),
             rs.getString("project_key"),
             rs.getString("description"),
-            deserializeDebugRules(rs.getString("debug_allowed_hosts_json")));
+            deserializeDebugRules(rs.getString("debug_allowed_hosts_json")),
+            null,
+            false,
+            false,
+            false);
 
     private static final RowMapper<ProjectDetail> PROJECT_ACCESS_ROW_MAPPER = (rs, rowNum) -> new ProjectDetail(
             rs.getLong("id"),
@@ -85,7 +91,8 @@ public class ProjectRepository {
             deserializeDebugRules(rs.getString("debug_allowed_hosts_json")),
             rs.getString("current_user_role"),
             rs.getBoolean("can_write"),
-            rs.getBoolean("can_manage_members"));
+            rs.getBoolean("can_manage_members"),
+            rs.getBoolean("can_manage_ai_settings"));
 
     private static final RowMapper<ProjectMemberDetail> PROJECT_MEMBER_ROW_MAPPER = (rs, rowNum) -> new ProjectMemberDetail(
             rs.getLong("user_id"),
@@ -191,6 +198,19 @@ public class ProjectRepository {
             rs.getTimestamp("created_at").toInstant(),
             rs.getTimestamp("updated_at").toInstant());
 
+    private static final RowMapper<ProjectResourcePermissionDetail> PROJECT_RESOURCE_PERMISSION_ROW_MAPPER = (rs, rowNum) -> new ProjectResourcePermissionDetail(
+            rs.getLong("id"),
+            rs.getLong("project_id"),
+            rs.getString("resource_type"),
+            rs.getLong("resource_id"),
+            rs.getString("resource_name"),
+            rs.getLong("user_id"),
+            rs.getString("username"),
+            rs.getString("display_name"),
+            rs.getString("email"),
+            rs.getString("permission_level"),
+            rs.getTimestamp("created_at").toInstant());
+
     private static final RowMapper<WebhookDeliveryDetail> WEBHOOK_DELIVERY_ROW_MAPPER = (rs, rowNum) -> new WebhookDeliveryDetail(
             rs.getLong("id"),
             rs.getLong("project_id"),
@@ -231,28 +251,97 @@ public class ProjectRepository {
                                 project.debug_allowed_hosts_json,
                                 case
                                     when project.owner_id = ? then 'project_admin'
-                                    else project_member.role_code
+                                    when project_member.id is not null then project_member.role_code
+                                    when exists (
+                                        select 1
+                                        from project_resource_permission permission
+                                        where permission.project_id = project.id
+                                          and permission.user_id = ?
+                                          and permission.resource_type = 'project'
+                                          and permission.permission_level = 'manage'
+                                    ) then 'resource_manage'
+                                    when exists (
+                                        select 1
+                                        from project_resource_permission permission
+                                        where permission.project_id = project.id
+                                          and permission.user_id = ?
+                                          and permission.resource_type = 'project'
+                                          and permission.permission_level = 'preview'
+                                    ) then 'resource_preview'
+                                    when exists (
+                                        select 1
+                                        from project_resource_permission permission
+                                        join api_group g on g.id = permission.resource_id
+                                        where permission.user_id = ?
+                                          and permission.resource_type = 'group'
+                                          and permission.permission_level = 'manage'
+                                          and g.project_id = project.id
+                                    ) then 'resource_manage'
+                                    when exists (
+                                        select 1
+                                        from project_resource_permission permission
+                                        join api_group g on g.id = permission.resource_id
+                                        where permission.user_id = ?
+                                          and permission.resource_type = 'group'
+                                          and permission.permission_level = 'preview'
+                                          and g.project_id = project.id
+                                    ) then 'resource_preview'
+                                    else null
                                 end as current_user_role,
                                 case
                                     when project.owner_id = ? then true
                                     when project_member.role_code in ('project_admin', 'editor') then true
+                                    when exists (
+                                        select 1
+                                        from project_resource_permission permission
+                                        where permission.project_id = project.id
+                                          and permission.user_id = ?
+                                          and permission.resource_type = 'project'
+                                          and permission.permission_level = 'manage'
+                                    ) then true
                                     else false
                                 end as can_write,
                                 case
                                     when project.owner_id = ? then true
                                     when project_member.role_code = 'project_admin' then true
                                     else false
-                                end as can_manage_members
+                                end as can_manage_members,
+                                case
+                                    when project.owner_id = ? then true
+                                    when project_member.role_code = 'project_admin' then true
+                                    else false
+                                end as can_manage_ai_settings
                 from project
                 join space on space.id = project.space_id
                 left join project_member
                   on project_member.project_id = project.id
                  and project_member.user_id = ?
                  and project_member.member_status = 'active'
-                where project.owner_id = ?
-                   or project_member.id is not null
+                where (
+                        project.owner_id = ?
+                     or project_member.id is not null
+                     or exists (
+                        select 1
+                        from project_resource_permission permission
+                        where permission.project_id = project.id
+                          and permission.user_id = ?
+                          and permission.resource_type = 'project'
+                          and permission.permission_level in ('preview', 'manage')
+                     )
+                     or exists (
+                        select 1
+                        from project_resource_permission permission
+                        join api_group g on g.id = permission.resource_id
+                        where permission.user_id = ?
+                          and permission.resource_type = 'group'
+                          and permission.permission_level in ('preview', 'manage')
+                          and g.project_id = project.id
+                     )
+                )
                 """);
-        List<Object> params = new ArrayList<>(List.of(userId, userId, userId, userId, userId));
+        List<Object> params = new ArrayList<>(List.of(
+                userId, userId, userId, userId, userId,
+                userId, userId, userId, userId, userId, userId, userId, userId, userId, userId));
         if (spaceId != null) {
             sql.append(" and project.space_id = ? ");
             params.add(spaceId);
@@ -290,6 +379,23 @@ public class ProjectRepository {
                      and project_member.member_status = 'active'
                     where project.owner_id = ?
                        or project_member.id is not null
+                       or exists (
+                            select 1
+                            from project_resource_permission permission
+                            where permission.project_id = project.id
+                              and permission.user_id = ?
+                              and permission.resource_type = 'project'
+                              and permission.permission_level in ('preview', 'manage')
+                       )
+                       or exists (
+                            select 1
+                            from project_resource_permission permission
+                            join api_group g on g.id = permission.resource_id
+                            where permission.user_id = ?
+                              and permission.resource_type = 'group'
+                              and permission.permission_level in ('preview', 'manage')
+                              and g.project_id = project.id
+                       )
                     group by project.space_id
                 ) projects
                   on projects.space_id = space.id
@@ -297,7 +403,7 @@ public class ProjectRepository {
                    or space_member.id is not null
                    or projects.project_count > 0
                 order by space.id
-                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId);
+                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId);
     }
 
     public SpaceSummary createSpace(Long userId, CreateSpaceRequest request) {
@@ -338,18 +444,66 @@ public class ProjectRepository {
                        project.debug_allowed_hosts_json,
                        case
                            when project.owner_id = ? then 'project_admin'
-                           else project_member.role_code
+                           when project_member.id is not null then project_member.role_code
+                           when exists (
+                                select 1
+                                from project_resource_permission permission
+                                where permission.project_id = project.id
+                                  and permission.user_id = ?
+                                  and permission.resource_type = 'project'
+                                  and permission.permission_level = 'manage'
+                           ) then 'resource_manage'
+                           when exists (
+                                select 1
+                                from project_resource_permission permission
+                                where permission.project_id = project.id
+                                  and permission.user_id = ?
+                                  and permission.resource_type = 'project'
+                                  and permission.permission_level = 'preview'
+                           ) then 'resource_preview'
+                           when exists (
+                                select 1
+                                from project_resource_permission permission
+                                join api_group g on g.id = permission.resource_id
+                                where permission.user_id = ?
+                                  and permission.resource_type = 'group'
+                                  and permission.permission_level = 'manage'
+                                  and g.project_id = project.id
+                           ) then 'resource_manage'
+                           when exists (
+                                select 1
+                                from project_resource_permission permission
+                                join api_group g on g.id = permission.resource_id
+                                where permission.user_id = ?
+                                  and permission.resource_type = 'group'
+                                  and permission.permission_level = 'preview'
+                                  and g.project_id = project.id
+                           ) then 'resource_preview'
+                           else null
                        end as current_user_role,
                        case
                            when project.owner_id = ? then true
                            when project_member.role_code in ('project_admin', 'editor') then true
+                           when exists (
+                                select 1
+                                from project_resource_permission permission
+                                where permission.project_id = project.id
+                                  and permission.user_id = ?
+                                  and permission.resource_type = 'project'
+                                  and permission.permission_level = 'manage'
+                           ) then true
                            else false
                        end as can_write,
                        case
                            when project.owner_id = ? then true
                            when project_member.role_code = 'project_admin' then true
                            else false
-                       end as can_manage_members
+                       end as can_manage_members,
+                       case
+                           when project.owner_id = ? then true
+                           when project_member.role_code = 'project_admin' then true
+                           else false
+                       end as can_manage_ai_settings
                 from project
                 join space on space.id = project.space_id
                 left join project_member
@@ -357,8 +511,30 @@ public class ProjectRepository {
                  and project_member.user_id = ?
                  and project_member.member_status = 'active'
                 where project.id = ?
-                  and (project.owner_id = ? or project_member.id is not null)
-                """, PROJECT_ACCESS_ROW_MAPPER, userId, userId, userId, userId, projectId, userId).stream().findFirst();
+                  and (
+                        project.owner_id = ?
+                     or project_member.id is not null
+                     or exists (
+                        select 1
+                        from project_resource_permission permission
+                        where permission.project_id = project.id
+                          and permission.user_id = ?
+                          and permission.resource_type = 'project'
+                          and permission.permission_level in ('preview', 'manage')
+                     )
+                     or exists (
+                        select 1
+                        from project_resource_permission permission
+                        join api_group g on g.id = permission.resource_id
+                        where permission.user_id = ?
+                          and permission.resource_type = 'group'
+                          and permission.permission_level in ('preview', 'manage')
+                          and g.project_id = project.id
+                     )
+                  )
+                """, PROJECT_ACCESS_ROW_MAPPER,
+                userId, userId, userId, userId, userId,
+                userId, userId, userId, userId, userId, projectId, userId, userId, userId, userId, userId).stream().findFirst();
     }
 
     public Optional<SpaceSummary> findSpaceSummary(Long userId, Long spaceId) {
@@ -390,6 +566,23 @@ public class ProjectRepository {
                      and project_member.member_status = 'active'
                     where project.owner_id = ?
                        or project_member.id is not null
+                       or exists (
+                            select 1
+                            from project_resource_permission permission
+                            where permission.project_id = project.id
+                              and permission.user_id = ?
+                              and permission.resource_type = 'project'
+                              and permission.permission_level in ('preview', 'manage')
+                       )
+                       or exists (
+                            select 1
+                            from project_resource_permission permission
+                            join api_group g on g.id = permission.resource_id
+                            where permission.user_id = ?
+                              and permission.resource_type = 'group'
+                              and permission.permission_level in ('preview', 'manage')
+                              and g.project_id = project.id
+                       )
                     group by project.space_id
                 ) projects
                   on projects.space_id = space.id
@@ -399,7 +592,7 @@ public class ProjectRepository {
                      or space_member.id is not null
                      or projects.project_count > 0
                   )
-                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, spaceId, userId).stream().findFirst();
+                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, spaceId, userId).stream().findFirst();
     }
 
     public Optional<ProjectDetail> findProject(Long projectId) {
@@ -465,34 +658,11 @@ public class ProjectRepository {
     }
 
     public boolean canAccessProject(Long userId, Long projectId) {
-        Integer matched = jdbcTemplate.queryForObject("""
-                select count(*)
-                from project
-                left join project_member
-                  on project_member.project_id = project.id
-                 and project_member.user_id = ?
-                 and project_member.member_status = 'active'
-                where project.id = ?
-                  and (project.owner_id = ? or project_member.id is not null)
-                """, Integer.class, userId, projectId, userId);
-        return matched != null && matched > 0;
+        return findProject(userId, projectId).isPresent();
     }
 
     public boolean canWriteProject(Long userId, Long projectId) {
-        Integer matched = jdbcTemplate.queryForObject("""
-                select count(*)
-                from project
-                left join project_member
-                  on project_member.project_id = project.id
-                 and project_member.user_id = ?
-                 and project_member.member_status = 'active'
-                where project.id = ?
-                  and (
-                        project.owner_id = ?
-                     or project_member.role_code in ('project_admin', 'editor')
-                  )
-                """, Integer.class, userId, projectId, userId);
-        return matched != null && matched > 0;
+        return findProject(userId, projectId).map(ProjectDetail::canWrite).orElse(false);
     }
 
     public boolean canTestProject(Long userId, Long projectId) {
@@ -513,6 +683,14 @@ public class ProjectRepository {
     }
 
     public boolean canManageProjectMembers(Long userId, Long projectId) {
+        return findProject(userId, projectId).map(ProjectDetail::canManageMembers).orElse(false);
+    }
+
+    public boolean canManageProjectAiSettings(Long userId, Long projectId) {
+        return findProject(userId, projectId).map(ProjectDetail::canManageAiSettings).orElse(false);
+    }
+
+    public boolean hasProjectScopeAccess(Long userId, Long projectId) {
         Integer matched = jdbcTemplate.queryForObject("""
                 select count(*)
                 from project
@@ -523,9 +701,76 @@ public class ProjectRepository {
                 where project.id = ?
                   and (
                         project.owner_id = ?
-                     or project_member.role_code = 'project_admin'
+                     or project_member.id is not null
+                     or exists (
+                          select 1
+                          from project_resource_permission permission
+                          where permission.project_id = project.id
+                            and permission.user_id = ?
+                            and permission.resource_type = 'project'
+                            and permission.permission_level in ('preview', 'manage')
+                      )
                   )
-                """, Integer.class, userId, projectId, userId);
+                """, Integer.class, userId, projectId, userId, userId);
+        return matched != null && matched > 0;
+    }
+
+    public boolean hasProjectScopeWriteAccess(Long userId, Long projectId) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from project
+                left join project_member
+                  on project_member.project_id = project.id
+                 and project_member.user_id = ?
+                 and project_member.member_status = 'active'
+                where project.id = ?
+                  and (
+                        project.owner_id = ?
+                     or project_member.role_code in ('project_admin', 'editor')
+                     or exists (
+                          select 1
+                          from project_resource_permission permission
+                          where permission.project_id = project.id
+                            and permission.user_id = ?
+                            and permission.resource_type = 'project'
+                            and permission.permission_level = 'manage'
+                      )
+                  )
+                """, Integer.class, userId, projectId, userId, userId);
+        return matched != null && matched > 0;
+    }
+
+    public boolean canAccessGroup(Long userId, Long groupId) {
+        GroupReference group = findGroupReference(groupId).orElse(null);
+        if (group == null) {
+            return false;
+        }
+        if (canAccessProject(userId, group.projectId())) {
+            return true;
+        }
+        return hasGroupPermission(userId, groupId, "preview") || hasGroupPermission(userId, groupId, "manage");
+    }
+
+    public boolean canWriteGroup(Long userId, Long groupId) {
+        GroupReference group = findGroupReference(groupId).orElse(null);
+        if (group == null) {
+            return false;
+        }
+        if (hasProjectScopeWriteAccess(userId, group.projectId())) {
+            return true;
+        }
+        return hasGroupPermission(userId, groupId, "manage");
+    }
+
+    private boolean hasGroupPermission(Long userId, Long groupId, String permissionLevel) {
+        Integer matched = jdbcTemplate.queryForObject("""
+                select count(*)
+                from project_resource_permission permission
+                where permission.resource_type = 'group'
+                  and permission.resource_id = ?
+                  and permission.user_id = ?
+                  and permission.permission_level = ?
+                """, Integer.class, groupId, userId, permissionLevel);
         return matched != null && matched > 0;
     }
 
@@ -587,6 +832,26 @@ public class ProjectRepository {
                 where project_id = ?
                 order by sort_order, id
                 """, MODULE_ROW_MAPPER, projectId);
+    }
+
+    public List<ModuleDetail> listModules(Long userId, Long projectId) {
+        if (hasProjectScopeAccess(userId, projectId)) {
+            return listModules(projectId);
+        }
+        return jdbcTemplate.query("""
+                select distinct module.id,
+                                module.project_id,
+                                module.name
+                from module
+                join api_group on api_group.module_id = module.id
+                join project_resource_permission permission
+                  on permission.resource_type = 'group'
+                 and permission.resource_id = api_group.id
+                 and permission.user_id = ?
+                 and permission.permission_level in ('preview', 'manage')
+                where module.project_id = ?
+                order by module.sort_order, module.id
+                """, MODULE_ROW_MAPPER, userId, projectId);
     }
 
     public Optional<ModuleReference> findModuleReference(Long moduleId) {
@@ -718,6 +983,26 @@ public class ProjectRepository {
                 """, GROUP_ROW_MAPPER, moduleId);
     }
 
+    public List<GroupDetail> listGroups(Long userId, Long moduleId) {
+        ProjectRepository.ModuleReference moduleReference = findModuleReference(moduleId).orElseThrow();
+        if (hasProjectScopeAccess(userId, moduleReference.projectId())) {
+            return listGroups(moduleId);
+        }
+        return jdbcTemplate.query("""
+                select distinct api_group.id,
+                                api_group.module_id,
+                                api_group.name
+                from api_group
+                join project_resource_permission permission
+                  on permission.resource_type = 'group'
+                 and permission.resource_id = api_group.id
+                 and permission.user_id = ?
+                 and permission.permission_level in ('preview', 'manage')
+                where api_group.module_id = ?
+                order by api_group.sort_order, api_group.id
+                """, GROUP_ROW_MAPPER, userId, moduleId);
+    }
+
     public Optional<GroupReference> findGroupReference(Long groupId) {
         return jdbcTemplate.query("""
                 select g.id, g.module_id, m.project_id
@@ -782,6 +1067,11 @@ public class ProjectRepository {
     }
 
     public void deleteGroup(Long groupId) {
+        jdbcTemplate.update("""
+                delete from project_resource_permission
+                where resource_type = 'group'
+                  and resource_id = ?
+                """, groupId);
         jdbcTemplate.update("delete from api_group where id = ?", groupId);
     }
 
@@ -1423,6 +1713,140 @@ public class ProjectRepository {
                 """, projectId, userId);
     }
 
+    public List<ProjectResourcePermissionDetail> listProjectResourcePermissions(Long projectId) {
+        return jdbcTemplate.query("""
+                select permission.id,
+                       permission.project_id,
+                       permission.resource_type,
+                       permission.resource_id,
+                       case
+                           when permission.resource_type = 'project' then project.name
+                           else api_group.name
+                       end as resource_name,
+                       permission.user_id,
+                       u.username,
+                       u.display_name,
+                       u.email,
+                       permission.permission_level,
+                       permission.created_at
+                from project_resource_permission permission
+                join sys_user u
+                  on u.id = permission.user_id
+                left join project
+                  on permission.resource_type = 'project'
+                 and project.id = permission.resource_id
+                left join api_group
+                  on permission.resource_type = 'group'
+                 and api_group.id = permission.resource_id
+                where permission.project_id = ?
+                order by permission.resource_type, permission.resource_id, permission.id
+                """, PROJECT_RESOURCE_PERMISSION_ROW_MAPPER, projectId);
+    }
+
+    public Optional<ProjectResourcePermissionReference> findProjectResourcePermissionReference(Long permissionId) {
+        return jdbcTemplate.query("""
+                select id,
+                       project_id,
+                       resource_type,
+                       resource_id,
+                       user_id,
+                       permission_level
+                from project_resource_permission
+                where id = ?
+                """, (rs, rowNum) -> new ProjectResourcePermissionReference(
+                rs.getLong("id"),
+                rs.getLong("project_id"),
+                rs.getString("resource_type"),
+                rs.getLong("resource_id"),
+                rs.getLong("user_id"),
+                rs.getString("permission_level")), permissionId).stream().findFirst();
+    }
+
+    public ProjectResourcePermissionDetail saveProjectResourcePermission(Long actorUserId,
+                                                                        Long projectId,
+                                                                        Long targetUserId,
+                                                                        String resourceType,
+                                                                        Long resourceId,
+                                                                        String permissionLevel) {
+        Integer existingId = jdbcTemplate.query("""
+                select id
+                from project_resource_permission
+                where project_id = ?
+                  and resource_type = ?
+                  and resource_id = ?
+                  and user_id = ?
+                """, rs -> rs.next() ? rs.getInt("id") : null, projectId, resourceType, resourceId, targetUserId);
+
+        if (existingId == null) {
+            jdbcTemplate.update("""
+                    insert into project_resource_permission (
+                        project_id,
+                        resource_type,
+                        resource_id,
+                        user_id,
+                        permission_level,
+                        created_by,
+                        updated_by
+                    ) values (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    projectId,
+                    resourceType,
+                    resourceId,
+                    targetUserId,
+                    permissionLevel,
+                    actorUserId,
+                    actorUserId);
+        } else {
+            jdbcTemplate.update("""
+                    update project_resource_permission
+                    set permission_level = ?,
+                        updated_by = ?
+                    where id = ?
+                    """, permissionLevel, actorUserId, existingId);
+        }
+
+        return findProjectResourcePermission(projectId, resourceType, resourceId, targetUserId).orElseThrow();
+    }
+
+    public Optional<ProjectResourcePermissionDetail> findProjectResourcePermission(Long projectId,
+                                                                                   String resourceType,
+                                                                                   Long resourceId,
+                                                                                   Long userId) {
+        return jdbcTemplate.query("""
+                select permission.id,
+                       permission.project_id,
+                       permission.resource_type,
+                       permission.resource_id,
+                       case
+                           when permission.resource_type = 'project' then project.name
+                           else api_group.name
+                       end as resource_name,
+                       permission.user_id,
+                       u.username,
+                       u.display_name,
+                       u.email,
+                       permission.permission_level,
+                       permission.created_at
+                from project_resource_permission permission
+                join sys_user u
+                  on u.id = permission.user_id
+                left join project
+                  on permission.resource_type = 'project'
+                 and project.id = permission.resource_id
+                left join api_group
+                  on permission.resource_type = 'group'
+                 and api_group.id = permission.resource_id
+                where permission.project_id = ?
+                  and permission.resource_type = ?
+                  and permission.resource_id = ?
+                  and permission.user_id = ?
+                """, PROJECT_RESOURCE_PERMISSION_ROW_MAPPER, projectId, resourceType, resourceId, userId).stream().findFirst();
+    }
+
+    public void deleteProjectResourcePermission(Long permissionId) {
+        jdbcTemplate.update("delete from project_resource_permission where id = ?", permissionId);
+    }
+
     public long countProjectAdmins(Long projectId) {
         Long count = jdbcTemplate.queryForObject("""
                 select count(*)
@@ -1601,6 +2025,16 @@ public class ProjectRepository {
     }
 
     public record ProjectWebhookReference(Long id, Long projectId, String name) {
+    }
+
+    public record ProjectResourcePermissionReference(
+            Long id,
+            Long projectId,
+            String resourceType,
+            Long resourceId,
+            Long userId,
+            String permissionLevel
+    ) {
     }
 
     public record ProjectWebhookSecretRecord(

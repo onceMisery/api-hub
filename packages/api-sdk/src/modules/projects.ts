@@ -12,6 +12,7 @@ export type ProjectSummary = {
   currentUserRole: string | null;
   canWrite: boolean;
   canManageMembers: boolean;
+  canManageAiSettings: boolean;
 };
 
 export type ProjectDocPushSettings = {
@@ -42,6 +43,7 @@ export type ProjectDetail = {
   currentUserRole: string | null;
   canWrite: boolean;
   canManageMembers: boolean;
+  canManageAiSettings: boolean;
 };
 
 export type ProjectMemberDetail = {
@@ -51,6 +53,27 @@ export type ProjectMemberDetail = {
   email: string;
   roleCode: "project_admin" | "editor" | "tester" | "viewer";
   owner: boolean;
+};
+
+export type ProjectResourcePermissionDetail = {
+  id: number;
+  projectId: number;
+  resourceType: "project" | "group";
+  resourceId: number;
+  resourceName: string;
+  userId: number;
+  username: string;
+  displayName: string;
+  email: string;
+  permissionLevel: "preview" | "manage";
+  createdAt: string;
+};
+
+export type UpsertProjectResourcePermissionPayload = {
+  resourceType: "project" | "group";
+  resourceId: number | null;
+  username: string;
+  permissionLevel: "preview" | "manage";
 };
 
 export type SpaceSummary = {
@@ -399,6 +422,7 @@ export type ProjectAiSettingsDetail = {
   timeoutMs: number;
   enabled: boolean;
   apiKeyConfigured: boolean;
+  canManage: boolean;
   updatedAt: string | null;
 };
 
@@ -1418,6 +1442,37 @@ export function saveProjectMember(
 export function deleteProjectMember(projectId: number, memberUserId: number) {
   return apiFetch<null>(
     `/api/v1/projects/${projectId}/members/${memberUserId}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export function fetchProjectResourcePermissions(projectId: number) {
+  return apiFetch<ProjectResourcePermissionDetail[]>(
+    `/api/v1/projects/${projectId}/resource-permissions`,
+  );
+}
+
+export function saveProjectResourcePermission(
+  projectId: number,
+  payload: UpsertProjectResourcePermissionPayload,
+) {
+  return apiFetch<ProjectResourcePermissionDetail>(
+    `/api/v1/projects/${projectId}/resource-permissions`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function deleteProjectResourcePermission(
+  projectId: number,
+  permissionId: number,
+) {
+  return apiFetch<null>(
+    `/api/v1/projects/${projectId}/resource-permissions/${permissionId}`,
     {
       method: "DELETE",
     },

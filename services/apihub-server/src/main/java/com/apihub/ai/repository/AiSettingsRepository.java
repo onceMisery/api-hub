@@ -122,7 +122,7 @@ public class AiSettingsRepository {
         return findByProjectId(projectId).orElseThrow();
     }
 
-    public static ProjectAiSettingsDetail toDetail(ProjectAiSettingsRecord record) {
+    public static ProjectAiSettingsDetail toDetail(ProjectAiSettingsRecord record, boolean canManage) {
         return new ProjectAiSettingsDetail(
                 record.id(),
                 record.projectId(),
@@ -135,6 +135,7 @@ public class AiSettingsRepository {
                 record.timeoutMs(),
                 record.enabled(),
                 record.apiKey() != null && !record.apiKey().isBlank(),
+                canManage,
                 record.updatedAt());
     }
 

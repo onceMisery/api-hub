@@ -54,10 +54,11 @@ public final class ProjectDtos {
             List<DebugTargetRuleEntry> debugAllowedHosts,
             String currentUserRole,
             boolean canWrite,
-            boolean canManageMembers
+            boolean canManageMembers,
+            boolean canManageAiSettings
     ) {
         public ProjectDetail(Long id, String name, String projectKey, String description, List<DebugTargetRuleEntry> debugAllowedHosts) {
-            this(id, null, null, null, name, projectKey, description, debugAllowedHosts, null, false, false);
+            this(id, null, null, null, name, projectKey, description, debugAllowedHosts, null, false, false, false);
         }
 
         public ProjectDetail(
@@ -70,7 +71,7 @@ public final class ProjectDtos {
                 String description,
                 List<DebugTargetRuleEntry> debugAllowedHosts
         ) {
-            this(id, spaceId, spaceName, spaceKey, name, projectKey, description, debugAllowedHosts, null, false, false);
+            this(id, spaceId, spaceName, spaceKey, name, projectKey, description, debugAllowedHosts, null, false, false, false);
         }
     }
 
@@ -85,6 +86,29 @@ public final class ProjectDtos {
     }
 
     public record UpsertProjectMemberRequest(String username, String roleCode) {
+    }
+
+    public record ProjectResourcePermissionDetail(
+            Long id,
+            Long projectId,
+            String resourceType,
+            Long resourceId,
+            String resourceName,
+            Long userId,
+            String username,
+            String displayName,
+            String email,
+            String permissionLevel,
+            Instant createdAt
+    ) {
+    }
+
+    public record UpsertProjectResourcePermissionRequest(
+            String resourceType,
+            Long resourceId,
+            String username,
+            String permissionLevel
+    ) {
     }
 
     public record ProjectTreeResponse(List<ModuleTreeItem> modules) {
