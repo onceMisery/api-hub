@@ -4,12 +4,16 @@ import com.apihub.auth.model.AuthMeResponse;
 import com.apihub.auth.model.LoginRequest;
 import com.apihub.auth.model.LoginResponse;
 import com.apihub.auth.model.RefreshTokenRequest;
+import com.apihub.auth.model.UserSearchResult;
 import com.apihub.auth.repository.AuthUserRepository;
+import com.apihub.auth.repository.AuthUserRepository.UserSearchRecord;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 @Service
 public class AuthService {
@@ -61,5 +65,18 @@ public class AuthService {
 
     public void logout(Long userId) {
         authUserRepository.incrementTokenVersion(userId);
+    }
+
+    public List<UserSearchResult> searchActiveUsers(String query, Integer limit) {
+        int normalizedLimit = limit == null ? 20 : Math.max(1, Math.min(limit, 50));
+        String normalizedQuery = query == null ? "" : query.trim();
+        return authUserRepository.searchActiveUsers(normalizedQuery, normalizedLimit)
+                .stream()
+                .map(AuthService::toSearchResult)
+                .toList();
+    }
+
+    private static UserSearchResult toSearchResult(UserSearchRecord record) {
+        return new UserSearchResult(record.id(), record.username(), record.displayName(), record.email());
     }
 }
