@@ -272,19 +272,21 @@ public class ProjectRepository {
                                         select 1
                                         from project_resource_permission permission
                                         join api_group g on g.id = permission.resource_id
+                                        join module m on m.id = g.module_id
                                         where permission.user_id = ?
                                           and permission.resource_type = 'group'
                                           and permission.permission_level = 'manage'
-                                          and g.project_id = project.id
+                                          and m.project_id = project.id
                                     ) then 'resource_manage'
                                     when exists (
                                         select 1
                                         from project_resource_permission permission
                                         join api_group g on g.id = permission.resource_id
+                                        join module m on m.id = g.module_id
                                         where permission.user_id = ?
                                           and permission.resource_type = 'group'
                                           and permission.permission_level = 'preview'
-                                          and g.project_id = project.id
+                                          and m.project_id = project.id
                                     ) then 'resource_preview'
                                     else null
                                 end as current_user_role,
@@ -332,10 +334,11 @@ public class ProjectRepository {
                         select 1
                         from project_resource_permission permission
                         join api_group g on g.id = permission.resource_id
+                        join module m on m.id = g.module_id
                         where permission.user_id = ?
                           and permission.resource_type = 'group'
                           and permission.permission_level in ('preview', 'manage')
-                          and g.project_id = project.id
+                          and m.project_id = project.id
                      )
                 )
                 """);
@@ -392,10 +395,11 @@ public class ProjectRepository {
                             select 1
                             from project_resource_permission permission
                             join api_group g on g.id = permission.resource_id
+                            join module m on m.id = g.module_id
                             where permission.user_id = ?
                               and permission.resource_type = 'group'
                               and permission.permission_level in ('preview', 'manage')
-                              and g.project_id = project.id
+                              and m.project_id = project.id
                        )
                     group by project.space_id
                 ) projects
@@ -404,7 +408,7 @@ public class ProjectRepository {
                    or space_member.id is not null
                    or projects.project_count > 0
                 order by space.id
-                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, userId);
+                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, userId, userId);
     }
 
     public SpaceSummary createSpace(Long userId, CreateSpaceRequest request) {
@@ -466,19 +470,21 @@ public class ProjectRepository {
                                 select 1
                                 from project_resource_permission permission
                                 join api_group g on g.id = permission.resource_id
+                                join module m on m.id = g.module_id
                                 where permission.user_id = ?
                                   and permission.resource_type = 'group'
                                   and permission.permission_level = 'manage'
-                                  and g.project_id = project.id
+                                  and m.project_id = project.id
                            ) then 'resource_manage'
                            when exists (
                                 select 1
                                 from project_resource_permission permission
                                 join api_group g on g.id = permission.resource_id
+                                join module m on m.id = g.module_id
                                 where permission.user_id = ?
                                   and permission.resource_type = 'group'
                                   and permission.permission_level = 'preview'
-                                  and g.project_id = project.id
+                                  and m.project_id = project.id
                            ) then 'resource_preview'
                            else null
                        end as current_user_role,
@@ -527,10 +533,11 @@ public class ProjectRepository {
                         select 1
                         from project_resource_permission permission
                         join api_group g on g.id = permission.resource_id
+                        join module m on m.id = g.module_id
                         where permission.user_id = ?
                           and permission.resource_type = 'group'
                           and permission.permission_level in ('preview', 'manage')
-                          and g.project_id = project.id
+                          and m.project_id = project.id
                      )
                   )
                 """, PROJECT_ACCESS_ROW_MAPPER,
@@ -580,10 +587,11 @@ public class ProjectRepository {
                             select 1
                             from project_resource_permission permission
                             join api_group g on g.id = permission.resource_id
+                            join module m on m.id = g.module_id
                             where permission.user_id = ?
                               and permission.resource_type = 'group'
                               and permission.permission_level in ('preview', 'manage')
-                              and g.project_id = project.id
+                              and m.project_id = project.id
                        )
                     group by project.space_id
                 ) projects
@@ -852,7 +860,7 @@ public class ProjectRepository {
                  and permission.user_id = ?
                  and permission.permission_level in ('preview', 'manage')
                 where module.project_id = ?
-                order by module.sort_order, module.id
+                  order by module.sort_order, module.id
                 """, MODULE_ROW_MAPPER, userId, projectId);
     }
 
@@ -1000,9 +1008,11 @@ public class ProjectRepository {
                  and permission.resource_id = api_group.id
                  and permission.user_id = ?
                  and permission.permission_level in ('preview', 'manage')
+                join module on module.id = api_group.module_id
                 where api_group.module_id = ?
+                  and module.project_id = ?
                 order by api_group.sort_order, api_group.id
-                """, GROUP_ROW_MAPPER, userId, moduleId);
+                """, GROUP_ROW_MAPPER, userId, moduleId, moduleReference.projectId());
     }
 
     public Optional<GroupReference> findGroupReference(Long groupId) {
