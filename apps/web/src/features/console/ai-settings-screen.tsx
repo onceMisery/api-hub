@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   fetchProjectAiSettings,
   testProjectAiSettings,
   updateProjectAiSettings,
   type UpdateProjectAiSettingsPayload,
 } from "@api-hub/api-sdk";
-import { Bot, CheckCircle2, KeyRound, Sparkles, Workflow } from "lucide-react";
+import { Bot, CheckCircle2, KeyRound, Sparkles, Workflow, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export function AiSettingsScreen({ projectId }: Props) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +49,7 @@ export function AiSettingsScreen({ projectId }: Props) {
           return;
         }
         setDraft({
-          providerType: "openai_compatible",
+          providerType: response.data.providerType,
           baseUrl: response.data.baseUrl,
           apiKey: "",
           defaultModel: response.data.defaultModel,
@@ -59,6 +60,7 @@ export function AiSettingsScreen({ projectId }: Props) {
           enabled: response.data.enabled,
         });
         setApiKeyConfigured(response.data.apiKeyConfigured);
+        setCanManage(response.data.canManage);
       })
       .catch((loadError) => mounted && setError(loadError instanceof Error ? loadError.message : "AI 配置加载失败"))
       .finally(() => mounted && setLoading(false));
@@ -68,10 +70,16 @@ export function AiSettingsScreen({ projectId }: Props) {
   }, [projectId]);
 
   function updateDraft(patch: Partial<UpdateProjectAiSettingsPayload>) {
+    if (!canManage) {
+      return;
+    }
     setDraft((current) => ({ ...current, ...patch }));
   }
 
   async function handleSave() {
+    if (!canManage) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -88,6 +96,9 @@ export function AiSettingsScreen({ projectId }: Props) {
   }
 
   async function handleTest() {
+    if (!canManage) {
+      return;
+    }
     setTesting(true);
     setError(null);
     setMessage(null);
@@ -107,7 +118,16 @@ export function AiSettingsScreen({ projectId }: Props) {
         {error ? <Notice tone="error" text={error} /> : null}
         {message ? <Notice tone="success" text={message} /> : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+        {!canManage && !loading ? (
+          <Card className="rounded-[1.6rem] border-border/80 bg-card/84">
+            <CardContent className="flex items-center gap-3 p-4 text-sm text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              当前账号只有查看权限，AI 配置、密钥和连通性测试仅管理员可编辑。
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px]">
           <Card className="rounded-[2rem] border-border/80 bg-card/84">
             <CardContent className="space-y-6 p-6">
               <div className="flex items-start justify-between gap-4">
@@ -117,7 +137,7 @@ export function AiSettingsScreen({ projectId }: Props) {
                     <p className="text-lg font-semibold text-foreground">项目级 AI Provider</p>
                   </div>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-                    当前阶段统一按 OpenAI-compatible 协议接入。配置完成后，接口说明生成、智能 Mock 和多语言代码示例会共用这套模型设置。
+                    当前阶段统一接入 OpenAI-compatible 协议。配置完成后，接口说明生成、智能 Mock、代码示例和测试建议都会复用这套模型配置。
                   </p>
                 </div>
                 <Badge variant={draft.enabled ? "success" : "outline"}>{draft.enabled ? "已启用" : "未启用"}</Badge>
@@ -125,38 +145,78 @@ export function AiSettingsScreen({ projectId }: Props) {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Provider">
-                  <Select value={draft.providerType} onChange={(event) => updateDraft({ providerType: event.target.value as "openai_compatible" })}>
+                  <Select
+                    disabled={!canManage}
+                    value={draft.providerType}
+                    onChange={(event) => updateDraft({ providerType: event.target.value as "openai_compatible" })}
+                  >
                     <option value="openai_compatible">OpenAI Compatible</option>
                   </Select>
                 </Field>
                 <Field label="超时（ms）">
-                  <Input type="number" value={draft.timeoutMs} onChange={(event) => updateDraft({ timeoutMs: Number(event.target.value) || 30000 })} />
+                  <Input
+                    disabled={!canManage}
+                    type="number"
+                    value={draft.timeoutMs}
+                    onChange={(event) => updateDraft({ timeoutMs: Number(event.target.value) || 30000 })}
+                  />
                 </Field>
               </div>
 
               <Field label="Base URL">
-                <Input value={draft.baseUrl} onChange={(event) => updateDraft({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" />
+                <Input
+                  disabled={!canManage}
+                  value={draft.baseUrl}
+                  onChange={(event) => updateDraft({ baseUrl: event.target.value })}
+                  placeholder="https://api.openai.com/v1"
+                />
               </Field>
 
               <Field
                 label="API Key"
-                hint={apiKeyConfigured ? "已存在密钥。留空表示继续沿用当前密钥。" : "尚未配置密钥。启用 AI 前必须填写。"}
+                hint={apiKeyConfigured ? "密钥已配置。留空表示继续使用当前密钥。" : "尚未配置密钥。启用 AI 前必须填写。"}
               >
-                <Input type="password" value={draft.apiKey} onChange={(event) => updateDraft({ apiKey: event.target.value })} placeholder="sk-..." />
+                <Input
+                  disabled={!canManage}
+                  type="password"
+                  value={draft.apiKey}
+                  onChange={(event) => updateDraft({ apiKey: event.target.value })}
+                  placeholder={canManage ? "sk-..." : "仅管理员可查看"}
+                />
               </Field>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="默认模型">
-                  <Input value={draft.defaultModel} onChange={(event) => updateDraft({ defaultModel: event.target.value })} placeholder="gpt-4.1-mini" />
+                  <Input
+                    disabled={!canManage}
+                    value={draft.defaultModel}
+                    onChange={(event) => updateDraft({ defaultModel: event.target.value })}
+                    placeholder="gpt-4.1-mini"
+                  />
                 </Field>
                 <Field label="说明生成模型">
-                  <Input value={draft.descriptionModel ?? ""} onChange={(event) => updateDraft({ descriptionModel: event.target.value })} placeholder="留空则复用默认模型" />
+                  <Input
+                    disabled={!canManage}
+                    value={draft.descriptionModel ?? ""}
+                    onChange={(event) => updateDraft({ descriptionModel: event.target.value })}
+                    placeholder="留空则复用默认模型"
+                  />
                 </Field>
                 <Field label="Mock 生成模型">
-                  <Input value={draft.mockModel ?? ""} onChange={(event) => updateDraft({ mockModel: event.target.value })} placeholder="留空则复用默认模型" />
+                  <Input
+                    disabled={!canManage}
+                    value={draft.mockModel ?? ""}
+                    onChange={(event) => updateDraft({ mockModel: event.target.value })}
+                    placeholder="留空则复用默认模型"
+                  />
                 </Field>
                 <Field label="代码示例模型">
-                  <Input value={draft.codeModel ?? ""} onChange={(event) => updateDraft({ codeModel: event.target.value })} placeholder="留空则复用默认模型" />
+                  <Input
+                    disabled={!canManage}
+                    value={draft.codeModel ?? ""}
+                    onChange={(event) => updateDraft({ codeModel: event.target.value })}
+                    placeholder="留空则复用默认模型"
+                  />
                 </Field>
               </div>
 
@@ -164,6 +224,7 @@ export function AiSettingsScreen({ projectId }: Props) {
                 <input
                   checked={draft.enabled}
                   className="h-4 w-4 accent-[hsl(var(--primary))]"
+                  disabled={!canManage}
                   type="checkbox"
                   onChange={(event) => updateDraft({ enabled: event.target.checked })}
                 />
@@ -171,10 +232,10 @@ export function AiSettingsScreen({ projectId }: Props) {
               </label>
 
               <div className="flex flex-wrap gap-3">
-                <Button disabled={saving} onClick={() => void handleSave()}>
+                <Button disabled={!canManage || saving} onClick={() => void handleSave()}>
                   {saving ? "保存中..." : "保存 AI 配置"}
                 </Button>
-                <Button disabled={testing} variant="outline" onClick={() => void handleTest()}>
+                <Button disabled={!canManage || testing} variant="outline" onClick={() => void handleTest()}>
                   {testing ? "测试中..." : "测试连通性"}
                 </Button>
               </div>
@@ -185,17 +246,17 @@ export function AiSettingsScreen({ projectId }: Props) {
             <CapabilityCard
               icon={<Sparkles className="h-4 w-4 text-primary" />}
               title="接口说明生成"
-              text="在接口工作台里根据路径、参数和响应结构自动补全文档说明，并可直接回填到描述字段。"
+              text="在接口工作台里根据路径、参数和响应结构自动补全文档说明，并可以直接回填到描述字段。"
             />
             <CapabilityCard
               icon={<Workflow className="h-4 w-4 text-primary" />}
               title="智能 Mock"
-              text="在 Mock 工作台里根据响应结构直接生成一份高保真 JSON 数据，用于规则体填充。"
+              text="在 Mock 工作台里根据响应结构直接生成更接近真实业务的 JSON 数据，用于规则兜底和模板初始化。"
             />
             <CapabilityCard
               icon={<KeyRound className="h-4 w-4 text-primary" />}
               title="多语言代码示例"
-              text="自动输出 cURL、TypeScript、Python、Java 等语言片段，复用当前接口定义和默认环境 Base URL。"
+              text="自动输出 cURL、TypeScript、Python、Java 等语言片段，复用当前接口定义和默认环境配置。"
             />
           </div>
         </div>
@@ -210,7 +271,7 @@ export function AiSettingsScreen({ projectId }: Props) {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
@@ -222,7 +283,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function CapabilityCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+function CapabilityCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
     <Card className="rounded-[1.8rem] border-border/80 bg-card/84">
       <CardContent className="p-5">

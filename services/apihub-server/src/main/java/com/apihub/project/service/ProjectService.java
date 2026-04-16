@@ -723,7 +723,7 @@ public class ProjectService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource permission not found");
         }
         projectRepository.deleteProjectResourcePermission(permissionId);
-        recordAudit(projectId, userId, "project.permission.delete", "project_resource_permission", permissionId, reference.userId() + "", Map.of(
+        recordAudit(projectId, userId, "project.permission.delete", "project_resource_permission", permissionId, reference.username(), Map.of(
                 "resourceType", reference.resourceType(),
                 "resourceId", reference.resourceId(),
                 "permissionLevel", reference.permissionLevel()));
@@ -1114,7 +1114,7 @@ public class ProjectService {
     private ProjectRepository.GroupReference requireGroupReadAccess(Long userId, Long groupId) {
         ProjectRepository.GroupReference group = projectRepository.findGroupReference(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
-        if (!projectRepository.canAccessProject(userId, group.projectId())) {
+        if (!projectRepository.canAccessGroup(userId, groupId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found");
         }
         return group;
@@ -1131,7 +1131,9 @@ public class ProjectService {
     private EndpointDetail requireEndpointReadAccess(Long userId, Long endpointId) {
         EndpointRepository.EndpointReference endpointReference = endpointRepository.findEndpointReference(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
-        requireProjectReadAccess(userId, endpointReference.projectId());
+        if (!projectRepository.canAccessGroup(userId, endpointReference.groupId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found");
+        }
         return endpointRepository.findEndpoint(endpointId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Endpoint not found"));
     }

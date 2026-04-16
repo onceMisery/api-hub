@@ -1,12 +1,14 @@
 package com.apihub.project.service;
 
 import com.apihub.auth.repository.AuthUserRepository;
+import com.apihub.ai.service.AiRagService;
 import com.apihub.doc.model.DocDtos.CreateEndpointRequest;
 import com.apihub.doc.model.DocDtos.ParameterUpsertItem;
 import com.apihub.doc.model.DocDtos.ResponseUpsertItem;
 import com.apihub.doc.model.DocDtos.CreateVersionRequest;
 import com.apihub.doc.model.DocDtos.UpdateEndpointRequest;
 import com.apihub.doc.service.VersionComparisonService;
+import com.apihub.project.service.ProjectWebhookNotifier;
 import com.apihub.mock.model.MockDtos.MockBodyConditionEntry;
 import com.apihub.mock.model.MockDtos.MockConditionEntry;
 import com.apihub.mock.model.MockDtos.MockRuleUpsertItem;
@@ -46,6 +48,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -66,6 +69,12 @@ class ProjectServiceTest {
 
     @Autowired
     private ProjectService projectService;
+
+    @MockBean
+    private AiRagService aiRagService;
+
+    @MockBean
+    private ProjectWebhookNotifier projectWebhookNotifier;
 
     @Test
     void shouldListOnlyProjectsVisibleToCurrentUser() {

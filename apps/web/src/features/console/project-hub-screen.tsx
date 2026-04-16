@@ -67,6 +67,16 @@ function formatRoleLabel(role: string | null | undefined) {
   }
 }
 
+function formatVisibleRoleLabel(role: string | null | undefined) {
+  if (role === "resource_manage") {
+    return "资源管理";
+  }
+  if (role === "resource_preview") {
+    return "资源预览";
+  }
+  return formatRoleLabel(role);
+}
+
 function slugify(value: string) {
   return value
     .trim()
@@ -334,7 +344,7 @@ export function ProjectHubScreen() {
                       </div>
                       <div className="mt-6 flex items-center justify-between gap-3">
                         <div className="text-xs text-muted-foreground">
-                          {formatRoleLabel(space.currentUserRole)} · {space.canCreateProject ? "可创建项目" : "只读"}
+                          {formatVisibleRoleLabel(space.currentUserRole)} · {space.canCreateProject ? "可创建项目" : "只读"}
                         </div>
                         <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                           进入
@@ -421,7 +431,7 @@ export function ProjectHubScreen() {
                         <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                         返回分组
                       </Button>
-                      <Badge variant="outline">{formatRoleLabel(selectedSpace?.currentUserRole)}</Badge>
+                      <Badge variant="outline">{formatVisibleRoleLabel(selectedSpace?.currentUserRole)}</Badge>
                     </div>
                     <h2 className="text-2xl font-semibold text-foreground">{selectedSpace?.name ?? "当前分组"}</h2>
                     <p className="mt-2 text-sm leading-7 text-muted-foreground">
@@ -479,7 +489,7 @@ export function ProjectHubScreen() {
                         </p>
 
                         <div className="mt-5 grid grid-cols-2 gap-3">
-                          <InfoTile label="我的角色" value={formatRoleLabel(project.currentUserRole)} />
+                          <InfoTile label="我的角色" value={formatVisibleRoleLabel(project.currentUserRole)} />
                           <InfoTile
                             label="协作权限"
                             value={project.canManageMembers ? "成员管理" : "项目协作"}

@@ -17,6 +17,7 @@ import {
   MessageSquareMore,
   Search,
   Share2,
+  ShieldCheck,
   TestTube2,
   Waypoints,
   Workflow,
@@ -35,7 +36,7 @@ import { flattenProjectTree } from "@/features/console/tree-utils";
 import { clearTokens } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const baseNavItems = [
   { href: "search", icon: Search, label: "搜索" },
   { href: "api", icon: LayoutDashboard, label: "接口列表" },
   { href: "debug", icon: TestTube2, label: "调试台" },
@@ -48,6 +49,12 @@ const navItems = [
   { href: "dictionary", icon: BookMarked, label: "字典中心" },
   { href: "share", icon: Share2, label: "分享" },
   { href: "test-suites", icon: FlaskConical, label: "测试套件" },
+] as const;
+
+const navItems = [
+  ...baseNavItems.slice(0, 7),
+  { href: "permissions", icon: ShieldCheck, label: "权限" },
+  ...baseNavItems.slice(7),
 ] as const;
 
 type ProjectConsoleLayoutProps = {

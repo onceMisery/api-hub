@@ -341,7 +341,8 @@ public class ProjectRepository {
                 """);
         List<Object> params = new ArrayList<>(List.of(
                 userId, userId, userId, userId, userId,
-                userId, userId, userId, userId, userId, userId, userId, userId, userId, userId));
+                userId, userId, userId, userId, userId,
+                userId, userId, userId));
         if (spaceId != null) {
             sql.append(" and project.space_id = ? ");
             params.add(spaceId);
@@ -403,7 +404,7 @@ public class ProjectRepository {
                    or space_member.id is not null
                    or projects.project_count > 0
                 order by space.id
-                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId);
+                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, userId);
     }
 
     public SpaceSummary createSpace(Long userId, CreateSpaceRequest request) {
@@ -534,7 +535,8 @@ public class ProjectRepository {
                   )
                 """, PROJECT_ACCESS_ROW_MAPPER,
                 userId, userId, userId, userId, userId,
-                userId, userId, userId, userId, userId, projectId, userId, userId, userId, userId, userId).stream().findFirst();
+                userId, userId, userId, userId, userId,
+                projectId, userId, userId, userId).stream().findFirst();
     }
 
     public Optional<SpaceSummary> findSpaceSummary(Long userId, Long spaceId) {
@@ -592,7 +594,7 @@ public class ProjectRepository {
                      or space_member.id is not null
                      or projects.project_count > 0
                   )
-                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, spaceId, userId).stream().findFirst();
+                """, SPACE_ROW_MAPPER, userId, userId, userId, userId, userId, userId, userId, spaceId, userId).stream().findFirst();
     }
 
     public Optional<ProjectDetail> findProject(Long projectId) {
@@ -1745,20 +1747,24 @@ public class ProjectRepository {
 
     public Optional<ProjectResourcePermissionReference> findProjectResourcePermissionReference(Long permissionId) {
         return jdbcTemplate.query("""
-                select id,
-                       project_id,
-                       resource_type,
-                       resource_id,
-                       user_id,
-                       permission_level
-                from project_resource_permission
-                where id = ?
+                select permission.id,
+                       permission.project_id,
+                       permission.resource_type,
+                       permission.resource_id,
+                       permission.user_id,
+                       u.username,
+                       permission.permission_level
+                from project_resource_permission permission
+                join sys_user u
+                  on u.id = permission.user_id
+                where permission.id = ?
                 """, (rs, rowNum) -> new ProjectResourcePermissionReference(
                 rs.getLong("id"),
                 rs.getLong("project_id"),
                 rs.getString("resource_type"),
                 rs.getLong("resource_id"),
                 rs.getLong("user_id"),
+                rs.getString("username"),
                 rs.getString("permission_level")), permissionId).stream().findFirst();
     }
 
@@ -2033,6 +2039,7 @@ public class ProjectRepository {
             String resourceType,
             Long resourceId,
             Long userId,
+            String username,
             String permissionLevel
     ) {
     }

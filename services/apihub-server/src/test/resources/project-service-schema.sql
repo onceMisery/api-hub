@@ -47,6 +47,19 @@ CREATE TABLE project_member (
   member_status VARCHAR(16) NOT NULL DEFAULT 'active'
 );
 
+CREATE TABLE project_resource_permission (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  resource_type VARCHAR(16) NOT NULL,
+  resource_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  permission_level VARCHAR(16) NOT NULL,
+  created_by BIGINT NOT NULL,
+  updated_by BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE environment (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT NOT NULL,
