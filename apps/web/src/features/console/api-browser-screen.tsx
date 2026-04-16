@@ -18,6 +18,7 @@ import {
   type VersionDetail,
 } from "@api-hub/api-sdk";
 import {
+  Bot,
   Copy,
   Eye,
   GitBranch,
@@ -44,7 +45,7 @@ import { EndpointAiPanel } from "./endpoint-ai-panel";
 import { filterModules, findFirstEndpointId, flattenProjectTree } from "./tree-utils";
 
 type Props = { projectId: number };
-type ViewMode = "browse" | "edit";
+type WorkspaceTab = "preview" | "edit" | "ai";
 type EditTab = "basics" | "parameters" | "responses" | "versions";
 type EditableParameter = ParameterUpsertItem & { rowId: string };
 type EditableResponse = ResponseUpsertItem & { rowId: string };
@@ -117,7 +118,7 @@ export function ApiBrowserScreen({ projectId }: Props) {
   const [modules, setModules] = useState<ModuleTreeItem[]>([]);
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("browse");
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("preview");
   const [editTab, setEditTab] = useState<EditTab>("basics");
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -455,8 +456,24 @@ export function ApiBrowserScreen({ projectId }: Props) {
           <section className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.8rem] border border-border/80 bg-card/88 px-5 py-4 shadow-card">
               <div className="flex flex-wrap items-center gap-2">
-                <ToolbarToggle active={viewMode === "browse"} icon={<Eye className="mr-1.5 inline h-3.5 w-3.5" />} label="预览模式" onClick={() => setViewMode("browse")} />
-                <ToolbarToggle active={viewMode === "edit"} icon={<PencilLine className="mr-1.5 inline h-3.5 w-3.5" />} label="编辑模式" onClick={() => setViewMode("edit")} />
+                <ToolbarToggle
+                  active={workspaceTab === "preview"}
+                  icon={<Eye className="mr-1.5 inline h-3.5 w-3.5" />}
+                  label="接口预览"
+                  onClick={() => setWorkspaceTab("preview")}
+                />
+                <ToolbarToggle
+                  active={workspaceTab === "edit"}
+                  icon={<PencilLine className="mr-1.5 inline h-3.5 w-3.5" />}
+                  label="接口编辑"
+                  onClick={() => setWorkspaceTab("edit")}
+                />
+                <ToolbarToggle
+                  active={workspaceTab === "ai"}
+                  icon={<Bot className="mr-1.5 inline h-3.5 w-3.5" />}
+                  label="AI 功能"
+                  onClick={() => setWorkspaceTab("ai")}
+                />
               </div>
               {bundle ? (
                 <div className="flex flex-wrap gap-2">
@@ -522,20 +539,7 @@ export function ApiBrowserScreen({ projectId }: Props) {
                   </CardContent>
                 </Card>
 
-                <EndpointAiPanel
-                  endpointId={bundle.endpoint.id}
-                  draft={{
-                    name: basics.name,
-                    method: basics.method,
-                    path: basics.path,
-                    description: basics.description,
-                    parameters,
-                    responses,
-                  }}
-                  onApplyDescription={(content) => setBasics((current) => ({ ...current, description: content }))}
-                />
-
-                {viewMode === "browse" ? (
+                {workspaceTab === "preview" ? (
                   <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-5">
                       <PreviewCard count={`${bundle.parameters.length} 项`} title="接口输入预览">
@@ -609,7 +613,7 @@ export function ApiBrowserScreen({ projectId }: Props) {
                       </PreviewCard>
                     </div>
                   </div>
-                ) : (
+                ) : workspaceTab === "edit" ? (
                   <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
                     <PreviewCard title="编辑工作区">
                       <div className="mb-5 flex flex-wrap gap-2">
@@ -761,6 +765,50 @@ export function ApiBrowserScreen({ projectId }: Props) {
                       <Summary label="创建人" value={bundle.endpoint.createdByDisplayName || "未记录"} />
                       <Summary label="更新人" value={bundle.endpoint.updatedByDisplayName || "未记录"} />
                     </PreviewCard>
+                  </div>
+                ) : (
+                  <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="space-y-5">
+                      <EndpointAiPanel
+                        endpointId={bundle.endpoint.id}
+                        draft={{
+                          name: basics.name,
+                          method: basics.method,
+                          path: basics.path,
+                          description: basics.description,
+                          parameters,
+                          responses,
+                        }}
+                        onApplyDescription={(content) => setBasics((current) => ({ ...current, description: content }))}
+                      />
+                    </div>
+
+                    <div className="space-y-5">
+                      <PreviewCard title="编辑摘要">
+                        <Summary
+                          label="当前标签"
+                          value={
+                            editTab === "basics"
+                              ? "基础信息"
+                              : editTab === "parameters"
+                                ? "请求参数"
+                                : editTab === "responses"
+                                  ? "响应结构"
+                                  : "版本快照"
+                          }
+                        />
+                        <Summary label="创建人" value={bundle.endpoint.createdByDisplayName || "未记录"} />
+                        <Summary label="更新人" value={bundle.endpoint.updatedByDisplayName || "未记录"} />
+                      </PreviewCard>
+
+                      <PreviewCard title="当前草稿">
+                        <Summary label="接口名称" value={basics.name || "未填写"} />
+                        <Summary label="请求方法" value={basics.method} />
+                        <Summary label="接口路径" mono value={basics.path} />
+                        <Summary label="参数数量" value={`${parameters.length} 项`} />
+                        <Summary label="响应数量" value={`${responses.length} 项`} />
+                      </PreviewCard>
+                    </div>
                   </div>
                 )}
               </>

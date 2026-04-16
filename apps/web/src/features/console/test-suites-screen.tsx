@@ -781,7 +781,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
           </div>
         ) : null}
         {dashboard ? (
-          <Card className="overflow-hidden rounded-[2.2rem] border-border/80 bg-[radial-gradient(circle_at_top_left,rgba(202,138,4,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(28,25,23,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.9),rgba(250,250,249,0.78))] shadow-[0_32px_120px_rgba(28,25,23,0.14)]">
+          <Card className="overflow-hidden rounded-[2.2rem] border-border/80 bg-[radial-gradient(circle_at_top_left,hsla(var(--primary)/0.18),transparent_28%),radial-gradient(circle_at_bottom_right,hsla(var(--primary)/0.08),transparent_34%),linear-gradient(180deg,hsla(var(--card)/0.94),hsla(var(--card)/0.82))] shadow-[0_32px_120px_hsl(var(--primary)/0.14)]">
             <CardContent className="space-y-6 p-6">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
@@ -806,7 +806,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
                   const Icon = metric.icon;
                   return (
                     <div
-                      className="rounded-[1.6rem] border border-white/60 bg-white/70 p-4 backdrop-blur"
+                      className="rounded-[1.6rem] border border-border/80 bg-card/88 p-4 backdrop-blur"
                       key={metric.label}
                     >
                       <div className="flex items-center justify-between">
@@ -827,7 +827,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
-                <div className="rounded-[1.8rem] border border-white/60 bg-white/72 p-5 backdrop-blur">
+                <div className="rounded-[1.8rem] border border-border/80 bg-card/88 p-5 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -917,7 +917,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
                   </div>
                 </div>
 
-                <div className="rounded-[1.8rem] border border-white/60 bg-white/72 p-5 backdrop-blur">
+                <div className="rounded-[1.8rem] border border-border/80 bg-card/88 p-5 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -1337,7 +1337,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
                         </div>
 
                         <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                          <div className="rounded-[1.3rem] border border-white/60 bg-white/70 p-4">
+                        <div className="rounded-[1.3rem] border border-border/80 bg-card/90 p-4 shadow-[0_12px_32px_hsl(var(--primary)/0.08)]">
                             <label className="flex items-center gap-3 text-sm font-medium text-foreground">
                               <input
                                 checked={scheduleDraft.enabled}
@@ -1385,7 +1385,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
                           </div>
 
                           <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-[1.3rem] border border-border/70 bg-background/60 p-4">
+                            <div className="rounded-[1.3rem] border border-border/80 bg-card/80 p-4">
                               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">下次运行</p>
                               <p className="mt-3 text-base font-semibold text-foreground">
                                 {schedule?.enabled
@@ -1397,7 +1397,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
                               </p>
                             </div>
 
-                            <div className="rounded-[1.3rem] border border-border/70 bg-background/60 p-4">
+                            <div className="rounded-[1.3rem] border border-border/80 bg-card/80 p-4">
                               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                                 最近一次定时运行
                               </p>
@@ -1413,7 +1413,7 @@ export function TestSuitesScreen({ projectId }: TestSuitesScreenProps) {
                               </p>
                             </div>
 
-                            <div className="rounded-[1.3rem] border border-border/70 bg-background/60 p-4 sm:col-span-2">
+                            <div className="rounded-[1.3rem] border border-border/80 bg-card/80 p-4 sm:col-span-2">
                               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                                 约束说明
                               </p>
