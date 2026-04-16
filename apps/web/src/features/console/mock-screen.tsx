@@ -52,14 +52,15 @@ type MockScreenProps = {
 type EditableRule = MockRuleUpsertItem & { rowId: string };
 type RuleDraft = { query: string; header: string; body: string };
 type EndpointFilter = "all" | "mocked" | "dirty" | "published";
+type MockPanel = "rules" | "simulate" | "history" | "ai";
 
 const TEMPLATE_MODE_OPTIONS: Array<{ value: MockRuleUpsertItem["templateMode"]; label: string; hint: string }> = [
-  { value: "plain", label: "静态", hint: "原样返回 body 内容" },
-  { value: "mockjs", label: "动态模板", hint: "支持 @guid / @email / items|3 这类 Mock.js 风格语法" },
+  { value: "plain", label: "静态", hint: "原样返回 body" },
+  { value: "mockjs", label: "动态模板", hint: "支持 @guid / @email / items|3" },
 ];
 
 const ACCESS_MODE_OPTIONS: Array<{ value: MockAccessMode; label: string; hint: string }> = [
-  { value: "private", label: "私有", hint: "仅控制台可访问" },
+  { value: "private", label: "私有", hint: "仅控制台访问" },
   { value: "token", label: "令牌", hint: "需要访问令牌" },
   { value: "public", label: "公开", hint: "外部可直接访问" },
 ];
@@ -69,6 +70,13 @@ const ENDPOINT_FILTERS: Array<{ value: EndpointFilter; label: string }> = [
   { value: "mocked", label: "已启用" },
   { value: "dirty", label: "待发布" },
   { value: "published", label: "已发布" },
+];
+
+const PANEL_TABS: Array<{ value: MockPanel; label: string }> = [
+  { value: "rules", label: "规则编辑" },
+  { value: "simulate", label: "模拟器" },
+  { value: "history", label: "发布历史" },
+  { value: "ai", label: "AI Mock" },
 ];
 
 const QUERY_HINTS = ["登录", "订单", "userId", "mock", "status=ready", "v2.0.0-release"];
@@ -203,6 +211,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
   const [headerText, setHeaderText] = useState("");
   const [bodySample, setBodySample] = useState("{}");
   const [simulation, setSimulation] = useState<MockSimulationResult | null>(null);
+  const [activePanel, setActivePanel] = useState<MockPanel>("rules");
   const deferredQuery = useDeferredValue(query);
 
   const runtimeUrl = typeof window === "undefined" ? `/mock/${projectId}` : `${window.location.origin}/mock/${projectId}`;
@@ -259,6 +268,11 @@ export function MockScreen({ projectId }: MockScreenProps) {
   }, [projectId]);
 
   useEffect(() => {
+    setActivePanel("rules");
+    setSimulation(null);
+  }, [selectedEndpointId]);
+
+  useEffect(() => {
     if (!selectedEndpointId) {
       setRules([]);
       setResponses([]);
@@ -311,22 +325,10 @@ export function MockScreen({ projectId }: MockScreenProps) {
       return [];
     }
     return [
-      {
-        label: "接口总数",
-        value: center?.items.length ?? 0,
-      },
-      {
-        label: "当前接口规则",
-        value: selectedItem.totalRuleCount,
-      },
-      {
-        label: "已启用规则",
-        value: selectedItem.enabledRuleCount,
-      },
-      {
-        label: "响应字段",
-        value: selectedItem.responseFieldCount,
-      },
+      { label: "接口总数", value: center?.items.length ?? 0 },
+      { label: "当前接口规则", value: selectedItem.totalRuleCount },
+      { label: "已启用规则", value: selectedItem.enabledRuleCount },
+      { label: "响应字段", value: selectedItem.responseFieldCount },
     ];
   }, [center?.items.length, selectedItem]);
 
@@ -477,7 +479,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
           </div>
         )}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_360px]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
           <Card className="overflow-hidden rounded-[2rem] border-border/80 bg-card/85">
             <CardContent className="space-y-5 p-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -503,9 +505,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_340px]">
                 <div className="space-y-3 rounded-[1.6rem] border border-border bg-background/55 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">运行地址</p>
-                  <code className="block break-all rounded-[1.2rem] border border-border bg-surface/75 px-4 py-3 font-mono text-sm text-foreground">
-                    {runtimeUrl}
-                  </code>
+                  <code className="block break-all rounded-[1.2rem] border border-border bg-surface/75 px-4 py-3 font-mono text-sm text-foreground">{runtimeUrl}</code>
                   <div className="flex flex-wrap gap-2">
                     <Button onClick={() => copyText(runtimeUrl)} size="sm" variant="outline">
                       <Copy className="mr-1.5 h-3.5 w-3.5" />
@@ -569,7 +569,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <Card className="rounded-[2rem] border-border/80 bg-card/85">
             <CardContent className="p-0">
               <div className="border-b border-border px-5 py-5">
@@ -643,7 +643,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             {selectedItem ? (
               <>
                 <Card className="rounded-[2rem] border-border/80 bg-card/85">
@@ -682,118 +682,136 @@ export function MockScreen({ projectId }: MockScreenProps) {
 
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       {metrics.map((item) => (
-                        <MetricCard key={item.label} label={item.label} value={typeof item.value === "number" ? item.value : item.value} subLabel={typeof item.value === "number" ? "条" : undefined} />
+                        <MetricCard key={item.label} label={item.label} value={item.value} subLabel={typeof item.value === "number" ? "条" : undefined} />
                       ))}
                     </div>
                   </CardContent>
                 </Card>
 
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                  <div className="space-y-6">
-                    <Card className="rounded-[2rem] border-border/80 bg-card/85">
-                      <CardContent className="space-y-4 p-6">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <Waypoints className="h-4 w-4 text-primary" />
-                            <h3 className="text-lg font-semibold text-foreground">规则编辑器</h3>
-                          </div>
-                          <Button onClick={addRule} size="sm" variant="outline">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            新增规则
-                          </Button>
+                <div className="flex flex-wrap gap-2 rounded-[1.4rem] border border-border bg-card/80 p-2">
+                  {PANEL_TABS.map((tab) => (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setActivePanel(tab.value)}
+                      className={[
+                        "rounded-full px-4 py-2 text-sm font-medium transition-fast",
+                        activePanel === tab.value ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {activePanel === "rules" ? (
+                  <Card className="rounded-[2rem] border-border/80 bg-card/85">
+                    <CardContent className="space-y-4 p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Waypoints className="h-4 w-4 text-primary" />
+                          <h3 className="text-lg font-semibold text-foreground">规则编辑器</h3>
                         </div>
+                        <Button onClick={addRule} size="sm" variant="outline">
+                          <Plus className="mr-1.5 h-3.5 w-3.5" />
+                          新增规则
+                        </Button>
+                      </div>
 
-                        {loadingEditor ? <div className="rounded-[1.4rem] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">正在加载规则、响应和发布历史...</div> : null}
+                      {loadingEditor ? <div className="rounded-[1.4rem] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">正在加载规则、响应和发布历史...</div> : null}
 
-                        {!loadingEditor && rules.length === 0 ? (
-                          <div className="rounded-[1.4rem] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">这个接口还没有规则，先创建第一条规则吧。</div>
-                        ) : null}
+                      {!loadingEditor && rules.length === 0 ? (
+                        <div className="rounded-[1.4rem] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">这个接口还没有规则，先创建第一条规则吧。</div>
+                      ) : null}
 
-                        <div className="space-y-4">
-                          {rules.map((rule) => (
-                            <div className="rounded-[1.5rem] border border-border bg-surface/65 p-4" key={rule.rowId}>
-                              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_110px_120px_44px]">
-                                <Input
-                                  onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, ruleName: event.target.value } : item)))}
-                                  placeholder="规则名称"
-                                  value={rule.ruleName}
+                      <div className="space-y-4">
+                        {rules.map((rule) => (
+                          <div className="rounded-[1.5rem] border border-border bg-surface/65 p-4" key={rule.rowId}>
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_110px_120px_44px]">
+                              <Input
+                                onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, ruleName: event.target.value } : item)))}
+                                placeholder="规则名称"
+                                value={rule.ruleName}
+                              />
+                              <Input
+                                onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, priority: Number(event.target.value) || 0 } : item)))}
+                                type="number"
+                                value={rule.priority}
+                              />
+                              <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3">
+                                <input
+                                  checked={rule.enabled}
+                                  className="h-4 w-4 accent-primary"
+                                  onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, enabled: event.target.checked } : item)))}
+                                  type="checkbox"
                                 />
-                                <Input
-                                  onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, priority: Number(event.target.value) || 0 } : item)))}
-                                  type="number"
-                                  value={rule.priority}
-                                />
-                                <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3">
-                                  <input
-                                    checked={rule.enabled}
-                                    className="h-4 w-4 accent-primary"
-                                    onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, enabled: event.target.checked } : item)))}
-                                    type="checkbox"
-                                  />
-                                  <span className="text-xs text-muted-foreground">启用</span>
-                                </div>
-                                <Button onClick={() => removeRule(rule.rowId)} size="icon-sm" variant="ghost">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <span className="text-xs text-muted-foreground">启用</span>
                               </div>
+                              <Button onClick={() => removeRule(rule.rowId)} size="icon-sm" variant="ghost">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
 
-                              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                <RuleField title="Query 条件" placeholder="status=ready" value={drafts[rule.rowId]?.query ?? ""} onChange={(value) => setDrafts((current) => ({ ...current, [rule.rowId]: { query: value, header: current[rule.rowId]?.header ?? "", body: current[rule.rowId]?.body ?? "" } }))} />
-                                <RuleField title="Header 条件" placeholder="x-env=qa" value={drafts[rule.rowId]?.header ?? ""} onChange={(value) => setDrafts((current) => ({ ...current, [rule.rowId]: { query: current[rule.rowId]?.query ?? "", header: value, body: current[rule.rowId]?.body ?? "" } }))} />
-                                <RuleField title="Body 条件" placeholder="$.status=ready" value={drafts[rule.rowId]?.body ?? ""} onChange={(value) => setDrafts((current) => ({ ...current, [rule.rowId]: { query: current[rule.rowId]?.query ?? "", header: current[rule.rowId]?.header ?? "", body: value } }))} />
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <RuleField title="Query 条件" placeholder="status=ready" value={drafts[rule.rowId]?.query ?? ""} onChange={(value) => setDrafts((current) => ({ ...current, [rule.rowId]: { query: value, header: current[rule.rowId]?.header ?? "", body: current[rule.rowId]?.body ?? "" } }))} />
+                              <RuleField title="Header 条件" placeholder="x-env=qa" value={drafts[rule.rowId]?.header ?? ""} onChange={(value) => setDrafts((current) => ({ ...current, [rule.rowId]: { query: current[rule.rowId]?.query ?? "", header: value, body: current[rule.rowId]?.body ?? "" } }))} />
+                              <RuleField title="Body 条件" placeholder="$.status=ready" value={drafts[rule.rowId]?.body ?? ""} onChange={(value) => setDrafts((current) => ({ ...current, [rule.rowId]: { query: current[rule.rowId]?.query ?? "", header: current[rule.rowId]?.header ?? "", body: value } }))} />
 
-                                <div className="space-y-3">
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <Input
-                                      onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, statusCode: Number(event.target.value) || 200 } : item)))}
-                                      type="number"
-                                      value={rule.statusCode}
-                                    />
-                                    <Input
-                                      onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, mediaType: event.target.value } : item)))}
-                                      placeholder="application/json"
-                                      value={rule.mediaType}
-                                    />
-                                  </div>
-                                  <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                                    <Input
-                                      min={0}
-                                      onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, delayMs: Number(event.target.value) || 0 } : item)))}
-                                      placeholder="Delay ms"
-                                      type="number"
-                                      value={rule.delayMs}
-                                    />
-                                    <select
-                                      className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-0 transition-fast focus:border-primary/35"
-                                      onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, templateMode: event.target.value as MockRuleUpsertItem["templateMode"] } : item)))}
-                                      value={rule.templateMode}
-                                    >
-                                      {TEMPLATE_MODE_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <Textarea
-                                    className="min-h-[124px] font-mono text-xs"
-                                    onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, body: event.target.value } : item)))}
-                                    placeholder='{"ok": true}'
-                                    value={rule.body}
+                              <div className="space-y-3">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <Input
+                                    onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, statusCode: Number(event.target.value) || 200 } : item)))}
+                                    type="number"
+                                    value={rule.statusCode}
                                   />
-                                  <div className="rounded-[1rem] border border-border/70 bg-surface/55 px-3 py-3 text-[11px] leading-6 text-muted-foreground">
-                                    {rule.templateMode === "mockjs"
-                                      ? "动态模板示例：@guid、@email、@integer(1,10)、{\"items|3\":[{\"id\":\"@guid\"}]}"
-                                      : "静态模式下 body 会原样返回。Delay ms 会在运行态和模拟器中同时生效。"}
-                                  </div>
+                                  <Input
+                                    onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, mediaType: event.target.value } : item)))}
+                                    placeholder="application/json"
+                                    value={rule.mediaType}
+                                  />
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                                  <Input
+                                    min={0}
+                                    onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, delayMs: Number(event.target.value) || 0 } : item)))}
+                                    placeholder="Delay ms"
+                                    type="number"
+                                    value={rule.delayMs}
+                                  />
+                                  <select
+                                    className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none ring-0 transition-fast focus:border-primary/35"
+                                    onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, templateMode: event.target.value as MockRuleUpsertItem["templateMode"] } : item)))}
+                                    value={rule.templateMode}
+                                  >
+                                    {TEMPLATE_MODE_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <Textarea
+                                  className="min-h-[124px] font-mono text-xs"
+                                  onChange={(event) => setRules((current) => current.map((item) => (item.rowId === rule.rowId ? { ...item, body: event.target.value } : item)))}
+                                  placeholder='{"ok": true}'
+                                  value={rule.body}
+                                />
+                                <div className="rounded-[1rem] border border-border/70 bg-surface/55 px-3 py-3 text-[11px] leading-6 text-muted-foreground">
+                                  {rule.templateMode === "mockjs"
+                                    ? "动态模板示例：@guid、@email、@integer(1,10)、{\"items|3\":[{\"id\":\"@guid\"}]}"
+                                    : "静态模式下 body 会原样返回。Delay ms 会在运行态和模拟器中同时生效。"}
                                 </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
+                {activePanel === "simulate" ? (
+                  <div className="space-y-6">
                     <Card className="rounded-[2rem] border-border/80 bg-card/85">
                       <CardContent className="space-y-4 p-6">
                         <div className="flex items-center gap-2">
@@ -801,9 +819,9 @@ export function MockScreen({ projectId }: MockScreenProps) {
                           <h3 className="text-lg font-semibold text-foreground">模拟器</h3>
                         </div>
                         <div className="grid gap-3 md:grid-cols-3">
-                          <Textarea className="min-h-[86px] font-mono text-xs" onChange={(event) => setQueryText(event.target.value)} placeholder="query: status=ready" value={queryText} />
-                          <Textarea className="min-h-[86px] font-mono text-xs" onChange={(event) => setHeaderText(event.target.value)} placeholder="header: x-env=qa" value={headerText} />
-                          <Textarea className="min-h-[86px] font-mono text-xs md:min-h-[120px]" onChange={(event) => setBodySample(event.target.value)} placeholder='{"status":"ready"}' value={bodySample} />
+                          <Textarea className="min-h-[110px] font-mono text-xs" onChange={(event) => setQueryText(event.target.value)} placeholder="query: status=ready" value={queryText} />
+                          <Textarea className="min-h-[110px] font-mono text-xs" onChange={(event) => setHeaderText(event.target.value)} placeholder="header: x-env=qa" value={headerText} />
+                          <Textarea className="min-h-[110px] font-mono text-xs md:min-h-[140px]" onChange={(event) => setBodySample(event.target.value)} placeholder='{"status":"ready"}' value={bodySample} />
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <Button disabled={simulating} onClick={() => void handleSimulation()}>
@@ -833,7 +851,7 @@ export function MockScreen({ projectId }: MockScreenProps) {
 
                             <div className="rounded-[1.3rem] border border-border bg-background/70 p-4">
                               <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Response Body</p>
-                              <pre className="scrollbar-thin max-h-[260px] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-6 text-foreground">{simulation.body}</pre>
+                              <pre className="scrollbar-thin max-h-[320px] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-6 text-foreground">{simulation.body}</pre>
                             </div>
 
                             <div className="space-y-2">
@@ -857,19 +875,10 @@ export function MockScreen({ projectId }: MockScreenProps) {
                       </CardContent>
                     </Card>
                   </div>
+                ) : null}
 
-                  <div className="space-y-6">
-                    <MockAiGeneratorCard
-                      endpointId={selectedItem.endpointId}
-                      endpoint={{
-                        name: selectedItem.endpointName,
-                        method: selectedItem.method,
-                        path: selectedItem.path,
-                      }}
-                      responses={responses}
-                      onApplyGenerated={applyAiMock}
-                    />
-
+                {activePanel === "history" ? (
+                  <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
                     <Card className="rounded-[2rem] border-border/80 bg-card/85">
                       <CardContent className="space-y-4 p-6">
                         <div className="flex items-center gap-2">
@@ -918,7 +927,20 @@ export function MockScreen({ projectId }: MockScreenProps) {
                       </CardContent>
                     </Card>
                   </div>
-                </div>
+                ) : null}
+
+                {activePanel === "ai" ? (
+                  <MockAiGeneratorCard
+                    endpointId={selectedItem.endpointId}
+                    endpoint={{
+                      name: selectedItem.endpointName,
+                      method: selectedItem.method,
+                      path: selectedItem.path,
+                    }}
+                    responses={responses}
+                    onApplyGenerated={applyAiMock}
+                  />
+                ) : null}
               </>
             ) : (
               <Card className="rounded-[2rem] border-border/80 bg-card/85">
