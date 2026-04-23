@@ -192,8 +192,3 @@ pnpm --filter web test
 pnpm --filter web build
 ```
 
-## 说明
-
-- 当前仓库已经从早期 Gradle 方案迁移到 Maven
-- 数据库初始化已经收敛到 Flyway migration，不再依赖 `docker-entrypoint-initdb.d`
-- `README.md` 以仓库导航、能力概览和启动说明为主，不再内嵌 SQL/DDL 大段脚本
