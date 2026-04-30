@@ -5,13 +5,17 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlywayMigrationLayoutTest {
 
@@ -19,48 +23,34 @@ class FlywayMigrationLayoutTest {
     private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
 
     @Test
-    void shouldProvideBaselineMigrationWithoutDatabaseDirectives() throws Exception {
+    void shouldProvideSingleBaselineMigration() throws Exception {
+        List<String> migrations = listMigrationFileNames();
+
+        assertTrue(
+                migrations.size() == 1 && migrations.contains("V1__baseline.sql"),
+                () -> "expected only V1__baseline.sql, found: " + migrations
+        );
+    }
+
+    @Test
+    void shouldProvideCompleteBaselineMigrationWithoutDatabaseDirectives() throws Exception {
         String migration = readClasspathResource("db/migration/V1__baseline.sql");
+        String normalizedMigration = migration.toUpperCase();
 
-        assertFalse(migration.contains("CREATE DATABASE"), "baseline migration must not create databases");
-        assertFalse(migration.contains("USE apihub"), "baseline migration must not switch databases");
-    }
-
-    @Test
-    void shouldProvideSeedMigrationWithoutDatabaseDirectives() throws Exception {
-        String migration = readClasspathResource("db/migration/V2__phase1_seed.sql");
-
-        assertFalse(migration.contains("CREATE DATABASE"), "seed migration must not create databases");
-        assertFalse(migration.contains("USE apihub"), "seed migration must not switch databases");
-    }
-
-    @Test
-    void shouldProvideSeedNormalizationMigrationWithoutDatabaseDirectives() throws Exception {
-        String migration = readClasspathResource("db/migration/V4__normalize_seed_accounts.sql");
-
-        assertFalse(migration.contains("CREATE DATABASE"), "seed normalization migration must not create databases");
-        assertFalse(migration.contains("USE apihub"), "seed normalization migration must not switch databases");
-    }
-
-    @Test
-    void shouldProvideSeedPasswordRepairMigrationWithoutDatabaseDirectives() throws Exception {
-        String migration = readClasspathResource("db/migration/V5__repair_seed_password_hashes.sql");
-
-        assertFalse(migration.contains("CREATE DATABASE"), "seed password repair migration must not create databases");
-        assertFalse(migration.contains("USE apihub"), "seed password repair migration must not switch databases");
-    }
-
-    @Test
-    void shouldProvideProjectShareAndMockAccessMigrationWithoutDatabaseDirectives() throws Exception {
-        String migration = readClasspathResource("db/migration/V6__project_share_and_mock_access.sql");
-
-        assertFalse(migration.contains("CREATE DATABASE"), "project share migration must not create databases");
-        assertFalse(migration.contains("USE apihub"), "project share migration must not switch databases");
+        assertFalse(normalizedMigration.contains("CREATE DATABASE"), "baseline migration must not create databases");
+        assertFalse(normalizedMigration.contains("USE APIHUB"), "baseline migration must not switch databases");
+        assertTrue(normalizedMigration.contains("RELEASED_VERSION_ID BIGINT NULL"), "baseline must include endpoint release columns");
+        assertTrue(normalizedMigration.contains("MOCK_ACCESS_MODE VARCHAR(16) NOT NULL DEFAULT 'PRIVATE'"), "baseline must include mock access columns");
+        assertTrue(normalizedMigration.contains("DOC_PUSH_ENABLED TINYINT(1) NOT NULL DEFAULT 1"), "baseline must include doc push columns");
+        assertTrue(normalizedMigration.contains("EXTRACTORS_JSON JSON NOT NULL"), "baseline must include test step extractors");
+        assertTrue(normalizedMigration.contains("PRE_SCRIPT LONGTEXT NULL"), "baseline must include test step scripts");
+        assertTrue(normalizedMigration.contains("DELAY_MS INT NOT NULL DEFAULT 0"), "baseline must include mock rule delay");
+        assertTrue(normalizedMigration.contains("CREATE TABLE PROJECT_RESOURCE_PERMISSION"), "baseline must include latest resource permissions table");
     }
 
     @Test
     void shouldUseSeedPasswordHashesThatMatchDefaultPassword() throws Exception {
-        assertMigrationUsesDefaultSeedPassword("db/migration/V5__repair_seed_password_hashes.sql");
+        assertMigrationUsesDefaultSeedPassword("db/migration/V1__baseline.sql");
     }
 
     private void assertMigrationUsesDefaultSeedPassword(String path) throws IOException {
@@ -83,6 +73,18 @@ class FlywayMigrationLayoutTest {
         try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {
             assertNotNull(inputStream, () -> "missing classpath resource: " + path);
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private List<String> listMigrationFileNames() throws IOException, URISyntaxException {
+        var resource = Thread.currentThread().getContextClassLoader().getResource("db/migration");
+        assertNotNull(resource, "missing classpath migration directory");
+        try (var stream = Files.list(Path.of(resource.toURI()))) {
+            return stream
+                    .filter(path -> path.getFileName().toString().endsWith(".sql"))
+                    .map(path -> path.getFileName().toString())
+                    .sorted()
+                    .toList();
         }
     }
 }
